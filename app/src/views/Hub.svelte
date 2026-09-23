@@ -11,7 +11,7 @@
   import { S, guardarProyecto, avisar } from '../lib/store.svelte.js'
   import { estadoDeCitas, autorCorto, anio, coincide, TIPOS_PROYECTO, ESTADOS_USO } from '../lib/citas.js'
   import { F, envolver, ancho } from '../lib/texto.js'
-  import { NODO_W, alturaNodo, radial, porTema, limitesDe } from '../lib/grafo.js'
+  import { NODO_W, alturaNodo, radial, porTema, limitesDe, rutaConexion } from '../lib/grafo.js'
   import { descargarBib } from '../lib/io.svelte.js'
 
   let { p, fid = null, abrirDatos, atras } = $props()
@@ -262,16 +262,20 @@
       {@const a = centroDe(con.desde)}
       {@const b = centroDe(con.hasta)}
       {#if a && b}
-        <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} class="conexion" />
+        <!-- Si la recta pasaría por debajo del título, se curva alrededor de la tarjeta central. -->
+        {@const ruta = con.desde === 'hub' || con.hasta === 'hub'
+          ? { d: `M${a.x} ${a.y}L${b.x} ${b.y}`, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+          : rutaConexion(a, b, { x: -HUB_W / 2, y: -hubH / 2, w: HUB_W, h: hubH + 6 })}
+        <path d={ruta.d} class="conexion" />
         {#if con.etiqueta}
           {@const w = (S.tipografias, ancho(con.etiqueta, F.mini)) + 16}
-          <g class="etq" transform="translate({(a.x + b.x) / 2 - w / 2} {(a.y + b.y) / 2 - 9})" role="button" tabindex="0" aria-label="Conexión: {con.etiqueta}"
+          <g class="etq" transform="translate({ruta.x - w / 2} {ruta.y - 9})" role="button" tabindex="0" aria-label="Conexión: {con.etiqueta}"
             onpointerdown={e => e.stopPropagation()} onclick={() => editarConexion(con)} onkeydown={e => e.key === 'Enter' && editarConexion(con)}>
             <rect width={w} height="18" rx="9" />
             <text x={w / 2} y="12.5" text-anchor="middle">{con.etiqueta}</text>
           </g>
         {:else}
-          <circle cx={(a.x + b.x) / 2} cy={(a.y + b.y) / 2} r="6" class="etq-punto" role="button" tabindex="0" aria-label="Editar conexión"
+          <circle cx={ruta.x} cy={ruta.y} r="6" class="etq-punto" role="button" tabindex="0" aria-label="Editar conexión"
             onpointerdown={e => e.stopPropagation()} onclick={() => editarConexion(con)} onkeydown={e => e.key === 'Enter' && editarConexion(con)} />
         {/if}
       {/if}
@@ -436,7 +440,7 @@
   .vacio-hub .fila { justify-content: center; margin-top: 12px; }
 
   .arista { stroke: var(--ink-soft); stroke-opacity: .3; stroke-width: 1; }
-  .conexion { stroke: var(--accent); stroke-opacity: .55; stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .conexion { fill: none; stroke: var(--accent); stroke-opacity: .55; stroke-width: 1.5; stroke-dasharray: 5 4; }
   .etq { cursor: pointer; }
   .etq rect { fill: var(--paper); stroke: var(--accent); }
   .etq text { font: 400 10px var(--sans); fill: var(--accent); }

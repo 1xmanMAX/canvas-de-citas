@@ -83,6 +83,67 @@ export function enFilas(items, claveGrupo, anchoMax = 1500) {
   return { pos, grupos }
 }
 
+/** ¿El segmento a→b toca el rectángulo r ({x, y, w, h})? (Liang–Barsky) */
+function cruza(a, b, r) {
+  const dx = b.x - a.x, dy = b.y - a.y
+  let t0 = 0, t1 = 1
+  for (const [p, q] of [[-dx, a.x - r.x], [dx, r.x + r.w - a.x], [-dy, a.y - r.y], [dy, r.y + r.h - a.y]]) {
+    if (p === 0) { if (q < 0) return false; continue }
+    const t = q / p
+    if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t }
+    else { if (t < t0) return false; if (t < t1) t1 = t }
+  }
+  return true
+}
+
+const dentro = (p, r) => p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.h
+const bezier = (p0, p1, p2, p3, t) => {
+  const u = 1 - t
+  return {
+    x: u * u * u * p0.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t * t * t * p3.x,
+    y: u * u * u * p0.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * p3.y
+  }
+}
+
+/**
+ * Trazo de una conexión manual que nunca pasa por debajo del obstáculo (la tarjeta del título).
+ * Si la recta lo cruza, se curva por el lado opuesto al centro del obstáculo.
+ * Devuelve { d: atributo de <path>, x, y: punto medio para la etiqueta }.
+ */
+export function rutaConexion(a, b, obstaculo, margen = 28) {
+  const r = { x: obstaculo.x - margen, y: obstaculo.y - margen, w: obstaculo.w + 2 * margen, h: obstaculo.h + 2 * margen }
+  if (!cruza(a, b, r)) return { d: `M${a.x} ${a.y}L${b.x} ${b.y}`, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+
+  const c = { x: obstaculo.x + obstaculo.w / 2, y: obstaculo.y + obstaculo.h / 2 }
+  const dx = b.x - a.x, dy = b.y - a.y
+  const largo = Math.hypot(dx, dy) || 1
+  // Normal hacia el lado donde NO está el centro del obstáculo.
+  let n = { x: -dy / largo, y: dx / largo }
+  const lado = (c.x - a.x) * n.x + (c.y - a.y) * n.y
+  if (lado > 0 || (lado === 0 && n.y < 0)) n = { x: -n.x, y: -n.y }
+
+  const tp = Math.min(0.8, Math.max(0.2, ((c.x - a.x) * dx + (c.y - a.y) * dy) / (largo * largo)))
+  const base = { x: a.x + dx * tp, y: a.y + dy * tp }
+  const soporte = Math.abs(n.x) * r.w / 2 + Math.abs(n.y) * r.h / 2
+  let k = soporte - ((base.x - c.x) * n.x + (base.y - c.y) * n.y)
+
+  const interior = { x: obstaculo.x - 6, y: obstaculo.y - 6, w: obstaculo.w + 12, h: obstaculo.h + 12 }
+  let ruta
+  for (let intento = 0; intento < 6; intento++) {
+    const w = { x: base.x + n.x * k, y: base.y + n.y * k }
+    // Catmull-Rom a→w→b convertido a dos cúbicas (tangente en w paralela a a→b).
+    const t = { x: dx / 6, y: dy / 6 }
+    const s1 = [a, { x: a.x + (w.x - a.x) / 3, y: a.y + (w.y - a.y) / 3 }, { x: w.x - t.x, y: w.y - t.y }, w]
+    const s2 = [w, { x: w.x + t.x, y: w.y + t.y }, { x: b.x - (b.x - w.x) / 3, y: b.y - (b.y - w.y) / 3 }, b]
+    ruta = { d: `M${a.x} ${a.y}C${s1[1].x} ${s1[1].y} ${s1[2].x} ${s1[2].y} ${w.x} ${w.y}C${s2[1].x} ${s2[1].y} ${s2[2].x} ${s2[2].y} ${b.x} ${b.y}`, x: w.x, y: w.y }
+    let choca = false
+    for (let i = 1; i < 16 && !choca; i++) choca = dentro(bezier(...s1, i / 16), interior) || dentro(bezier(...s2, i / 16), interior)
+    if (!choca) break
+    k *= 1.3
+  }
+  return ruta
+}
+
 export function limitesDe(cajas, margen = 30) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
   for (const c of cajas) {
