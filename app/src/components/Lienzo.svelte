@@ -25,6 +25,12 @@
   /** Punto del mundo que está en el centro de la vista. */
   export const centro = () => ({ x: (W / 2 - tx) / k, y: (H / 2 - ty) / k })
 
+  /** Convierte un punto de la pantalla (clientX/Y) a coordenadas del mundo. */
+  export function aMundo(cx, cy) {
+    const r = svg.getBoundingClientRect()
+    return { x: (cx - r.left - tx) / k, y: (cy - r.top - ty) / k }
+  }
+
   $effect(() => {
     if (!ajustado && W && H && limites) { ajustado = true; encuadrar() }
   })
@@ -36,15 +42,37 @@
     k = nk
   }
 
+  // Trackpad: deslizar con dos dedos desplaza; pellizcar hace zoom (el navegador lo envía
+  // como rueda con ctrlKey). Con ratón: la rueda desplaza y Ctrl + rueda hace zoom.
   $effect(() => {
     const rueda = e => {
       e.preventDefault()
       const r = svg.getBoundingClientRect()
-      const escala = e.ctrlKey ? 0.01 : e.deltaMode ? 0.05 : 0.0015
-      zoomEn(Math.exp(-e.deltaY * escala), e.clientX - r.left, e.clientY - r.top)
+      if (e.ctrlKey || e.metaKey) {
+        zoomEn(Math.exp(-e.deltaY * (e.deltaMode ? 0.05 : 0.01)), e.clientX - r.left, e.clientY - r.top)
+        return
+      }
+      const f = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? H : 1
+      tx -= e.deltaX * f
+      ty -= e.deltaY * f
+    }
+    // Safari (macOS) envía el pellizco del trackpad como gesture* en lugar de rueda con ctrlKey.
+    let escala0 = 1
+    const gestoInicio = e => { e.preventDefault(); escala0 = 1 }
+    const gestoCambio = e => {
+      e.preventDefault()
+      const r = svg.getBoundingClientRect()
+      zoomEn(e.scale / escala0, e.clientX - r.left, e.clientY - r.top)
+      escala0 = e.scale
     }
     svg.addEventListener('wheel', rueda, { passive: false })
-    return () => svg.removeEventListener('wheel', rueda)
+    svg.addEventListener('gesturestart', gestoInicio)
+    svg.addEventListener('gesturechange', gestoCambio)
+    return () => {
+      svg.removeEventListener('wheel', rueda)
+      svg.removeEventListener('gesturestart', gestoInicio)
+      svg.removeEventListener('gesturechange', gestoCambio)
+    }
   })
 
   // --- Fondo: desplazar con un dedo / ratón, pellizcar con dos ---

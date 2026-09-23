@@ -149,6 +149,69 @@
     } catch { avisar('No se pudo leer la imagen') }
   }
 
+  // --- Pegar (Ctrl+V) o soltar texto / imágenes sobre el lienzo ---
+  const idLocal = prefijo => `${prefijo}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`
+  let soltando = $state(false)
+  let tSoltar
+
+  async function insertar(imagenes, texto, x, y) {
+    let fotos = 0
+    for (const archivo of imagenes) {
+      try {
+        const titulo = /^image\.\w+$/i.test(archivo.name) ? '' : archivo.name.replace(/\.[^.]+$/, '')
+        cv.fotos.push({ id: idLocal('foto'), titulo, imagen: await comprimir(archivo), x: Math.round(x - 60), y: Math.round(y - 45) })
+        fotos++
+        x += 30
+        y += 30
+      } catch { avisar(`No se pudo leer ${archivo.name}`) }
+    }
+    if (!imagenes.length && texto.trim()) {
+      cv.notas.push({ id: idLocal('nota'), texto: texto.trim().slice(0, 4000), x: Math.round(x - NOTA_W / 2), y: Math.round(y - 30) })
+    }
+    guardar()
+    avisar(fotos ? `${fotos === 1 ? 'Foto agregada' : `${fotos} fotos agregadas`}` : 'Nota agregada')
+  }
+
+  function pegar(e) {
+    if (modal || fuenteAbierta || document.querySelector('dialog[open]')) return
+    if (e.target.closest?.('input, textarea, [contenteditable]')) return
+    const dt = e.clipboardData
+    if (!dt) return
+    const imagenes = [...dt.files].filter(f => f.type.startsWith('image/'))
+    const texto = imagenes.length ? '' : dt.getData('text/plain')
+    if (!imagenes.length && !texto.trim()) return
+    e.preventDefault()
+    const c = lienzo.centro()
+    insertar(imagenes, texto, c.x, c.y)
+  }
+
+  /** Datos arrastrados que el lienzo puede recibir (los .json los importa la app). */
+  function recibible(dt) {
+    const archivos = [...(dt?.files || [])]
+    if (archivos.some(f => /\.json$/i.test(f.name))) return null
+    const imagenes = archivos.filter(f => f.type.startsWith('image/'))
+    const texto = imagenes.length ? '' : dt?.getData('text/plain') || ''
+    return imagenes.length || texto.trim() ? { imagenes, texto } : null
+  }
+
+  function sobreLienzo(e) {
+    const tipos = [...(e.dataTransfer?.types || [])]
+    if (!tipos.includes('Files') && !tipos.includes('text/plain')) return
+    soltando = true
+    clearTimeout(tSoltar)
+    tSoltar = setTimeout(() => (soltando = false), 150)
+  }
+
+  function soltarEnLienzo(e) {
+    soltando = false
+    const r = recibible(e.dataTransfer)
+    if (!r) return
+    e.preventDefault()
+    e.stopPropagation()
+    const p = lienzo.aMundo(e.clientX, e.clientY)
+    insertar(r.imagenes, r.texto, p.x, p.y)
+  }
+
   function guardarElemento(lista, obj, nueva) {
     const datos = copia(obj)
     if (nueva) cv[lista].push(datos)
@@ -189,7 +252,7 @@
   const editarConexion = con => (modal = { conexion: copia(con) })
 </script>
 
-<svelte:window onkeydown={e => e.key === 'Escape' && conectando && (conectando = null)} />
+<svelte:window onkeydown={e => e.key === 'Escape' && conectando && (conectando = null)} onpaste={pegar} />
 
 <header class="cabecera">
   <button class="icono-btn solo-movil" aria-label="Ficha del proyecto" onclick={() => (ficha = !ficha)}><Icono nombre="menu" tam={18} /></button>
@@ -208,7 +271,7 @@
   <button class="icono-btn" aria-label="Datos (importar / exportar)" title="Datos" onclick={abrirDatos}><Icono nombre="datos" tam={18} /></button>
 </header>
 
-<div class="cuerpo">
+<div class="cuerpo" class:soltando role="region" aria-label="Lienzo del proyecto" ondragover={sobreLienzo} ondrop={soltarEnLienzo}>
   <button class="velo" class:abierto={ficha} aria-label="Cerrar ficha" onclick={() => (ficha = false)}></button>
   <aside class="panel" class:abierto={ficha} style="width:320px">
     <span class="chip">{TIPOS_PROYECTO[p.tipo] || 'Tesis'}</span>
@@ -241,7 +304,7 @@
     </div>
     <div class="separador"></div>
     <div class="suave ayuda">
-      Arrastra las tarjetas para acomodarlas (pasa a modo Libre). Rueda o pellizco para zoom. Toca una fuente para ver sus citas.
+      Arrastra las tarjetas para acomodarlas (pasa a modo Libre). Desliza con dos dedos para mover el lienzo y pellizca para hacer zoom (con ratón: Ctrl + rueda). Toca una fuente para ver sus citas. Pega (Ctrl+V) o arrastra texto o imágenes al lienzo para crear notas y fotos.
     </div>
   </aside>
 
@@ -439,6 +502,11 @@
   .vacio-hub .serif { font-size: 17px; }
   .vacio-hub .fila { justify-content: center; margin-top: 12px; }
 
+  .soltando::after {
+    content: 'Suelta para agregar como nota o foto'; position: absolute; inset: 10px; z-index: 30; pointer-events: none;
+    display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--accent);
+    border: 2px dashed var(--accent); border-radius: 14px; background: rgba(227, 233, 236, .45);
+  }
   .arista { stroke: var(--ink-soft); stroke-opacity: .3; stroke-width: 1; }
   .conexion { fill: none; stroke: var(--accent); stroke-opacity: .55; stroke-width: 1.5; stroke-dasharray: 5 4; }
   .etq { cursor: pointer; }

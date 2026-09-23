@@ -53,13 +53,35 @@
     setTimeout(() => URL.revokeObjectURL(u), 60000)
   }
 
+  // --- Documento original: zona de arrastrar y soltar ---
+  let encima = $state(false)
+  let nombreDoc = $state('')
+  $effect(() => {
+    fuente.documento_original
+    leerDocumento(fuente.id).then(d => (nombreDoc = d?.nombre || ''))
+  })
+
+  const ACEPTADOS = /\.(pdf|html?|md|txt)$/i
+
+  async function guardarDoc(a) {
+    if (!a) return
+    if (!ACEPTADOS.test(a.name)) return avisar('Solo se aceptan archivos PDF, HTML, MD o TXT')
+    await adjuntarDocumento(fuente, a)
+    nombreDoc = a.name
+    avisar('Documento adjuntado')
+  }
+
   async function adjuntar(e) {
     const input = e.currentTarget
-    const a = input.files?.[0]
-    if (!a) return
-    await adjuntarDocumento(fuente, a)
-    avisar('Documento adjuntado')
+    await guardarDoc(input.files?.[0])
     input.value = ''
+  }
+
+  function soltar(e) {
+    e.preventDefault()
+    e.stopPropagation()
+    encima = false
+    guardarDoc(e.dataTransfer?.files?.[0])
   }
 </script>
 
@@ -86,15 +108,37 @@
     <div class="fila envolver acciones">
       <button class="btn chico" onclick={() => copiar(bib)}><Icono nombre="copiar" tam={12} trazo={2} />Copiar bibliografía</button>
       {#if url}<a class="btn chico" href={url} target="_blank" rel="noopener">Ver fuente ↗</a>{/if}
-      {#if fuente.documento_original}
-        <button class="btn chico" onclick={abrirDocumento}><Icono nombre="clip" tam={12} trazo={2} />Documento</button>
-        <button class="btn chico fantasma" onclick={() => confirm('¿Quitar el documento adjunto?') && quitarDocumento(fuente)}>Quitar documento</button>
-      {:else}
-        <button class="btn chico" onclick={() => archivo.click()}><Icono nombre="clip" tam={12} trazo={2} />Adjuntar PDF/HTML/MD</button>
-      {/if}
-      <input bind:this={archivo} type="file" accept=".pdf,.html,.htm,.md,.txt" hidden onchange={adjuntar} />
       <button class="btn chico" onclick={() => (editandoFuente = true)}>Editar fuente</button>
     </div>
+
+    <!-- Zona para arrastrar y soltar el documento original (o tocar para elegirlo) -->
+    <div
+      class="zona" class:encima class:con-doc={!!fuente.documento_original}
+      role="button" tabindex="0" aria-label="Adjuntar documento original: arrastra aquí o haz clic"
+      onclick={() => archivo.click()}
+      onkeydown={e => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), archivo.click())}
+      ondragover={e => { e.preventDefault(); e.stopPropagation(); encima = true }}
+      ondragleave={e => !e.currentTarget.contains(e.relatedTarget) && (encima = false)}
+      ondrop={soltar}
+    >
+      <Icono nombre="clip" tam={20} />
+      {#if fuente.documento_original}
+        <div class="zona-txt">
+          <b>{nombreDoc || fuente.documento_original.split('/').pop()}</b>
+          <span class="suave">Suelta otro archivo aquí para reemplazarlo</span>
+        </div>
+        <span class="fila">
+          <button class="btn chico" onclick={e => { e.stopPropagation(); abrirDocumento() }}>Abrir</button>
+          <button class="btn chico fantasma" onclick={e => { e.stopPropagation(); confirm('¿Quitar el documento adjunto?') && quitarDocumento(fuente) }}>Quitar</button>
+        </span>
+      {:else}
+        <div class="zona-txt">
+          <b>Arrastra aquí el documento original</b>
+          <span class="suave">PDF, HTML o MD · o haz clic para elegirlo</span>
+        </div>
+      {/if}
+    </div>
+    <input bind:this={archivo} type="file" accept=".pdf,.html,.htm,.md,.txt" hidden onchange={adjuntar} />
     {#if fuente.notas_correccion}<div class="notas"><span class="rotulo">Notas de corrección</span> {fuente.notas_correccion}</div>{/if}
   {/if}
 
@@ -153,6 +197,17 @@
   h2 { margin: 0; font-size: 21px; line-height: 1.3; }
   .bib { font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
   .acciones { gap: 6px; }
+  .zona {
+    display: flex; align-items: center; gap: 14px; padding: 18px 20px; cursor: pointer;
+    border: 2px dashed var(--line); border-radius: 12px; background: var(--paper-hi); color: var(--ink-soft);
+    transition: border-color .12s, background .12s;
+  }
+  .zona:hover, .zona:focus-visible { border-color: var(--ink-soft); }
+  .zona.encima { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .zona.con-doc { border-style: solid; }
+  .zona-txt { display: flex; flex-direction: column; gap: 3px; flex-grow: 1; min-width: 0; font-size: 13px; }
+  .zona-txt b { color: var(--ink); font-weight: 500; overflow-wrap: anywhere; }
+  .zona-txt .suave { font-size: 12px; }
   .notas { font-size: 13px; line-height: 1.5; color: var(--ink-soft); }
   .lista { display: flex; flex-direction: column; gap: 12px; }
   .cita { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
