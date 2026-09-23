@@ -8,13 +8,15 @@
   import FuenteModal from '../components/FuenteModal.svelte'
   import AgregarFuente from '../components/AgregarFuente.svelte'
   import ProyectoForm from '../components/ProyectoForm.svelte'
+  import ObjetivoLienzo from '../components/ObjetivoLienzo.svelte'
+  import { listaObjetivos, objetivosPorIndicador } from '../lib/objetivos.js'
   import { S, guardarProyecto, avisar } from '../lib/store.svelte.js'
   import { estadoDeCitas, autorCorto, anio, coincide, TIPOS_PROYECTO, ESTADOS_USO } from '../lib/citas.js'
   import { F, envolver, ancho } from '../lib/texto.js'
   import { NODO_W, alturaNodo, radial, porTema, limitesDe, rutaConexion } from '../lib/grafo.js'
   import { descargarBib } from '../lib/io.svelte.js'
 
-  let { p, fid = null, abrirDatos, atras } = $props()
+  let { p, fid = null, oid = null, abrirDatos, atras } = $props()
 
   const cv = $derived(p.canvas)
   const citas = $derived(S.citasPorProyecto.get(p.id) || [])
@@ -38,7 +40,21 @@
   // --- Disposición ---
   const HUB_W = 420
   const hubLineas = $derived((S.tipografias, envolver(p.titulo, F.hub, HUB_W - 52, 4)))
-  const hubH = $derived(22 + 22 + 10 + hubLineas.length * 27 + 6 + 16 + 22)
+  // Objetivos: chips en la tarjeta del título que abren su sub-lienzo.
+  const objetivos = $derived(listaObjetivos(p))
+  const indObjetivos = $derived(objetivosPorIndicador(p))
+  const chipsObj = $derived.by(() => {
+    S.tipografias
+    let x = 26
+    return objetivos.map(o => {
+      const w = ancho(o.corto, '600 11px "Work Sans", sans-serif') + 22
+      const c = { ...o, x, w }
+      x += w + 6
+      return c
+    }).filter(c => c.x + c.w <= HUB_W - 20)
+  })
+  const filaObj = $derived(chipsObj.length ? 34 : 0)
+  const hubH = $derived(22 + 22 + 10 + hubLineas.length * 27 + 6 + 16 + 22 + filaObj)
   const chipTipo = $derived((TIPOS_PROYECTO[p.tipo] || 'Tesis').toUpperCase())
   const chipW = $derived((S.tipografias, ancho(chipTipo, '600 11px "Work Sans", sans-serif') + chipTipo.length * 0.5 + 20))
   const items = $derived(fuentes.map(f => ({ id: f.id, f, h: alturaNodo(false, !!f.etiquetas?.length) })))
@@ -119,8 +135,16 @@
     }
   }
 
-  const abrirFuente = id => (location.hash = `#/p/${p.id}/f/${id}`)
-  const cerrarFuente = () => atras(`#/p/${p.id}`)
+  const rutaObjetivo = $derived(oid ? `#/p/${p.id}/o/${oid}` : `#/p/${p.id}`)
+  const abrirFuente = id => (location.hash = `${rutaObjetivo}/f/${id}`)
+  const cerrarFuente = () => atras(rutaObjetivo)
+  const abrirObjetivo = clave => {
+    ficha = false
+    if (clave === oid) return
+    if (oid) location.replace(`#/p/${p.id}/o/${clave}`)
+    else location.hash = `#/p/${p.id}/o/${clave}`
+  }
+  const cerrarObjetivo = () => atras(`#/p/${p.id}`)
   const fuenteAbierta = $derived(fid ? S.fuentePorId.get(fid) : null)
 
   function nuevaNota() {
@@ -173,7 +197,7 @@
   }
 
   function pegar(e) {
-    if (modal || fuenteAbierta || document.querySelector('dialog[open]')) return
+    if (modal || fuenteAbierta || oid || document.querySelector('dialog[open]')) return
     if (e.target.closest?.('input, textarea, [contenteditable]')) return
     const dt = e.clipboardData
     if (!dt) return
@@ -204,6 +228,7 @@
 
   function soltarEnLienzo(e) {
     soltando = false
+    if (oid) return
     const r = recibible(e.dataTransfer)
     if (!r) return
     e.preventDefault()
@@ -276,20 +301,29 @@
   <aside class="panel" class:abierto={ficha} style="width:320px">
     <span class="chip">{TIPOS_PROYECTO[p.tipo] || 'Tesis'}</span>
     {#if p.area}<div class="suave area">{p.area}</div>{/if}
-    <div>
-      <div class="rotulo sub">Objetivo general</div>
-      <div class="texto">{p.objetivo_general || '—'}</div>
-    </div>
-    {#if p.objetivos_especificos.length}
+    {#if objetivos.length}
       <div>
-        <div class="rotulo sub">Objetivos específicos</div>
-        <ol>{#each p.objetivos_especificos as o}<li>{o}</li>{/each}</ol>
+        <div class="rotulo sub">Objetivos</div>
+        <div class="objetivos">
+          {#each objetivos as o (o.clave)}
+            <button class="objetivo" class:activo={oid === o.clave} onclick={() => abrirObjetivo(o.clave)} title="Abrir el lienzo de {o.rotulo.toLowerCase()}">
+              <span class="obj-corto">{o.corto}</span><span class="obj-texto">{o.texto}</span>
+            </button>
+          {/each}
+        </div>
+      </div>
+    {:else}
+      <div>
+        <div class="rotulo sub">Objetivos</div>
+        <div class="texto suave">— Agrégalos en la ficha para desarrollar cada uno en su propio lienzo.</div>
       </div>
     {/if}
     {#if p.indicadores.length}
       <div>
         <div class="rotulo sub">Indicadores</div>
-        <ul>{#each p.indicadores as o}<li>{o}</li>{/each}</ul>
+        <ul>{#each p.indicadores as t}
+          <li>{t}{#each indObjetivos.get(t) || [] as c}<span class="vinculo">{c}</span>{/each}</li>
+        {/each}</ul>
       </div>
     {/if}
     <button class="btn chico" onclick={() => (modal = 'ficha')}>Editar ficha</button>
@@ -352,7 +386,15 @@
       <rect x="26" y="22" width={chipW} height="20" rx="10" fill="var(--accent-soft)" />
       <text x={26 + chipW / 2} y="36" text-anchor="middle" class="hub-chip">{chipTipo}</text>
       {#each hubLineas as l, i}<text x="26" y={72 + i * 27} class="hub-titulo">{l}</text>{/each}
-      <text x="26" y={hubH - 22} class="hub-sub">{fuentes.length} fuentes · {nCitas} citas</text>
+      <text x="26" y={hubH - 22 - filaObj} class="hub-sub">{fuentes.length} fuentes · {nCitas} citas</text>
+      {#each chipsObj as c (c.clave)}
+        <g class="hub-obj" transform="translate({c.x} {hubH - 44})" role="button" tabindex="0" aria-label="Abrir lienzo de {c.rotulo.toLowerCase()}"
+          onpointerdown={e => e.stopPropagation()} onclick={() => abrirObjetivo(c.clave)} onkeydown={e => e.key === 'Enter' && abrirObjetivo(c.clave)}>
+          <title>{c.rotulo}: {c.texto}</title>
+          <rect width={c.w} height="22" rx="11" />
+          <text x={c.w / 2} y="15" text-anchor="middle">{c.corto}</text>
+        </g>
+      {/each}
     </Arrastrable>
 
     <!-- Fuentes -->
@@ -432,6 +474,10 @@
       </div>
     </div>
   {/if}
+
+  {#if oid}
+    {#key oid}<ObjetivoLienzo {p} clave={oid} {abrirFuente} cerrar={cerrarObjetivo} />{/key}
+  {/if}
 </div>
 
 {#if fuenteAbierta}
@@ -481,6 +527,22 @@
   .leyenda { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
   .leyenda .punto { width: 9px; height: 9px; }
   .ayuda { font-size: 12px; line-height: 1.5; }
+  .objetivos { display: flex; flex-direction: column; gap: 4px; margin: 0 -8px; }
+  .objetivo {
+    display: flex; gap: 8px; align-items: flex-start; text-align: left; width: 100%; padding: 7px 8px;
+    border: 1px solid transparent; border-radius: 8px; background: none; font: inherit; font-size: 13px; line-height: 1.45; color: var(--ink); cursor: pointer;
+  }
+  .objetivo:hover { background: var(--paper-dim); }
+  .objetivo.activo { background: var(--accent-soft); border-color: var(--accent); }
+  .obj-corto { flex-shrink: 0; font-size: 10.5px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 2px 7px; margin-top: 1px; }
+  .objetivo.activo .obj-corto { background: var(--paper); }
+  .obj-texto { display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .vinculo { display: inline-block; margin-left: 5px; font-size: 10px; font-weight: 600; color: var(--using); background: var(--using-bg); border-radius: 999px; padding: 0 6px; vertical-align: 1px; }
+  .hub-obj { cursor: pointer; }
+  .hub-obj rect { fill: var(--paper-dim); stroke: var(--accent); stroke-opacity: .45; }
+  .hub-obj:hover rect, .hub-obj:focus-visible rect { fill: var(--accent-soft); stroke-opacity: 1; }
+  .hub-obj:focus { outline: none; }
+  .hub-obj text { font: 600 11px var(--sans); fill: var(--accent); letter-spacing: .04em; }
 
   .barra {
     position: absolute; top: 16px; left: calc(50% + 160px); transform: translateX(-50%); z-index: 5;

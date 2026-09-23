@@ -3,6 +3,7 @@
   import Modal from './Modal.svelte'
   import { S, guardarProyecto, eliminarProyecto } from '../lib/store.svelte.js'
   import { TIPOS_PROYECTO } from '../lib/citas.js'
+  import { remapear } from '../lib/objetivos.js'
 
   let { proyecto = null, onclose, oncreado } = $props()
   const base = untrack(() => (proyecto ? $state.snapshot(proyecto) : { tipo: 'tesis' }))
@@ -14,7 +15,14 @@
   function enviar(e) {
     e.preventDefault()
     if (!p.titulo?.trim()) return
-    const item = guardarProyecto({ ...p, objetivos_especificos: lineas(objetivos), indicadores: lineas(indicadores) })
+    const datos = { ...p, objetivos_especificos: lineas(objetivos), indicadores: lineas(indicadores) }
+    if (proyecto) {
+      // Los sub-lienzos siguen a su objetivo aunque se reordene o se reescriba.
+      const r = remapear(base, datos.objetivo_general, datos.objetivos_especificos, datos.indicadores)
+      if (r.perdidos.length && !confirm(`Se borrará el lienzo de ${r.perdidos.join(', ')} porque su objetivo ya no está en la ficha. ¿Continuar?`)) return
+      datos.canvas = { ...base.canvas, objetivos: r.objetivos }
+    }
+    const item = guardarProyecto(datos)
     if (!proyecto) oncreado?.(item.id)
     onclose()
   }

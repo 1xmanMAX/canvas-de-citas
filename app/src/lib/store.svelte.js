@@ -64,6 +64,7 @@ export function asegurarProyecto(p) {
   c.notas ||= []
   c.fotos ||= []
   c.conexiones ||= []
+  c.objetivos ||= {} // sub-lienzos por objetivo (lib/objetivos.js)
   return p
 }
 
@@ -168,7 +169,14 @@ function limpiarLienzo(p, fid) {
   const tenia = fid in c.posiciones
   delete c.posiciones[fid]
   c.conexiones = c.conexiones.filter(x => x.desde !== fid && x.hasta !== fid)
-  return tenia || antes !== c.conexiones.length
+  let enObjetivos = false
+  for (const o of Object.values(c.objetivos || {})) {
+    if (!o.fuentes.some(x => x.id === fid)) continue
+    o.fuentes = o.fuentes.filter(x => x.id !== fid)
+    o.conexiones = o.conexiones.filter(x => x.desde !== fid && x.hasta !== fid)
+    enObjetivos = true
+  }
+  return tenia || enObjetivos || antes !== c.conexiones.length
 }
 
 export function eliminarCita(id) {

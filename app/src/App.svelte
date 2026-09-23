@@ -6,12 +6,14 @@
   import Datos from './components/Datos.svelte'
   import { C, iniciarCarpeta, reconectar } from './lib/carpeta.svelte.js'
 
-  // Rutas por hash: #/  ·  #/p/<id>  ·  #/p/<id>/f/<fuente>  ·  #/citas  ·  #/citas/<id>
+  // Rutas por hash: #/  ·  #/p/<id>  ·  #/p/<id>/f/<fuente>  ·  #/p/<id>/o/<objetivo>[/f/<fuente>]
+  //                 #/citas  ·  #/citas/<id>
   let hash = $state(location.hash)
   let navegaciones = 0
   const ruta = $derived.by(() => {
     const m = hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent)
-    if (m[0] === 'p' && m[1]) return { vista: 'hub', pid: m[1], fid: m[2] === 'f' ? m[3] : null }
+    const tras = k => { const i = m.indexOf(k, 2); return i > 0 ? m[i + 1] || null : null }
+    if (m[0] === 'p' && m[1]) return { vista: 'hub', pid: m[1], oid: tras('o'), fid: tras('f') }
     if (m[0] === 'citas') return { vista: 'general', pid: m[1] || null }
     return { vista: 'proyectos' }
   })
@@ -44,7 +46,7 @@
   {#if ruta.vista === 'hub'}
     {@const p = S.proyectoPorId.get(ruta.pid)}
     {#if p}
-      {#key p.id}<Hub {p} fid={ruta.fid} {abrirDatos} {atras} />{/key}
+      {#key p.id}<Hub {p} fid={ruta.fid} oid={ruta.oid} {abrirDatos} {atras} />{/key}
     {:else}
       <div class="no-encontrado">
         <p>No existe el proyecto <code>{ruta.pid}</code> en este dispositivo.</p>

@@ -12,4 +12,24 @@ png(redondo(192), 'icon-192.png')
 png(redondo(512), 'icon-512.png')
 png(lleno(512, 0.7), 'icon-maskable-512.png')
 png(lleno(180, 0.85), 'apple-touch-icon.png')
+
+// icon.ico (Windows: acceso directo de escritorio). Contenedor ICO con entradas PNG.
+const tamanos = [16, 32, 48, 256]
+const pngs = tamanos.map(s => new Resvg(redondo(s)).render().asPng())
+const cabecera = Buffer.alloc(6 + 16 * pngs.length)
+cabecera.writeUInt16LE(0, 0)
+cabecera.writeUInt16LE(1, 2)
+cabecera.writeUInt16LE(pngs.length, 4)
+let desplazamiento = cabecera.length
+pngs.forEach((p, i) => {
+  const o = 6 + 16 * i, s = tamanos[i]
+  cabecera.writeUInt8(s >= 256 ? 0 : s, o)
+  cabecera.writeUInt8(s >= 256 ? 0 : s, o + 1)
+  cabecera.writeUInt16LE(1, o + 4)
+  cabecera.writeUInt16LE(32, o + 6)
+  cabecera.writeUInt32LE(p.length, o + 8)
+  cabecera.writeUInt32LE(desplazamiento, o + 12)
+  desplazamiento += p.length
+})
+writeFileSync('public/icon.ico', Buffer.concat([cabecera, ...pngs]))
 console.log('Íconos generados')
