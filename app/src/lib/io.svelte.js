@@ -1,7 +1,6 @@
 // Exportar / importar los tres JSON con el mismo esquema que la skill citas-tesis
-// (references/formato-datos.md). También sincroniza con una carpeta del disco
-// (File System Access API) cuando el navegador lo permite.
-import { S, COLECCIONES, importar, registrarIds, nuevoId, leerDocumento, idsConDocumento, guardarDocumentoImportado, leerMeta, ponerMeta } from './store.svelte.js'
+// (references/formato-datos.md). La carpeta de almacenamiento vive en carpeta.svelte.js.
+import { S, COLECCIONES, importar, registrarIds, nuevoId } from './store.svelte.js'
 import { aBibtex, extraerDoi, normalizar } from './citas.js'
 
 const CAMPOS = {
@@ -143,78 +142,4 @@ function convertirFormatoAntiguo(datos) {
 export async function aplicar(datos, modo) {
   await importar(datos, modo)
   return COLECCIONES.filter(c => datos[c]).map(c => `${datos[c].length} ${c}`).join(', ')
-}
-
-// --- Carpeta en disco (Chrome/Edge escritorio) ---
-export const soportaCarpeta = typeof window !== 'undefined' && 'showDirectoryPicker' in window
-
-export async function carpetaGuardada() {
-  return soportaCarpeta ? leerMeta('carpeta') : null
-}
-
-async function permiso(dir) {
-  const opts = { mode: 'readwrite' }
-  if ((await dir.queryPermission(opts)) === 'granted') return true
-  return (await dir.requestPermission(opts)) === 'granted'
-}
-
-export async function elegirCarpeta() {
-  const dir = await window.showDirectoryPicker({ id: 'canvas-de-citas', mode: 'readwrite' })
-  await ponerMeta('carpeta', dir)
-  return dir
-}
-
-async function escribir(dir, ruta, contenido) {
-  const partes = ruta.split('/')
-  const nombre = partes.pop()
-  for (const p of partes) dir = await dir.getDirectoryHandle(p, { create: true })
-  const w = await (await dir.getFileHandle(nombre, { create: true })).createWritable()
-  await w.write(contenido)
-  await w.close()
-}
-
-async function leerRuta(dir, ruta) {
-  try {
-    const partes = ruta.split('/').filter(Boolean)
-    const nombre = partes.pop()
-    for (const p of partes) dir = await dir.getDirectoryHandle(p)
-    return await (await dir.getFileHandle(nombre)).getFile()
-  } catch { return null }
-}
-
-/** Escribe los tres JSON y los documentos adjuntos (fuentes/<id>/documento.ext). */
-export async function guardarEnCarpeta(dir) {
-  if (!(await permiso(dir))) throw new Error('Permiso denegado')
-  for (const col of COLECCIONES) await escribir(dir, `${col}.json`, serializar(col))
-  let docs = 0
-  const conDoc = new Set(await idsConDocumento())
-  for (const f of S.fuentes) {
-    if (!f.documento_original || !conDoc.has(f.id)) continue
-    const d = await leerDocumento(f.id)
-    if (d?.blob) { await escribir(dir, f.documento_original, d.blob); docs++ }
-  }
-  return docs
-}
-
-/** Lee los JSON de la carpeta (los que existan). */
-export async function leerDeCarpeta(dir) {
-  if (!(await permiso(dir))) throw new Error('Permiso denegado')
-  const archivos = []
-  for (const col of COLECCIONES) {
-    const f = await leerRuta(dir, `${col}.json`)
-    if (f) archivos.push(f)
-  }
-  if (!archivos.length) throw new Error('La carpeta no tiene proyectos.json, fuentes.json ni citas.json')
-  return leerArchivos(archivos)
-}
-
-/** Carga los documentos originales referenciados por documento_original. */
-export async function importarDocumentosDeCarpeta(dir) {
-  let n = 0
-  for (const f of S.fuentes) {
-    if (!f.documento_original) continue
-    const archivo = await leerRuta(dir, f.documento_original)
-    if (archivo) { await guardarDocumentoImportado(f.id, archivo.name, archivo); n++ }
-  }
-  return n
 }

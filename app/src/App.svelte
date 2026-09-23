@@ -4,6 +4,7 @@
   import Hub from './views/Hub.svelte'
   import General from './views/General.svelte'
   import Datos from './components/Datos.svelte'
+  import { C, iniciarCarpeta, reconectar } from './lib/carpeta.svelte.js'
 
   // Rutas por hash: #/  ·  #/p/<id>  ·  #/p/<id>/f/<fuente>  ·  #/citas  ·  #/citas/<id>
   let hash = $state(location.hash)
@@ -30,7 +31,7 @@
     if (archivos.length) datos = { archivos }
   }
 
-  cargar()
+  cargar().then(iniciarCarpeta)
 </script>
 
 <svelte:window
@@ -63,7 +64,12 @@
 
 {#if S.aviso}<div class="aviso" role="status">{S.aviso}</div>{/if}
 
-{#if S.actualizacion && !S.aviso}
+{#if C.estado === 'sin-permiso' && !S.aviso && !datos}
+  <div class="aviso fila" role="status">
+    La carpeta "{C.dir?.name}" necesita permiso para seguir guardando
+    <button class="btn chico" onclick={reconectar}>Dar permiso</button>
+  </div>
+{:else if S.actualizacion && !S.aviso}
   <div class="aviso fila" role="status">
     Nueva versión disponible
     <button class="btn chico" onclick={() => S.actualizacion.postMessage('activar')}>Actualizar</button>

@@ -268,7 +268,7 @@
   <a class="btn solo-escritorio" href="#/citas/{p.id}">Vista de citas</a>
   <a class="icono-btn solo-movil" href="#/citas/{p.id}" aria-label="Vista de citas"><Icono nombre="lista" tam={18} /></a>
   <button class="btn solo-escritorio" onclick={() => descargarBib(fuentes, 'bibliografia.bib')}>Exportar .bib</button>
-  <button class="icono-btn" aria-label="Datos (importar / exportar)" title="Datos" onclick={abrirDatos}><Icono nombre="datos" tam={18} /></button>
+  <button class="icono-btn" aria-label="Configuración" title="Configuración" onclick={abrirDatos}><Icono nombre="ajustes" tam={18} /></button>
 </header>
 
 <div class="cuerpo" class:soltando role="region" aria-label="Lienzo del proyecto" ondragover={sobreLienzo} ondrop={soltarEnLienzo}>

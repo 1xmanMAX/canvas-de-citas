@@ -1,38 +1,25 @@
 <script>
+  // Configuración: carpeta de almacenamiento + exportar / importar los tres JSON de la skill citas-tesis.
   import { untrack } from 'svelte'
-  // Exportar / importar los tres JSON que lee y escribe la skill citas-tesis.
   import Modal from './Modal.svelte'
   import Icono from './Icono.svelte'
   import { S, avisar } from '../lib/store.svelte.js'
-  import { descargarTodo, descargarBib, leerArchivos, aplicar, soportaCarpeta, carpetaGuardada, elegirCarpeta, guardarEnCarpeta, leerDeCarpeta, importarDocumentosDeCarpeta } from '../lib/io.svelte.js'
+  import { descargarTodo, descargarBib, leerArchivos, aplicar } from '../lib/io.svelte.js'
+  import { C, establecerCarpeta, reconectar, dejarDeUsarCarpeta, guardarAhora } from '../lib/carpeta.svelte.js'
+  import { haceCuanto } from '../lib/citas.js'
 
   let { onclose, archivosIniciales = null } = $props()
-  let carpeta = $state(null)
   let previa = $state(null) // datos leídos pendientes de confirmar
   let modo = $state('combinar')
   let ocupado = $state(false)
   let entrada = $state()
 
-  carpetaGuardada().then(c => (carpeta = c || null))
   untrack(() => archivosIniciales && leerArchivos(archivosIniciales).then(d => (previa = d)))
 
   async function tarea(fn) {
     ocupado = true
     try { await fn() } catch (e) { if (e?.name !== 'AbortError') avisar(e.message || String(e)) } finally { ocupado = false }
   }
-
-  const elegir = () => tarea(async () => { carpeta = await elegirCarpeta() })
-  const guardarCarpeta = () => tarea(async () => {
-    carpeta ||= await elegirCarpeta()
-    const docs = await guardarEnCarpeta(carpeta)
-    avisar(`Guardado en "${carpeta.name}"${docs ? ` (+${docs} documentos)` : ''}`)
-  })
-  const cargarCarpeta = () => tarea(async () => {
-    carpeta ||= await elegirCarpeta()
-    const d = await leerDeCarpeta(carpeta)
-    d.desdeCarpeta = true
-    previa = d
-  })
 
   async function leer(e) {
     const input = e.currentTarget
@@ -44,23 +31,20 @@
   const confirmar = () => tarea(async () => {
     if (modo === 'reemplazar' && !confirm('Reemplazar borra las colecciones importadas que tengas en este dispositivo. ¿Continuar?')) return
     const resumen = await aplicar(previa, modo)
-    const docs = previa.desdeCarpeta ? await importarDocumentosDeCarpeta(carpeta) : 0
-    avisar(`Importado: ${resumen}${docs ? `, ${docs} documentos` : ''}`)
+    avisar(`Importado: ${resumen}`)
     previa = null
     onclose()
   })
+
+  function dejar() {
+    if (confirm(`¿Dejar de guardar en "${C.dir?.name}"? Los archivos que ya están en la carpeta no se borran.`)) dejarDeUsarCarpeta()
+  }
 
   const COLS = ['proyectos', 'fuentes', 'citas']
   const cuenta = col => previa?.[col]?.length
 </script>
 
-<Modal titulo="Datos" {onclose} ancho={620}>
-  <p class="suave intro">
-    Tus datos viven en este dispositivo (IndexedDB). Exporta <code>proyectos.json</code>, <code>fuentes.json</code> y
-    <code>citas.json</code> para que la skill <b>citas-tesis</b> de Claude los lea, y vuelve a importarlos cuando la skill
-    agregue o corrija citas.
-  </p>
-
+<Modal titulo="Configuración" {onclose} ancho={640}>
   {#if previa}
     <section>
       <div class="rotulo">Vista previa de la importación</div>
@@ -80,10 +64,49 @@
       </div>
     </section>
   {:else}
+    <section class="primera">
+      <div class="rotulo">Carpeta de almacenamiento</div>
+      {#if C.estado === 'no-soportado'}
+        <p class="suave nota">
+          Este navegador no permite guardar en una carpeta del disco. Usa <b>Chrome</b> o <b>Edge</b> en una computadora
+          para elegir una. Mientras tanto, tus datos se guardan en este navegador y puedes exportarlos abajo.
+        </p>
+      {:else if C.estado === 'ninguna'}
+        <p class="suave nota">
+          Elige una carpeta y la app guardará ahí todo automáticamente: <code>proyectos.json</code>, <code>fuentes.json</code>,
+          <code>citas.json</code> (con notas, fotos y conexiones) y los documentos en <code>fuentes/&lt;id&gt;/</code>.
+          Si la skill <b>citas-tesis</b> trabaja en esa misma carpeta, sus cambios aparecen solos en la app.
+        </p>
+        <div class="fila"><button class="btn primario" disabled={ocupado} onclick={() => tarea(establecerCarpeta)}><Icono nombre="carpeta" />Elegir carpeta…</button></div>
+      {:else}
+        <div class="carpeta" class:alerta={C.estado === 'sin-permiso'}>
+          <Icono nombre="carpeta" tam={22} />
+          <div class="carpeta-txt">
+            <b>{C.dir?.name}</b>
+            {#if C.estado === 'sin-permiso'}
+              <span>El navegador pide permiso otra vez para usar esta carpeta.</span>
+            {:else}
+              <span class="suave">Guardado automático{C.guardado ? ` · último guardado ${haceCuanto(C.guardado)}` : ''}</span>
+            {/if}
+            {#if C.error && C.estado === 'conectada'}<span class="error">{C.error}</span>{/if}
+          </div>
+        </div>
+        <div class="fila envolver">
+          {#if C.estado === 'sin-permiso'}
+            <button class="btn primario" onclick={() => tarea(reconectar)}>Dar permiso</button>
+          {:else}
+            <button class="btn" disabled={ocupado} onclick={() => tarea(async () => { await guardarAhora(); avisar('Guardado en la carpeta') })}>Guardar ahora</button>
+          {/if}
+          <button class="btn" disabled={ocupado} onclick={() => tarea(establecerCarpeta)}>Cambiar carpeta…</button>
+          <button class="btn peligro" onclick={dejar}>Dejar de usar</button>
+        </div>
+      {/if}
+    </section>
+
     <section>
       <div class="rotulo">Exportar</div>
       <div class="fila envolver">
-        <button class="btn primario" onclick={descargarTodo}><Icono nombre="datos" />Descargar los 3 JSON</button>
+        <button class="btn" onclick={descargarTodo}><Icono nombre="datos" />Descargar los 3 JSON</button>
         <button class="btn" onclick={() => descargarBib(S.fuentes)}>Exportar .bib (toda la biblioteca)</button>
       </div>
       <p class="suave nota">{S.proyectos.length} proyectos · {S.fuentes.length} fuentes · {S.citas.length} citas</p>
@@ -97,29 +120,19 @@
       </div>
       <p class="suave nota">Puedes elegir uno, dos o los tres archivos. También puedes arrastrarlos sobre la ventana.</p>
     </section>
-
-    {#if soportaCarpeta}
-      <section>
-        <div class="rotulo">Carpeta sincronizada</div>
-        <p class="suave nota">
-          {carpeta ? `Carpeta: "${carpeta.name}". ` : ''}Guarda los JSON (y los documentos en <code>fuentes/&lt;id&gt;/</code>)
-          directamente en la carpeta de trabajo donde la skill los lee.
-        </p>
-        <div class="fila envolver">
-          <button class="btn" disabled={ocupado} onclick={guardarCarpeta}>Guardar en carpeta</button>
-          <button class="btn" disabled={ocupado} onclick={cargarCarpeta}>Cargar desde carpeta</button>
-          <button class="btn fantasma" disabled={ocupado} onclick={elegir}>{carpeta ? 'Cambiar carpeta…' : 'Elegir carpeta…'}</button>
-        </div>
-      </section>
-    {/if}
   {/if}
 </Modal>
 
 <style>
-  .intro { margin: 0; font-size: 13px; line-height: 1.55; }
   section { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line); padding-top: 16px; }
-  .nota { margin: 0; font-size: 12px; line-height: 1.5; }
+  section.primera { border-top: none; padding-top: 0; }
+  .nota { margin: 0; font-size: 13px; line-height: 1.55; }
   .resumen { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.7; }
   .aviso-imp { margin: 0; font-size: 12px; color: var(--reviewed); }
   code { font-size: 12px; }
+  .carpeta { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--using-bg); color: var(--using); }
+  .carpeta.alerta { background: var(--reviewed-bg); color: var(--reviewed); }
+  .carpeta-txt { display: flex; flex-direction: column; gap: 2px; font-size: 13px; min-width: 0; }
+  .carpeta-txt b { color: var(--ink); font-size: 14px; overflow-wrap: anywhere; }
+  .error { color: var(--unreviewed); font-size: 12px; }
 </style>

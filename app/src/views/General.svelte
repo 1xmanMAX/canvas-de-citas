@@ -83,7 +83,7 @@
   <div class="espacio solo-escritorio"></div>
   <button class="btn solo-escritorio" onclick={() => descargarBib(visibles)}>Exportar .bib</button>
   <button class="btn primario" aria-label="Agregar fuente" onclick={() => (modal = proyecto ? 'agregar' : 'nueva')}><span class="solo-escritorio">+ Agregar fuente</span><span class="solo-movil">+</span></button>
-  <button class="icono-btn" aria-label="Datos" title="Datos" onclick={abrirDatos}><Icono nombre="datos" tam={18} /></button>
+  <button class="icono-btn" aria-label="Configuración" title="Configuración" onclick={abrirDatos}><Icono nombre="ajustes" tam={18} /></button>
 </header>
 
 <div class="cuerpo">

@@ -81,6 +81,12 @@ export async function cargar() {
   navigator.storage?.persist?.().catch(() => {})
 }
 
+// --- Aviso de cambios (lo usa la carpeta de almacenamiento para guardar sola) ---
+let oyente = null
+export const alCambiar = fn => (oyente = fn)
+/** @param {string} [docId] fuente cuyo documento original cambió */
+const cambio = docId => oyente?.(docId)
+
 let temporizador
 export function avisar(texto) {
   S.aviso = texto
@@ -105,6 +111,7 @@ function guardarEn(col, mapa, obj) {
     item = S[col].at(-1)
   } else if (item !== obj) Object.assign(item, obj)
   db.poner(col, snap(item)).catch(fallo)
+  cambio()
   return item
 }
 
@@ -151,6 +158,7 @@ function quitar(col, ids) {
   if (!set.size) return
   S[col] = S[col].filter(x => !set.has(x.id))
   db.borrarVarios(col, [...set]).catch(fallo)
+  cambio()
 }
 
 function limpiarLienzo(p, fid) {
@@ -196,6 +204,7 @@ export async function adjuntarDocumento(f, archivo) {
   await db.poner('documentos', { nombre: archivo.name, tipo: archivo.type, blob: archivo }, f.id)
   f.documento_original = `fuentes/${f.id}/documento.${ext}`
   guardarFuente(f)
+  cambio(f.id)
 }
 
 export async function quitarDocumento(f) {
@@ -229,6 +238,7 @@ export async function importar(datos, modo) {
     S[col] = resultado
   }
   await db.poner('meta', { ...tope }, 'tope')
+  cambio()
 }
 
 export const leerMeta = clave => db.leer('meta', clave)
