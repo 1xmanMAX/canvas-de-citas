@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canvas de Citas — Tesis</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&amp;family=Work+Sans:wght@400;500;600&amp;display=swap">
+<style>
+body{
+  margin:0;
+  font-family:'Work Sans',system-ui,sans-serif;
+  --paper:#F7F5EF;
+  --paper-dim:#EFEAE0;
+  --ink:#211F1A;
+  --ink-soft:#6B6559;
+  --line:#DFD8C8;
+  --accent:#2E4B5E;
+  --accent-soft:#E3E9EC;
+  --using:#3E7A5C;
+  --using-bg:#E4EEE7;
+  --reviewed:#B8842E;
+  --reviewed-bg:#F5EAD6;
+  --unreviewed:#B0503B;
+  --unreviewed-bg:#F3E3DD;
+}
+a{color:var(--accent)}
+a:hover{color:var(--ink)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+</style>
+</head>
+<body>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; background: var(--paper); color: var(--ink); display: flex; flex-direction: column; overflow: hidden;">
+
+  <header style="height: 72px; flex-shrink: 0; display: flex; align-items: center; gap: 20px; padding: 0 28px; background: var(--paper-dim); border-bottom: 1px solid var(--line); box-sizing: border-box;">
+    <div style="width: 28px; height: 28px; border-radius: 8px; background: var(--accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+      <span style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 15px; color: var(--paper); line-height: 1;">C</span>
+    </div>
+    <a href="1-proyectos.html" style="font-size: 14px; font-weight: 500; text-decoration: none; color: var(--ink-soft);">Proyectos</a>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B6559" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    <span style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 16px;">Comportamiento estructural de puentes en zonas sísmicas</span>
+    <div style="flex-grow: 1;"></div>
+    <label for="search2" class="sr-only">Buscar fuentes</label>
+    <input id="search2" type="search" placeholder="Buscar fuente..." style="width: 240px; box-sizing: border-box; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); font-size: 13px;">
+    <button style="padding: 8px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font-size: 13px; font-weight: 500; cursor: pointer;">Exportar .bib</button>
+  </header>
+
+  <div style="flex-grow: 1; display: flex; min-height: 0;">
+
+    <!-- Sidebar: project sheet -->
+    <aside style="width: 320px; flex-shrink: 0; background: var(--paper); border-right: 1px solid var(--line); padding: 26px 24px; box-sizing: border-box; overflow-y: auto; display: flex; flex-direction: column; gap: 20px;">
+
+      <span style="display: inline-block; padding: 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; width: fit-content;">Tesis</span>
+
+      <div>
+        <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 6px;">Objetivo general</div>
+        <div style="font-size: 13px; line-height: 1.5;">Evaluar el comportamiento estructural de puentes de concreto armado sometidos a cargas sísmicas en la costa peruana.</div>
+      </div>
+
+      <div>
+        <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 6px;">Objetivos específicos</div>
+        <ol style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6;">
+          <li>Analizar el desempeño sismorresistente de tres tipologías de puentes.</li>
+          <li>Proponer criterios de diseño basados en desempeño para zonas de alta sismicidad.</li>
+        </ol>
+      </div>
+
+      <div>
+        <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 6px;">Indicadores</div>
+        <ul style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6;">
+          <li>Índice de daño estructural (IDE)</li>
+          <li>Desplazamiento relativo de entrepiso</li>
+        </ul>
+      </div>
+
+      <div style="height: 1px; background: var(--line);"></div>
+
+      <div>
+        <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 10px;">Leyenda</div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;"><span style="width: 9px; height: 9px; border-radius: 50%; background: var(--using); display: inline-block;"></span>Usando en el texto</div>
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;"><span style="width: 9px; height: 9px; border-radius: 50%; background: var(--reviewed); display: inline-block;"></span>Revisado, no usado</div>
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;"><span style="width: 9px; height: 9px; border-radius: 50%; background: var(--unreviewed); display: inline-block;"></span>Sin revisar</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Hub canvas -->
+    <div style="flex-grow: 1; position: relative; overflow: hidden; background-image: radial-gradient(circle, #DFD8C8 1px, transparent 1px); background-size: 22px 22px; background-color: var(--paper);">
+
+      <svg style="position: absolute; inset: 0; width: 1120px; height: 828px; pointer-events: none;">
+        <line x1="560" y1="414" x2="560" y2="84" stroke="#6B6559" stroke-width="1" stroke-opacity="0.3"></line>
+        <line x1="560" y1="414" x2="754" y2="147" stroke="#6B6559" stroke-width="1" stroke-opacity="0.3"></line>
+        <line x1="560" y1="414" x2="874" y2="312" stroke="#6B6559" stroke-width="1" stroke-opacity="0.3"></line>
+        <line x1="560" y1="414" x2="874" y2="516" stroke="#6B6559" stroke-width="1" stroke-opacity="0.3"></line>
+        <line x1="560" y1="414" x2="754" y2="681" stroke="#6B6559" stroke-width="1" stroke-opacity="0.3"></line>
+        <line x1="560" y1="414" x2="560" y2="744" stroke="#6B6559" stroke-width="1" stroke-opacity="0.3"></line>
+        <line x1="560" y1="414" x2="366" y2="681" stroke="#6B6559" stroke-width="1" stroke-opacity="0.3"></line>
+        <line x1="560" y1="414" x2="246" y2="516" stroke="#6B6559" stroke-width="1" stroke-opacity="0.3"></line>
+        <line x1="560" y1="414" x2="246" y2="312" stroke="#6B6559" stroke-width="1" stroke-opacity="0.3"></line>
+        <line x1="560" y1="414" x2="366" y2="147" stroke="#6B6559" stroke-width="1" stroke-opacity="0.3"></line>
+        <line x1="874" y1="312" x2="754" y2="681" stroke="#2E4B5E" stroke-width="1.5" stroke-dasharray="5 4" stroke-opacity="0.55"></line>
+        <line x1="84" y1="645" x2="100" y2="61" stroke="#2E4B5E" stroke-width="1.5" stroke-dasharray="5 4" stroke-opacity="0.55"></line>
+        <line x1="84" y1="645" x2="366" y2="681" stroke="#2E4B5E" stroke-width="1.5" stroke-dasharray="5 4" stroke-opacity="0.55"></line>
+      </svg>
+
+      <!-- Floating toolbar: add note / photo / connection, and arrange -->
+      <div style="position: absolute; top: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 6px; box-shadow: 0 4px 14px rgba(33,31,26,0.12); z-index: 2;">
+        <button aria-label="Añadir nota" style="width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border: none; background: none; border-radius: 8px; cursor: pointer; color: var(--ink-soft);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h11l5 5v11H4z"></path><path d="M15 4v5h5"></path></svg>
+        </button>
+        <button aria-label="Añadir foto" style="width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border: none; background: none; border-radius: 8px; cursor: pointer; color: var(--ink-soft);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+        </button>
+        <button aria-label="Conectar elementos" style="width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border: none; background: none; border-radius: 8px; cursor: pointer; color: var(--ink-soft);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l2-2a5 5 0 0 0-7.07-7.07l-1 1"></path><path d="M14 11a5 5 0 0 0-7.07 0l-2 2a5 5 0 0 0 7.07 7.07l1-1"></path></svg>
+        </button>
+        <div style="width: 1px; height: 22px; background: var(--line); margin: 0 4px;"></div>
+        <div style="display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden;">
+          <button aria-pressed="true" style="padding: 6px 12px; border: none; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 500; cursor: pointer;">Radial</button>
+          <button aria-pressed="false" style="padding: 6px 12px; border: none; border-left: 1px solid var(--line); background: var(--paper); color: var(--ink-soft); font-size: 12px; cursor: pointer;">Libre</button>
+          <button aria-pressed="false" style="padding: 6px 12px; border: none; border-left: 1px solid var(--line); background: var(--paper); color: var(--ink-soft); font-size: 12px; cursor: pointer;">Por tema</button>
+        </div>
+      </div>
+
+      <!-- Manual connection label -->
+      <div style="position: absolute; top: 486px; left: 758px; background: var(--paper); border: 1px solid var(--accent); color: var(--accent); font-size: 10px; padding: 2px 8px; border-radius: 999px; white-space: nowrap;">misma metodología</div>
+
+      <!-- Sticky note -->
+      <div style="position: absolute; top: 16px; left: 16px; width: 168px; background: #FBEFC0; border-radius: 4px; padding: 14px 16px; box-shadow: 0 6px 14px rgba(33,31,26,0.15); transform: rotate(-2deg); font-size: 12.5px; line-height: 1.5; color: #4A3F1E;">Revisar con el asesor si conviene citar directo a MTC (2022) o buscar la norma técnica original.</div>
+
+      <!-- Photo attached to the graph -->
+      <div style="position: absolute; top: 600px; left: 24px; width: 120px;">
+        <div style="width: 120px; height: 90px; border-radius: 10px; background: #E4E0D4; border: 1px solid var(--line); display: flex; align-items: center; justify-content: center;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6B6559" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+        </div>
+        <div style="font-size: 11px; color: var(--ink-soft); margin-top: 6px; line-height: 1.4;">Foto: ensayo en laboratorio, feb. 2026</div>
+        <div style="display: flex; align-items: center; gap: 4px; margin-top: 5px; color: var(--accent); font-size: 10px;">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l2-2a5 5 0 0 0-7.07-7.07l-1 1"></path><path d="M14 11a5 5 0 0 0-7.07 0l-2 2a5 5 0 0 0 7.07 7.07l1-1"></path></svg>
+          2 conexiones
+        </div>
+      </div>
+
+      <!-- Hub: the thesis itself, styled as a card like the sources around it -->
+      <div style="position: absolute; top: 322px; left: 350px; width: 420px; box-sizing: border-box; border-radius: 16px; background: var(--paper); border: 2px solid var(--accent); padding: 22px 26px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 10px 24px rgba(46,75,94,0.22);">
+        <span style="display: inline-block; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; width: fit-content;">Tesis</span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 20px; line-height: 1.35; color: var(--ink);">Comportamiento estructural de puentes en zonas sísmicas</div>
+        <div style="font-size: 12px; color: var(--ink-soft);">42 fuentes</div>
+      </div>
+
+      <!-- Satellite: Villarreal, 2018 — highlighted / clickable -->
+      <a href="3-fuente-citas.html" style="position: absolute; top: 52px; left: 490px; width: 140px; text-decoration: none; color: inherit; display: block; padding: 10px 12px; border-radius: 10px; border: 2px solid var(--using); background: var(--paper-dim); box-shadow: 0 6px 14px rgba(62,122,92,0.22);">
+        <span style="display: flex; align-items: center; gap: 6px; margin-bottom: 3px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--using); display: inline-block;"></span><span style="font-size: 11px; color: var(--ink-soft);">2018</span></span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px;">Villarreal</div>
+        <div style="font-size: 10px; color: var(--using); margin-top: 3px;">Ver citas →</div>
+        <span style="display: inline-block; margin-top: 6px; padding: 2px 7px; border-radius: 999px; background: var(--paper); border: 1px solid var(--line); font-size: 10px; color: var(--ink-soft);">cap. 2</span>
+      </a>
+
+      <!-- Satellite: ASCE, 2016 -->
+      <a href="3-fuente-citas.html" style="position: absolute; top: 115px; left: 684px; width: 140px; text-decoration: none; color: inherit; display: block; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-dim); box-shadow: 0 1px 2px rgba(33,31,26,0.06);">
+        <span style="display: flex; align-items: center; gap: 6px; margin-bottom: 3px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--using); display: inline-block;"></span><span style="font-size: 11px; color: var(--ink-soft);">2016</span></span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px;">ASCE</div>
+      </a>
+
+      <!-- Satellite: Priestley et al., 2007 -->
+      <a href="3-fuente-citas.html" style="position: absolute; top: 280px; left: 804px; width: 140px; text-decoration: none; color: inherit; display: block; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-dim); box-shadow: 0 1px 2px rgba(33,31,26,0.06);">
+        <span style="display: flex; align-items: center; gap: 6px; margin-bottom: 3px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--using); display: inline-block;"></span><span style="font-size: 11px; color: var(--ink-soft);">2007</span></span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px;">Priestley et al.</div>
+      </a>
+
+      <!-- Satellite: MTC, 2021 (reviewed, not used) -->
+      <a href="3-fuente-citas.html" style="position: absolute; top: 484px; left: 804px; width: 140px; text-decoration: none; color: inherit; display: block; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-dim); box-shadow: 0 1px 2px rgba(33,31,26,0.06);">
+        <span style="display: flex; align-items: center; gap: 6px; margin-bottom: 3px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--reviewed); display: inline-block;"></span><span style="font-size: 11px; color: var(--ink-soft);">2021</span></span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px;">MTC</div>
+        <span style="display: inline-block; margin-top: 6px; padding: 2px 7px; border-radius: 999px; background: var(--paper); border: 1px solid var(--line); font-size: 10px; color: var(--ink-soft);">normativa</span>
+      </a>
+
+      <!-- Satellite: Chopra, 2012 -->
+      <a href="3-fuente-citas.html" style="position: absolute; top: 649px; left: 684px; width: 140px; text-decoration: none; color: inherit; display: block; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-dim); box-shadow: 0 1px 2px rgba(33,31,26,0.06);">
+        <span style="display: flex; align-items: center; gap: 6px; margin-bottom: 3px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--using); display: inline-block;"></span><span style="font-size: 11px; color: var(--ink-soft);">2012</span></span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px;">Chopra</div>
+      </a>
+
+      <!-- Satellite: SENCICO, 2019 (unreviewed) -->
+      <a href="3-fuente-citas.html" style="position: absolute; top: 712px; left: 490px; width: 140px; text-decoration: none; color: inherit; display: block; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-dim); box-shadow: 0 1px 2px rgba(33,31,26,0.06);">
+        <span style="display: flex; align-items: center; gap: 6px; margin-bottom: 3px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--unreviewed); display: inline-block;"></span><span style="font-size: 11px; color: var(--ink-soft);">2019</span></span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px;">SENCICO</div>
+      </a>
+
+      <!-- Satellite: Bertero, 2000 (reviewed, not used) -->
+      <a href="3-fuente-citas.html" style="position: absolute; top: 649px; left: 296px; width: 140px; text-decoration: none; color: inherit; display: block; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-dim); box-shadow: 0 1px 2px rgba(33,31,26,0.06);">
+        <span style="display: flex; align-items: center; gap: 6px; margin-bottom: 3px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--reviewed); display: inline-block;"></span><span style="font-size: 11px; color: var(--ink-soft);">2000</span></span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px;">Bertero</div>
+      </a>
+
+      <!-- Satellite: Paulay & Priestley, 1992 (unreviewed) -->
+      <a href="3-fuente-citas.html" style="position: absolute; top: 484px; left: 176px; width: 140px; text-decoration: none; color: inherit; display: block; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-dim); box-shadow: 0 1px 2px rgba(33,31,26,0.06);">
+        <span style="display: flex; align-items: center; gap: 6px; margin-bottom: 3px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--unreviewed); display: inline-block;"></span><span style="font-size: 11px; color: var(--ink-soft);">1992</span></span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px;">Paulay &amp; Priestley</div>
+      </a>
+
+      <!-- Satellite: Ottazzi, 2015 (reviewed, not used) -->
+      <a href="3-fuente-citas.html" style="position: absolute; top: 280px; left: 176px; width: 140px; text-decoration: none; color: inherit; display: block; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-dim); box-shadow: 0 1px 2px rgba(33,31,26,0.06);">
+        <span style="display: flex; align-items: center; gap: 6px; margin-bottom: 3px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--reviewed); display: inline-block;"></span><span style="font-size: 11px; color: var(--ink-soft);">2015</span></span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px;">Ottazzi</div>
+      </a>
+
+      <!-- Satellite: AASHTO, 2020 (unreviewed) -->
+      <a href="3-fuente-citas.html" style="position: absolute; top: 115px; left: 296px; width: 140px; text-decoration: none; color: inherit; display: block; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-dim); box-shadow: 0 1px 2px rgba(33,31,26,0.06);">
+        <span style="display: flex; align-items: center; gap: 6px; margin-bottom: 3px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: var(--unreviewed); display: inline-block;"></span><span style="font-size: 11px; color: var(--ink-soft);">2020</span></span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px;">AASHTO</div>
+      </a>
+
+      <div style="position: absolute; bottom: 20px; right: 20px; display: flex; align-items: center; gap: 2px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 4px; box-shadow: 0 2px 8px rgba(33,31,26,0.08);">
+        <button aria-label="Alejar" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: none; background: none; border-radius: 6px; cursor: pointer; color: var(--ink-soft);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <span style="font-size: 12px; color: var(--ink-soft); width: 40px; text-align: center;">100%</span>
+        <button aria-label="Acercar" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: none; background: none; border-radius: 6px; cursor: pointer; color: var(--ink-soft);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

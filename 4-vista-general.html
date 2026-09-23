@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canvas de Citas — vista principal</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&amp;family=Work+Sans:wght@400;500;600&amp;display=swap">
+<style>
+body{
+  margin:0;
+  font-family:'Work Sans',system-ui,sans-serif;
+  --paper:#F7F5EF;
+  --paper-dim:#EFEAE0;
+  --ink:#211F1A;
+  --ink-soft:#6B6559;
+  --line:#DFD8C8;
+  --accent:#2E4B5E;
+  --accent-soft:#E3E9EC;
+  --verified:#3E7A5C;
+  --verified-bg:#E4EEE7;
+  --partial:#B8842E;
+  --partial-bg:#F5EAD6;
+  --unverified:#B0503B;
+  --unverified-bg:#F3E3DD;
+}
+a{color:var(--accent)}
+a:hover{color:var(--ink)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+</style>
+</head>
+<body>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; background: var(--paper); color: var(--ink); display: flex; flex-direction: column; overflow: hidden;">
+
+  <!-- Header -->
+  <header style="height: 72px; flex-shrink: 0; display: flex; align-items: center; gap: 24px; padding: 0 28px; background: var(--paper-dim); border-bottom: 1px solid var(--line); box-sizing: border-box;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="width: 28px; height: 28px; border-radius: 8px; background: var(--accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <span style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 15px; color: var(--paper); line-height: 1;">C</span>
+      </div>
+      <span style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 21px; letter-spacing: -0.01em;">Canvas de Citas</span>
+      <span style="font-size: 13px; color: var(--ink-soft); margin-left: 2px;">Tesis · Max</span>
+    </div>
+
+    <div style="flex-grow: 1; max-width: 480px; position: relative;">
+      <label for="search" class="sr-only">Buscar citas</label>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B6559" stroke-width="2" stroke-linecap="round" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%);">
+        <circle cx="11" cy="11" r="7"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input id="search" type="search" placeholder="Buscar por autor, año o palabra clave..." style="width: 100%; box-sizing: border-box; padding: 9px 14px 9px 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); font-family: 'Work Sans', sans-serif; font-size: 14px; color: var(--ink);">
+    </div>
+
+    <div style="flex-grow: 1;"></div>
+
+    <button style="padding: 9px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font-family: 'Work Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer;">Exportar .bib</button>
+    <button style="padding: 9px 16px; border-radius: 8px; border: none; background: var(--accent); color: var(--paper); font-family: 'Work Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer;">+ Agregar cita</button>
+  </header><div style="flex-grow: 1; display: flex; min-height: 0;">
+
+    <!-- Sidebar -->
+    <aside style="width: 264px; flex-shrink: 0; background: var(--paper); border-right: 1px solid var(--line); padding: 24px 22px; box-sizing: border-box; overflow-y: auto; display: flex; flex-direction: column; gap: 28px;">
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);">Tipo de fuente</div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="t-art" checked="" style="accent-color: var(--accent);">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6B6559" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="13" y2="17"></line></svg>
+            <label for="t-art" style="font-size: 14px;">Artículo científico</label>
+          </div>
+          <span style="font-size: 12px; color: var(--ink-soft);">24</span>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="t-lib" checked="" style="accent-color: var(--accent);">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6B6559" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v16H6.5A2.5 2.5 0 0 0 4 20.5z"></path><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20"></path></svg>
+            <label for="t-lib" style="font-size: 14px;">Libro</label>
+          </div>
+          <span style="font-size: 12px; color: var(--ink-soft);">6</span>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="t-norm" checked="" style="accent-color: var(--accent);">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6B6559" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"></path><path d="M5 7h5"></path><path d="M14 7h5"></path><path d="M3.5 7l3 6a3 3 0 0 0 3 0l-3-6z"></path><path d="M14.5 7l3 6a3 3 0 0 0 3 0l-3-6z"></path><path d="M7 21h10"></path></svg>
+            <label for="t-norm" style="font-size: 14px;">Normativa técnica</label>
+          </div>
+          <span style="font-size: 12px; color: var(--ink-soft);">9</span>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="t-otro" checked="" style="accent-color: var(--accent);">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6B6559" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12.5l-8 8a2 2 0 0 1-2.8 0l-6.2-6.2a2 2 0 0 1 0-2.8l8-8H18a2.5 2.5 0 0 1 2.5 2.5z"></path><circle cx="14.5" cy="7.5" r="1.2"></circle></svg>
+            <label for="t-otro" style="font-size: 14px;">Otro</label>
+          </div>
+          <span style="font-size: 12px; color: var(--ink-soft);">3</span>
+        </div>
+      </div>
+
+      <div style="height: 1px; background: var(--line);"></div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);">Estado de verificación</div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="width: 9px; height: 9px; border-radius: 50%; background: var(--verified); display: inline-block;"></span>
+            <span style="font-size: 14px;">Verificado</span>
+          </div>
+          <span style="font-size: 12px; color: var(--ink-soft);">31</span>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="width: 9px; height: 9px; border-radius: 50%; background: var(--partial); display: inline-block;"></span>
+            <span style="font-size: 14px;">Verificado parcial</span>
+          </div>
+          <span style="font-size: 12px; color: var(--ink-soft);">7</span>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="width: 9px; height: 9px; border-radius: 50%; background: var(--unverified); display: inline-block;"></span>
+            <span style="font-size: 14px;">No verificado</span>
+          </div>
+          <span style="font-size: 12px; color: var(--ink-soft);">4</span>
+        </div>
+      </div>
+
+      <div style="height: 1px; background: var(--line);"></div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);">Ordenar por</div>
+        <div style="display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden;">
+          <button aria-pressed="true" style="flex-grow: 1; padding: 7px 0; border: none; background: var(--accent-soft); color: var(--accent); font-size: 13px; font-weight: 500; cursor: pointer;">Autor</button>
+          <button aria-pressed="false" style="flex-grow: 1; padding: 7px 0; border: none; border-left: 1px solid var(--line); background: var(--paper); color: var(--ink-soft); font-size: 13px; cursor: pointer;">Año</button>
+          <button aria-pressed="false" style="flex-grow: 1; padding: 7px 0; border: none; border-left: 1px solid var(--line); background: var(--paper); color: var(--ink-soft); font-size: 13px; cursor: pointer;">Tema</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Canvas -->
+    <div style="flex-grow: 1; position: relative; overflow: hidden; background-image: radial-gradient(circle, #DFD8C8 1px, transparent 1px); background-size: 22px 22px; background-color: var(--paper);">
+
+      <svg style="position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;">
+        <line x1="135" y1="145" x2="255" y2="235" stroke="#6B6559" stroke-width="1" stroke-opacity="0.25"></line>
+        <line x1="255" y1="235" x2="375" y2="125" stroke="#6B6559" stroke-width="1" stroke-opacity="0.25"></line>
+        <line x1="305" y1="375" x2="475" y2="455" stroke="#6B6559" stroke-width="1" stroke-opacity="0.3"></line>
+        <line x1="305" y1="375" x2="555" y2="335" stroke="#6B6559" stroke-width="1" stroke-opacity="0.3"></line>
+        <line x1="415" y1="595" x2="595" y2="675" stroke="#6B6559" stroke-width="1" stroke-opacity="0.25"></line>
+        <line x1="595" y1="675" x2="675" y2="555" stroke="#6B6559" stroke-width="1" stroke-opacity="0.25"></line>
+        <line x1="305" y1="375" x2="415" y2="595" stroke="#6B6559" stroke-width="1" stroke-opacity="0.12"></line>
+      </svg>
+
+      <div style="position: absolute; top: 18px; left: 40px; font-family: 'Fraunces', serif; font-size: 34px; font-weight: 600; color: var(--ink); opacity: 0.08; text-transform: uppercase; letter-spacing: 0.02em; pointer-events: none;">Topografía</div>
+      <div style="position: absolute; top: 248px; left: 220px; font-family: 'Fraunces', serif; font-size: 34px; font-weight: 600; color: var(--ink); opacity: 0.08; text-transform: uppercase; letter-spacing: 0.02em; pointer-events: none;">Resistencia de materiales</div>
+      <div style="position: absolute; top: 478px; left: 340px; font-family: 'Fraunces', serif; font-size: 34px; font-weight: 600; color: var(--ink); opacity: 0.08; text-transform: uppercase; letter-spacing: 0.02em; pointer-events: none;">Normativa y métodos</div>
+
+      <!-- Node A -->
+      <button style="position: absolute; top: 110px; left: 60px; width: 150px; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-dim); box-shadow: 0 1px 2px rgba(33,31,26,0.06); cursor: pointer;">
+        <span style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--verified); display: inline-block;"></span>
+          <span style="font-size: 11px; color: var(--ink-soft);">2021</span>
+        </span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px; color: var(--ink);">Huamán</div>
+        <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Levantamiento con RTK</div>
+      </button>
+
+      <!-- Node B -->
+      <button style="position: absolute; top: 200px; left: 180px; width: 150px; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-dim); box-shadow: 0 1px 2px rgba(33,31,26,0.06); cursor: pointer;">
+        <span style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--verified); display: inline-block;"></span>
+          <span style="font-size: 11px; color: var(--ink-soft);">2019</span>
+        </span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px; color: var(--ink);">INEI</div>
+        <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Censo de infraestructura vial</div>
+      </button>
+
+      <!-- Node C -->
+      <button style="position: absolute; top: 90px; left: 300px; width: 150px; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-dim); box-shadow: 0 1px 2px rgba(33,31,26,0.06); cursor: pointer;">
+        <span style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--partial); display: inline-block;"></span>
+          <span style="font-size: 11px; color: var(--ink-soft);">2015</span>
+        </span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px; color: var(--ink);">ISO</div>
+        <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ISO 17123: métodos de campo</div>
+      </button>
+
+      <!-- Node D — selected -->
+      <button style="position: absolute; top: 340px; left: 230px; width: 150px; text-align: left; padding: 10px 12px; border-radius: 10px; border: 2px solid var(--accent); background: var(--paper); box-shadow: 0 4px 10px rgba(46,75,94,0.18); cursor: pointer;">
+        <span style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--verified); display: inline-block;"></span>
+          <span style="font-size: 11px; color: var(--ink-soft);">2020</span>
+        </span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px; color: var(--ink);">García</div>
+        <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Resistencia a compresión</div>
+      </button>
+
+      <!-- Node E -->
+      <button style="position: absolute; top: 420px; left: 400px; width: 150px; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-dim); box-shadow: 0 1px 2px rgba(33,31,26,0.06); cursor: pointer;">
+        <span style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--unverified); display: inline-block;"></span>
+          <span style="font-size: 11px; color: var(--ink-soft);">2019</span>
+        </span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px; color: var(--ink);">Torres et al.</div>
+        <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Ensayos triaxiales</div>
+      </button>
+
+      <!-- Node F -->
+      <button style="position: absolute; top: 300px; left: 480px; width: 150px; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-dim); box-shadow: 0 1px 2px rgba(33,31,26,0.06); cursor: pointer;">
+        <span style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--verified); display: inline-block;"></span>
+          <span style="font-size: 11px; color: var(--ink-soft);">2018</span>
+        </span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px; color: var(--ink);">Medina</div>
+        <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Propiedades del concreto</div>
+      </button>
+
+      <!-- Node G -->
+      <button style="position: absolute; top: 560px; left: 340px; width: 150px; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-dim); box-shadow: 0 1px 2px rgba(33,31,26,0.06); cursor: pointer;">
+        <span style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--verified); display: inline-block;"></span>
+          <span style="font-size: 11px; color: var(--ink-soft);">2022</span>
+        </span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px; color: var(--ink);">MTC</div>
+        <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Manual de carreteras</div>
+      </button>
+
+      <!-- Node H -->
+      <button style="position: absolute; top: 640px; left: 520px; width: 150px; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-dim); box-shadow: 0 1px 2px rgba(33,31,26,0.06); cursor: pointer;">
+        <span style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--partial); display: inline-block;"></span>
+          <span style="font-size: 11px; color: var(--ink-soft);">2016</span>
+        </span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px; color: var(--ink);">ASTM</div>
+        <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">D2487: suelos</div>
+      </button>
+
+      <!-- Node I -->
+      <button style="position: absolute; top: 520px; left: 600px; width: 150px; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-dim); box-shadow: 0 1px 2px rgba(33,31,26,0.06); cursor: pointer;">
+        <span style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--unverified); display: inline-block;"></span>
+          <span style="font-size: 11px; color: var(--ink-soft);">2020</span>
+        </span>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 13px; color: var(--ink);">Quispe</div>
+        <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Estabilización de taludes</div>
+      </button>
+
+      <div style="position: absolute; bottom: 20px; right: 20px; display: flex; align-items: center; gap: 2px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 4px; box-shadow: 0 2px 8px rgba(33,31,26,0.08);">
+        <button aria-label="Alejar" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: none; background: none; border-radius: 6px; cursor: pointer; color: var(--ink-soft);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <span style="font-size: 12px; color: var(--ink-soft); width: 40px; text-align: center;">100%</span>
+        <button aria-label="Acercar" style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: none; background: none; border-radius: 6px; cursor: pointer; color: var(--ink-soft);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Detail panel -->
+    <aside style="width: 380px; flex-shrink: 0; background: var(--paper-dim); border-left: 1px solid var(--line); padding: 26px 26px; box-sizing: border-box; overflow-y: auto; display: flex; flex-direction: column; gap: 18px;">
+
+      <div style="display: flex; align-items: flex-start; justify-content: space-between;">
+        <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--verified-bg); color: var(--verified); font-size: 12px; font-weight: 500;">
+          <span style="width: 7px; height: 7px; border-radius: 50%; background: var(--verified); display: inline-block;"></span>
+          Verificado · CrossRef
+        </span>
+        <button aria-label="Cerrar detalle" style="border: none; background: none; padding: 2px; cursor: pointer;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B6559" stroke-width="2" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div>
+        <div style="font-family: 'Fraunces', serif; font-weight: 600; font-size: 19px; line-height: 1.3; color: var(--ink);">Resistencia a compresión en concreto reforzado</div>
+        <div style="font-size: 13px; color: var(--ink-soft); margin-top: 6px;">García, M. · 2020 · Artículo científico</div>
+      </div>
+
+      <div style="height: 1px; background: var(--line);"></div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);">Cita en texto</div>
+        <div style="font-family: 'Work Sans', sans-serif; font-size: 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; color: var(--ink);">(García, 2020, p. 45)</div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);">Entrada de bibliografía</div>
+        <div style="font-family: 'Work Sans', sans-serif; font-size: 13px; line-height: 1.5; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; color: var(--ink);">García, M. (2020). Resistencia a compresión en concreto reforzado. Revista de Ingeniería Civil, 11(41), 29-60.</div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);">Notas de corrección</div>
+        <div style="font-size: 13px; line-height: 1.5; color: var(--ink-soft);">Año corregido de 2019 a 2020, según CrossRef.</div>
+      </div>
+
+      <div style="height: 1px; background: var(--line);"></div>
+
+      <div style="display: flex; gap: 10px; margin-top: 2px;">
+        <button style="flex-grow: 1; padding: 9px 0; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font-family: 'Work Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer;">Editar</button>
+        <a href="https://doi.org/10.xxxx/xxxxx" style="flex-grow: 1; text-align: center; padding: 9px 0; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font-family: 'Work Sans', sans-serif; font-size: 13px; font-weight: 500; text-decoration: none;">Ver fuente ↗</a>
+      </div>
+      <button style="padding: 8px 0; border: none; background: none; color: var(--unverified); font-family: 'Work Sans', sans-serif; font-size: 13px; cursor: pointer;">Eliminar cita</button>
+    </aside>
+  </div>
+</div>
+</body>
+</html>
