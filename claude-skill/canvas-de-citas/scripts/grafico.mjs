@@ -6,9 +6,15 @@ const FUENTE = "'Segoe UI', Arial, Helvetica, sans-serif"
 const W = 760, H = 460
 
 const esc = t => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+// Formato de números: --decimales n fija los decimales; --coma usa coma decimal.
+let FMT = { coma: false, decimales: null }
 const fmt = (v, unidad = '') => {
-  const n = Math.abs(v) >= 1000 ? v.toLocaleString('es-PE', { maximumFractionDigits: 0 }) : +v.toFixed(Math.abs(v) < 10 ? 2 : 1)
-  return `${String(n).replace(/\.0+$/, '')}${unidad}`
+  let t
+  if (FMT.decimales !== null) t = v.toFixed(FMT.decimales)
+  else t = Math.abs(v) >= 1000 ? String(Math.round(v)) : String(+v.toFixed(Math.abs(v) < 10 ? 2 : 1))
+  if (Math.abs(v) >= 1000) t = t.replace(/\B(?=(\d{3})+(?!\d))/g, FMT.coma ? '.' : ',')
+  if (FMT.coma) t = t.replace(/\.(\d+)$/, ',$1')
+  return `${t}${unidad}`
 }
 
 /** Divisiones "redondas" del eje (1, 2, 2.5, 5 × 10^n). */
@@ -179,6 +185,7 @@ export const TIPOS = { barras, 'barras-h': barrasH, lineas, dona, pastel: dona, 
 
 /** Devuelve el SVG de un gráfico. `datos` según el tipo (ver SKILL.md); `o`: titulo, subtitulo, fuente, unidad, ejeX, ejeY, valores. */
 export function grafico(tipo, datos, o = {}) {
+  FMT = { coma: !!o.coma, decimales: Number.isFinite(o.decimales) ? o.decimales : null }
   const f = TIPOS[tipo]
   if (!f) throw new Error(`Tipo de gráfico desconocido: ${tipo}. Usa: ${Object.keys(TIPOS).join(', ')}`)
   return f(datos, o)

@@ -312,17 +312,21 @@ C.imagen = () => {
 C.grafico = () => {
   const tipo = pos[0] || fallar('Falta el tipo: barras, barras-h, lineas, dona, dispersion')
   const datos = leerJsonOp('datos') || fallar('Falta --datos (o --datos-archivo)')
-  const svg = grafico(tipo, datos, { titulo: op.titulo, subtitulo: op.subtitulo, fuente: op.fuente, unidad: op.unidad || '', ejeX: op['eje-x'], ejeY: op['eje-y'], valores: !!op.valores, total: op.total, desdeCero: !!op['desde-cero'] })
+  const svg = grafico(tipo, datos, { titulo: op.titulo, subtitulo: op.subtitulo, fuente: op.fuente, unidad: op.unidad || '', ejeX: op['eje-x'], ejeY: op['eje-y'], valores: !!op.valores, total: op.total, desdeCero: !!op['desde-cero'], coma: !!op.coma, decimales: op.decimales !== undefined ? +op.decimales : null })
   const archivo = op.guardar || path.join(process.env.TEMP || '.', `grafico-${Date.now()}.svg`)
   fs.writeFileSync(archivo, svg, 'utf8')
-  ok(`SVG: ${archivo}`)
+  if (op.guardar || op['solo-archivo']) ok(`SVG: ${archivo}`)
   if (op['solo-archivo']) return
   const img = cargarImagen(archivo)
+  if (!op.guardar) fs.rmSync(archivo, { force: true })
   nuevaTarjeta('fotos', { titulo: op.titulo || 'Gráfico', texto: op.texto || '', anotacion: op.anotacion || '', ...img, trazos: [] })
 }
 
 C.conectar = () => {
-  const d = cargar(), { p, clave, c } = destino(d)
+  const d = cargar()
+  // Sin --objetivo, se usa el lienzo donde ya está alguna de las tarjetas (principal o sub-lienzo).
+  if (!op.objetivo) for (const id of pos) { const r = localizar(d, id); if (r?.tipo === 'tarjeta' && r.clave) { op.objetivo = r.clave; op.proyecto ||= r.proyecto.id; break } }
+  const { p, clave, c } = destino(d)
   const [desde, hasta] = pos
   if (!desde || !hasta) fallar('Uso: conectar <desde> <hasta> [--etiqueta …]')
   const existe = id => id === (clave ? 'objetivo' : 'hub') || d.fuentes.some(f => f.id === id) || (c.indicadores || []).some(x => x.id === id) || LISTAS_TARJETA.some(l => (c[l] || []).some(x => x.id === id))

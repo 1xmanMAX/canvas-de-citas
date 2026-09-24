@@ -42,9 +42,20 @@ La lista completa de comandos, opciones y formatos está en `references/comandos
   sin citas aparece como "sin revisar"; cuando Max la use, registra la cita con `cita-nueva`
   (página, cita en texto, contexto).
 - Si Max da un PDF, adjúntalo con `documento <fuente> <ruta>`.
+- Libro sin DOI: deja `doi_o_url` vacío (o la URL de la editorial/Open Library si la hay); nunca
+  inventes un DOI. Ejemplo de `entrada_bibliografia` de libro:
+  `Priestley, M. J. N., Seible, F., & Calvi, G. M. (1996). Seismic design and retrofit of bridges. New York, NY: Wiley.`
+- `fuente-nueva --proyecto/--objetivo` deja una cita "sin revisar" como marcador; `cita-nueva`
+  la completa en vez de duplicarla.
 
 ## Tarjetas, imágenes y gráficos
 
+- **Dónde:** si el pedido menciona un objetivo ("para el OE2", "vincúlalo al OE2"), crea las
+  tarjetas relacionadas en ese sub-lienzo con `--objetivo oe2`; si no, en el lienzo principal.
+  `conectar` detecta solo el sub-lienzo de las tarjetas; las dos deben estar en el mismo lienzo.
+- **No inventes contenido.** Una ficha de lectura lleva lo que Max dio o lo que leíste en el
+  documento de la fuente (`extraer <fuente>` da la ruta del PDF para leerlo). Si no tienes el
+  contenido, crea la ficha con lo que sí sabes y `[completar: …]` donde falte, y díselo.
 - Notas: elige el estilo con sentido — `rayada` + título para fichas de lectura ("Extended Mind,
   p. 114"), `adhesiva` para pendientes o ideas rápidas, `tarjeta` para definiciones; `--letra mano`
   para comentarios personales.
@@ -54,6 +65,7 @@ La lista completa de comandos, opciones y formatos está en `references/comandos
   evolución en el tiempo → `lineas`, partes de un todo con pocas partes → `dona`, relación entre
   dos variables → `dispersion`. Pon siempre `--titulo` y, si los datos vienen de una fuente,
   `--fuente "Autor (año)"`: en una tesis cada figura debe citar su origen. No inventes datos.
+  Para decimales con coma usa `--coma`, y `--decimales 1` para fijar decimales (p. ej. 5,0).
 - Diagramas o esquemas (mapa conceptual, flujo de la metodología, línea de tiempo): escribe tú
   un SVG (fondo `#FBFAF6`, texto `#211F1A`, fuente Segoe UI/Arial, `viewBox` con el tamaño) en
   un archivo temporal y agrégalo con `imagen archivo.svg --titulo …`.
@@ -68,7 +80,8 @@ La lista completa de comandos, opciones y formatos está en `references/comandos
   pidió borrar explícitamente.
 - Las notas de voz solo se crean desde la app (micrófono) o el celular; aquí solo se leen,
   extraen o se corrige su transcripción.
-- Si la carpeta no existe o no hay `CLAUDE.md`, pide a Max abrir la app y elegir la carpeta en
-  Configuración → carpeta de almacenamiento.
+- Si la carpeta o `proyectos.json` no existen, pide a Max abrir la app y elegir la carpeta en
+  Configuración → carpeta de almacenamiento. Que falte `CLAUDE.md` no impide trabajar: solo
+  significa que la app todavía no guardó con la versión nueva.
 - No edites `CLAUDE.md` (la app lo sobrescribe) ni el lienzo con `editar`: usa los comandos de
   tarjetas.

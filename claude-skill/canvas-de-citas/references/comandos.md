@@ -21,7 +21,7 @@ Opciones comunes: `--proyecto proyecto_001` (se puede omitir si solo hay uno) y
 | Comando | Qué hace |
 |---|---|
 | `proyecto-nuevo --json '{"titulo":…, "objetivo_general":…, "objetivos_especificos":[…], "indicadores":[…]}'` | Crea un proyecto |
-| `fuente-nueva --json '{…}' [--proyecto P] [--objetivo oe1] [--forzar]` | Crea una fuente (detecta duplicados por DOI o título+año) y la vincula |
+| `fuente-nueva --json '{…}' [--proyecto P] [--objetivo oe1] [--forzar]` | Crea una fuente (detecta duplicados por DOI o título+año) y la vincula con una cita marcador "sin revisar" |
 | `vincular <fuente> [--proyecto P] [--objetivo oe1]` | Vincula una fuente existente a un proyecto u objetivo |
 | `desvincular <fuente> [--proyecto P] [--objetivo oe1]` | La quita del objetivo, o del proyecto (borra sus citas ahí) |
 | `cita-nueva --json '{"fuente_id":…, "estado_uso":"usando", "cita_textual_o_parafraseo":"textual", "pagina":45, "cita_en_texto":"(Autor, 2018, p. 45)", "contexto":"Cap. 2"}'` | Registra una cita (reutiliza el marcador "sin revisar") |
@@ -41,8 +41,8 @@ Campos de fuente: `tipo_fuente` (articulo_cientifico, libro, capitulo_libro, nor
 | `lista --titulo "…" --tareas "a|b|c"` | Lista de tareas |
 | `tarea <lista> --agregar "d|e" · --marcar 2 · --desmarcar 2 · --quitar 3 · --editar 1 --texto "…"` | Modifica una lista |
 | `imagen <ruta.png/jpg/webp/gif/svg> [--titulo] [--texto] [--anotacion]` | Imagen (se reduce como en la app) |
-| `grafico <tipo> --datos '{…}' --titulo "…" [--subtitulo] [--fuente "INEI (2023)"] [--unidad "%"] [--eje-x] [--eje-y] [--valores] [--guardar f.svg] [--solo-archivo]` | Gráfico SVG como tarjeta |
-| `conectar <desde> <hasta> [--etiqueta "…"]` | Hilo entre dos elementos (`hub` = tarjeta del proyecto; `objetivo` en sub-lienzos) |
+| `grafico <tipo> --datos '{…}' --titulo "…" [--subtitulo] [--fuente "INEI (2023)"] [--unidad "%"] [--eje-x] [--eje-y] [--valores] [--coma] [--decimales 1] [--guardar f.svg] [--solo-archivo]` | Gráfico SVG como tarjeta (el SVG temporal se borra salvo con `--guardar`) |
+| `conectar <desde> <hasta> [--etiqueta "…"]` | Hilo entre dos elementos del mismo lienzo (`hub` = tarjeta del proyecto; `objetivo` = tarjeta del objetivo). Detecta solo el sub-lienzo si una tarjeta vive en él |
 | `mover <id> <x> <y>` | Recoloca una tarjeta (o una fuente: pasa el lienzo a Libre) |
 
 Todas las tarjetas aceptan `--x --y`; si no, se colocan solas en un hueco libre.
