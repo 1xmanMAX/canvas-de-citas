@@ -4,6 +4,7 @@
   import Icono from './Icono.svelte'
   import CitaForm from './CitaForm.svelte'
   import FuenteForm from './FuenteForm.svelte'
+  import { abrirDocumentoFuente, V } from '../lib/visor.svelte.js'
   import { S, copiar, guardarCita, agregarCita, eliminarCita, guardarFuente, quitarFuenteDeProyecto, adjuntarDocumento, quitarDocumento, leerDocumento, avisar } from '../lib/store.svelte.js'
   import { ESTADOS_USO, ESTADOS_VERIF, estadoDeCitas, esMarcador, autorCorto, anio, urlFuente, sugerirBibliografia, paginaTexto } from '../lib/citas.js'
 
@@ -45,12 +46,10 @@
     onclose()
   }
 
+  /** Abre el documento en el visor de la app (panel lateral) y cierra la ficha. */
   async function abrirDocumento() {
-    const d = await leerDocumento(fuente.id)
-    if (!d?.blob) return avisar('El documento no está en este dispositivo (usa "Cargar desde carpeta")')
-    const u = URL.createObjectURL(d.blob)
-    window.open(u, '_blank', 'noopener')
-    setTimeout(() => URL.revokeObjectURL(u), 60000)
+    await abrirDocumentoFuente(fuente, proyectoId)
+    if (V.archivo) onclose()
   }
 
   // --- Documento original: zona de arrastrar y soltar ---

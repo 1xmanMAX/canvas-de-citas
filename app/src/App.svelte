@@ -7,6 +7,8 @@
   import Celular from './components/Celular.svelte'
   import { iniciarCelular } from './lib/celular.svelte.js'
   import { C, iniciarCarpeta, reconectar } from './lib/carpeta.svelte.js'
+  import Visor from './components/Visor.svelte'
+  import { abrirArchivo, ACEPTADOS } from './lib/visor.svelte.js'
 
   // Rutas por hash: #/  ·  #/p/<id>  ·  #/p/<id>/f/<fuente>  ·  #/p/<id>/o/<objetivo>[/f/<fuente>]
   //                 #/citas  ·  #/citas/<id>
@@ -31,10 +33,27 @@
   let celular = $state(false)
   const abrirCelular = () => (celular = true)
 
+  // --- Abrir documentos en el visor: botón, Ctrl+O o soltarlos sobre la app ---
+  let entradaDoc
+  const proyectoActual = () => (ruta.vista === 'hub' ? ruta.pid : null)
+  const abrirArchivos = () => entradaDoc.click()
+  function elegidoDoc(e) {
+    const a = e.currentTarget.files?.[0]
+    e.currentTarget.value = ''
+    if (a) abrirArchivo(a, proyectoActual())
+  }
+
   function soltar(e) {
     e.preventDefault()
-    const archivos = [...(e.dataTransfer?.files || [])].filter(f => /\.json$/i.test(f.name))
-    if (archivos.length) datos = { archivos }
+    const todos = [...(e.dataTransfer?.files || [])]
+    const archivos = todos.filter(f => /\.json$/i.test(f.name))
+    if (archivos.length) return (datos = { archivos })
+    const doc = todos.find(f => ACEPTADOS.test(f.name))
+    if (doc) abrirArchivo(doc, proyectoActual())
+  }
+
+  function teclas(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') { e.preventDefault(); abrirArchivos() }
   }
 
   cargar().then(iniciarCarpeta).then(iniciarCelular)
@@ -44,13 +63,16 @@
   onhashchange={() => { hash = location.hash; navegaciones++ }}
   ondragover={e => e.preventDefault()}
   ondrop={soltar}
+  onkeydown={teclas}
 />
+
+<input bind:this={entradaDoc} type="file" accept=".pdf,.html,.htm,.md,.markdown,.txt" hidden onchange={elegidoDoc} />
 
 {#if S.listo}
   {#if ruta.vista === 'hub'}
     {@const p = S.proyectoPorId.get(ruta.pid)}
     {#if p}
-      {#key p.id}<Hub {p} fid={ruta.fid} oid={ruta.oid} {abrirDatos} {abrirCelular} {atras} />{/key}
+      {#key p.id}<Hub {p} fid={ruta.fid} oid={ruta.oid} {abrirDatos} {abrirCelular} {abrirArchivos} {atras} />{/key}
     {:else}
       <div class="no-encontrado">
         <p>No existe el proyecto <code>{ruta.pid}</code> en este dispositivo.</p>
@@ -63,6 +85,8 @@
     <Proyectos {abrirDatos} {abrirCelular} />
   {/if}
 {/if}
+
+<Visor />
 
 {#if celular}
   <Celular onclose={() => (celular = false)} importarArchivos={archivos => { celular = false; datos = { archivos } }} />

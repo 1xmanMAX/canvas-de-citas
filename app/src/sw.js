@@ -27,5 +27,12 @@ self.addEventListener('fetch', e => {
     e.respondWith(caches.match('./').then(res => res || fetch(r)))
     return
   }
-  e.respondWith(caches.match(r, { ignoreSearch: true }).then(res => res || fetch(r)))
+  // Lo que no se precargó (p. ej. pdf.js) se guarda la primera vez para usarlo sin conexión.
+  e.respondWith(caches.match(r, { ignoreSearch: true }).then(res => res || fetch(r).then(resp => {
+    if (resp.ok && new URL(r.url).pathname.includes('/assets/')) {
+      const copia = resp.clone()
+      caches.open(VERSION).then(c => c.put(r, copia))
+    }
+    return resp
+  })))
 })
