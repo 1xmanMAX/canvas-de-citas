@@ -4,6 +4,7 @@
   import Lienzo from '../components/Lienzo.svelte'
   import NodoFuente from '../components/NodoFuente.svelte'
   import Icono from '../components/Icono.svelte'
+  import { R } from '../lib/celular.svelte.js'
   import Modal from '../components/Modal.svelte'
   import FuenteForm from '../components/FuenteForm.svelte'
   import AgregarFuente from '../components/AgregarFuente.svelte'
@@ -12,7 +13,7 @@
   import { NODO_W, alturaNodo, enFilas, limitesDe } from '../lib/grafo.js'
   import { descargarBib } from '../lib/io.svelte.js'
 
-  let { pid = null, abrirDatos } = $props()
+  let { pid = null, abrirDatos, abrirCelular } = $props()
 
   let proyecto = $state(untrack(() => pid || ''))
   let tipos = $state(Object.fromEntries(Object.keys(TIPOS_FUENTE).map(k => [k, true])))
@@ -83,6 +84,7 @@
   <div class="espacio solo-escritorio"></div>
   <button class="btn solo-escritorio" onclick={() => descargarBib(visibles)}>Exportar .bib</button>
   <button class="btn primario" aria-label="Agregar fuente" onclick={() => (modal = proyecto ? 'agregar' : 'nueva')}><span class="solo-escritorio">+ Agregar fuente</span><span class="solo-movil">+</span></button>
+<button class="icono-btn celular-btn" aria-label="Celular y PixPin" title="Pasar archivos con el celular o PixPin" onclick={abrirCelular}><Icono nombre="celular" tam={18} />{#if R.recibidos.length}<span class="insignia">{R.recibidos.length}</span>{/if}</button>
   <button class="icono-btn" aria-label="Configuración" title="Configuración" onclick={abrirDatos}><Icono nombre="ajustes" tam={18} /></button>
 </header>
 

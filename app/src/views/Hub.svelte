@@ -15,8 +15,10 @@
   import { F, envolver, ancho } from '../lib/texto.js'
   import { NODO_W, alturaNodo, radial, porTema, limitesDe, rutaConexion } from '../lib/grafo.js'
   import { descargarBib } from '../lib/io.svelte.js'
+  import { comprimir } from '../lib/imagen.js'
+  import { R } from '../lib/celular.svelte.js'
 
-  let { p, fid = null, oid = null, abrirDatos, atras } = $props()
+  let { p, fid = null, oid = null, abrirDatos, abrirCelular, atras } = $props()
 
   const cv = $derived(p.canvas)
   const citas = $derived(S.citasPorProyecto.get(p.id) || [])
@@ -152,15 +154,6 @@
     modal = { nota: { id: 'nota_' + Date.now().toString(36), texto: '', x: Math.round(c.x - NOTA_W / 2), y: Math.round(c.y - 50) }, nueva: true }
   }
 
-  async function comprimir(archivo) {
-    const bmp = await createImageBitmap(archivo)
-    const s = Math.min(1, 1024 / Math.max(bmp.width, bmp.height))
-    const tela = Object.assign(document.createElement('canvas'), { width: Math.round(bmp.width * s), height: Math.round(bmp.height * s) })
-    tela.getContext('2d').drawImage(bmp, 0, 0, tela.width, tela.height)
-    bmp.close?.()
-    return tela.toDataURL('image/jpeg', 0.78)
-  }
-
   async function nuevaFoto(e) {
     const input = e.currentTarget
     const archivo = input.files?.[0]
@@ -293,6 +286,7 @@
   <a class="btn solo-escritorio" href="#/citas/{p.id}">Vista de citas</a>
   <a class="icono-btn solo-movil" href="#/citas/{p.id}" aria-label="Vista de citas"><Icono nombre="lista" tam={18} /></a>
   <button class="btn solo-escritorio" onclick={() => descargarBib(fuentes, 'bibliografia.bib')}>Exportar .bib</button>
+<button class="icono-btn celular-btn" aria-label="Celular y PixPin" title="Pasar archivos con el celular o PixPin" onclick={abrirCelular}><Icono nombre="celular" tam={18} />{#if R.recibidos.length}<span class="insignia">{R.recibidos.length}</span>{/if}</button>
   <button class="icono-btn" aria-label="Configuración" title="Configuración" onclick={abrirDatos}><Icono nombre="ajustes" tam={18} /></button>
 </header>
 

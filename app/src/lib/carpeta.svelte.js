@@ -4,6 +4,7 @@
 // citas-tesis modifique en esa carpeta (al volver a la ventana y cada pocos segundos).
 import { S, COLECCIONES, avisar, alCambiar, leerMeta, ponerMeta, leerDocumento, idsConDocumento, guardarDocumentoImportado } from './store.svelte.js'
 import { serializar, leerArchivos, aplicar } from './io.svelte.js'
+import { generarClaudeMd } from './paraClaude.js'
 
 export const soportaCarpeta = typeof window !== 'undefined' && 'showDirectoryPicker' in window
 
@@ -68,6 +69,7 @@ export const guardarAhora = () => enCola(async () => {
       if (f?.documento_original && d?.blob) await escribir(C.dir, f.documento_original, d.blob)
       docsPendientes.delete(fid)
     }
+    await escribir(C.dir, 'CLAUDE.md', generarClaudeMd())
     await ponerMeta('carpetaEscritos', { ...escritos })
     C.guardado = new Date().toISOString()
     C.error = ''

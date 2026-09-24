@@ -1,0 +1,23 @@
+[package]
+name = "canvas-receptor"
+version = "0.1.0"
+edition = "2024"
+description = "Receptor de Canvas de Citas: enviar y recibir archivos por wifi con el protocolo de PixPin"
+publish = false
+
+# Proyecto suelto: no pertenece al workspace de PixPin, solo usa sus crates.
+[workspace]
+
+[dependencies]
+# El mismo cable que PixPin Windows y Android: canal cifrado, oferta, trozos
+# (pixpin-sincro) y el anuncio / busqueda mDNS de Windows (pixpin-shell).
+pixpin-sincro = { path = "../../../THE FORGE/PIXPIN PC VERSION MAX/crates/pixpin-sincro" }
+pixpin-shell = { path = "../../../THE FORGE/PIXPIN PC VERSION MAX/crates/pixpin-shell" }
+qrcodegen = "1.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tiny_http = "0.12"
+
+[profile.release]
+strip = true
+lto = "thin"

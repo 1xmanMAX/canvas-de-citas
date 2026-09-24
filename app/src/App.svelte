@@ -4,6 +4,8 @@
   import Hub from './views/Hub.svelte'
   import General from './views/General.svelte'
   import Datos from './components/Datos.svelte'
+  import Celular from './components/Celular.svelte'
+  import { iniciarCelular } from './lib/celular.svelte.js'
   import { C, iniciarCarpeta, reconectar } from './lib/carpeta.svelte.js'
 
   // Rutas por hash: #/  ·  #/p/<id>  ·  #/p/<id>/f/<fuente>  ·  #/p/<id>/o/<objetivo>[/f/<fuente>]
@@ -26,6 +28,8 @@
 
   let datos = $state(null) // null | { archivos }
   const abrirDatos = () => (datos = { archivos: null })
+  let celular = $state(false)
+  const abrirCelular = () => (celular = true)
 
   function soltar(e) {
     e.preventDefault()
@@ -33,7 +37,7 @@
     if (archivos.length) datos = { archivos }
   }
 
-  cargar().then(iniciarCarpeta)
+  cargar().then(iniciarCarpeta).then(iniciarCelular)
 </script>
 
 <svelte:window
@@ -46,7 +50,7 @@
   {#if ruta.vista === 'hub'}
     {@const p = S.proyectoPorId.get(ruta.pid)}
     {#if p}
-      {#key p.id}<Hub {p} fid={ruta.fid} oid={ruta.oid} {abrirDatos} {atras} />{/key}
+      {#key p.id}<Hub {p} fid={ruta.fid} oid={ruta.oid} {abrirDatos} {abrirCelular} {atras} />{/key}
     {:else}
       <div class="no-encontrado">
         <p>No existe el proyecto <code>{ruta.pid}</code> en este dispositivo.</p>
@@ -54,10 +58,14 @@
       </div>
     {/if}
   {:else if ruta.vista === 'general'}
-    {#key ruta.pid}<General pid={ruta.pid} {abrirDatos} />{/key}
+    {#key ruta.pid}<General pid={ruta.pid} {abrirDatos} {abrirCelular} />{/key}
   {:else}
-    <Proyectos {abrirDatos} />
+    <Proyectos {abrirDatos} {abrirCelular} />
   {/if}
+{/if}
+
+{#if celular}
+  <Celular onclose={() => (celular = false)} importarArchivos={archivos => { celular = false; datos = { archivos } }} />
 {/if}
 
 {#if datos}

@@ -38,3 +38,9 @@ foreach ($d in $destinos) {
   Write-Output "Acceso directo creado: $ruta"
 }
 Write-Output "Abre con: $navegador"
+
+# Receptor para pasar archivos por wifi desde el celular y PixPin (arranca solo con Windows).
+$receptor = Join-Path $PSScriptRoot 'instalar-receptor.ps1'
+if (Test-Path $receptor) {
+  try { & $receptor } catch { Write-Warning "No se pudo instalar el receptor: $_" }
+}
