@@ -5,7 +5,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import {
-  CARPETA, cargar, guardar, ruta, marcarEliminados, nuevoId, idLocal, ahoraISO, localizar,
+  CARPETA, CONFIG, cargar, guardar, ruta, marcarEliminados, nuevoId, idLocal, ahoraISO, localizar,
   proyecto as buscarProyecto, subLienzo, clavesObjetivo, lienzos, LISTAS_TARJETA
 } from './datos.mjs'
 import { tamano, ocupadasProyecto, ocupadasObjetivo, lugarLibre } from './disposicion.mjs'
@@ -140,6 +140,14 @@ function verProyecto(d, p) {
 const C = {}
 
 C.ayuda = () => ok(fs.readFileSync(new URL('../references/comandos.md', import.meta.url), 'utf8'))
+
+C.carpeta = () => {
+  if (!pos[0]) return ok(`Carpeta de datos: ${CARPETA}`)
+  const r = path.resolve(pos.join(' '))
+  if (!fs.existsSync(path.join(r, 'proyectos.json'))) fallar(`${r} no tiene proyectos.json: no parece la carpeta de la app`)
+  fs.writeFileSync(CONFIG, r + '\n', 'utf8')
+  ok(`Carpeta de datos guardada: ${r}`)
+}
 
 C.resumen = () => {
   const d = cargar()

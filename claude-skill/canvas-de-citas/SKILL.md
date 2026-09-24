@@ -5,8 +5,10 @@ description: Integración total de Claude Code con la app Canvas de Citas de Max
 
 # Canvas de Citas
 
-La app (PWA en `https://1xmanmax.github.io/canvas-de-citas/`) guarda todo en la carpeta
-**`F:\TESIS TAKE LOOK`**: `proyectos.json` (incluye los lienzos), `fuentes.json`, `citas.json`,
+La app (PWA en `https://1xmanmax.github.io/canvas-de-citas/`) guarda todo en la carpeta de
+almacenamiento que Max eligió en Configuración (hoy **`F:\THE FORGE\THESIS\New folder`**; el
+script la recuerda en `carpeta.txt`, se ve con `canvas.mjs carpeta` y se cambia con
+`canvas.mjs carpeta <ruta>`): `proyectos.json` (incluye los lienzos), `fuentes.json`, `citas.json`,
 `fuentes/<id>/documento.*` y un `CLAUDE.md` que regenera en cada guardado. Cuando la app está
 abierta revisa la carpeta cada ~8 s y carga lo que cambie; si está cerrada, lo carga al abrirla.
 

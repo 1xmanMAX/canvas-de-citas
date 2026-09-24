@@ -3,7 +3,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-export const CARPETA = process.env.CANVAS_CARPETA || 'F:\\TESIS TAKE LOOK'
+// Carpeta de datos: variable CANVAS_CARPETA, o la guardada con "canvas.mjs carpeta <ruta>" (carpeta.txt).
+export const CONFIG = new URL('../carpeta.txt', import.meta.url)
+const guardada = () => { try { return fs.readFileSync(CONFIG, 'utf8').trim() } catch { return '' } }
+export const CARPETA = process.env.CANVAS_CARPETA || guardada() || 'F:\\TESIS TAKE LOOK'
 export const COLECCIONES = ['proyectos', 'fuentes', 'citas']
 const PREFIJO = { proyectos: 'proyecto', fuentes: 'fuente', citas: 'cita' }
 
