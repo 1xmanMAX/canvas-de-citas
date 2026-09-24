@@ -13,9 +13,9 @@ function serviceWorker() {
     writeBundle(opciones, bundle) {
       const publicos = ['./', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png']
       const archivos = Object.keys(bundle).filter(f => !f.endsWith('.map') && f !== 'index.html' && f !== 'sw.js')
-      // pdf.js (~1,7 MB) solo hace falta en navegadores sin visor de PDF: no se precarga;
-      // el service worker lo guarda la primera vez que se usa.
-      const precache = archivos.filter(f => !/pdf[.-]|VisorPdf/.test(f))
+      // El lector de PDF (PDFium, ~4,6 MB) no se precarga: se descarga al abrir el primer PDF y
+      // el service worker lo guarda para usarlo sin conexión.
+      const precache = archivos.filter(f => !/pdf/i.test(f))
       const hash = createHash('sha1')
       for (const f of [...archivos, 'index.html'].sort()) {
         const b = bundle[f]

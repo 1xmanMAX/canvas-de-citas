@@ -6,11 +6,10 @@
   import { S } from '../lib/store.svelte.js'
   import { autorCorto, anio } from '../lib/citas.js'
 
-  // El visor de PDF integrado existe en Chrome/Edge/Firefox/Safari de escritorio; en Android no.
-  const pdfNativo = typeof navigator !== 'undefined' && navigator.pdfViewerEnabled === true
+  // Lector de PDF propio (PDFium en un hilo aparte): se descarga la primera vez que se abre un PDF.
   let VisorPdf = $state(null)
   $effect(() => {
-    if (V.archivo?.tipo === 'pdf' && !pdfNativo && !VisorPdf) import('./VisorPdf.svelte').then(m => (VisorPdf = m.default))
+    if (V.archivo?.tipo === 'pdf' && !VisorPdf) import('./VisorPdf.svelte').then(m => (VisorPdf = m.default))
   })
 
   const a = $derived(V.archivo)
@@ -79,7 +78,7 @@
         <b title={a.nombre}>{a.nombre}</b>
         {#if fuente}<span class="suave">{autorCorto(fuente)} ({anio(fuente)})</span>{/if}
       </div>
-      {#if (a.tipo === 'html' || a.tipo === 'md' || a.tipo === 'texto') && seleccion}
+      {#if seleccion}
         <button class="btn chico primario" onclick={() => { notaDesdeSeleccion(seleccion); seleccion = '' }} title="Crear una nota en el lienzo con el texto seleccionado">
           <Icono nombre="nota" tam={13} />Nota con la cita
         </button>
@@ -105,10 +104,8 @@
 
     <div class="v-cuerpo">
       {#if a.tipo === 'pdf'}
-        {#if pdfNativo}
-          <iframe src="{a.url}#view=FitH" title={a.nombre}></iframe>
-        {:else if VisorPdf}
-          <VisorPdf blob={a.blob} />
+        {#if VisorPdf}
+          {#key a.url}<VisorPdf blob={a.blob} onseleccion={t => (seleccion = t)} />{/key}
         {:else}
           <p class="suave cargando">Cargando lector de PDF…</p>
         {/if}
