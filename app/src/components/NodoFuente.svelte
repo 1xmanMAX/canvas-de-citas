@@ -49,16 +49,21 @@
     stroke-width={seleccionado || resaltado ? 2 : 1}
   />
   <circle cx="16" cy="17" r="4" fill={COLOR[estado]} />
-  <text x="26" y="21" class="chico">{anio}</text>
-  <text x="12" y="39" class="autor">{t.autor}</text>
-  {#if linea2}<text x="12" y="55" class="chico">{t.linea2}</text>{/if}
-  {#if pista}<text x={NODO_W - 12} y="21" class="pista" text-anchor="end">{pista}</text>{/if}
-  {#each t.chips as c}
-    <g transform="translate({c.x} {h - 27})">
-      <rect width={c.w} height="17" rx="8.5" fill="var(--paper)" stroke="var(--line)" />
-      <text x={c.w / 2} y="12" text-anchor="middle" class="mini">{c.txt}</text>
-    </g>
-  {/each}
+  {#if L.vista?.simple}
+    <!-- Lejos: barras en lugar de texto (mucho menos que dibujar) -->
+    <rect x="12" y="29" width={Math.min(NODO_W - 24, 12 + t.autor.length * 7)} height="10" rx="3" class="barra" />
+  {:else}
+    <text x="26" y="21" class="chico">{anio}</text>
+    <text x="12" y="39" class="autor">{t.autor}</text>
+    {#if linea2}<text x="12" y="55" class="chico">{t.linea2}</text>{/if}
+    {#if pista}<text x={NODO_W - 12} y="21" class="pista" text-anchor="end">{pista}</text>{/if}
+    {#each t.chips as c}
+      <g transform="translate({c.x} {h - 27})">
+        <rect width={c.w} height="17" rx="8.5" fill="var(--paper)" stroke="var(--line)" />
+        <text x={c.w / 2} y="12" text-anchor="middle" class="mini">{c.txt}</text>
+      </g>
+    {/each}
+  {/if}
 </g>
 
 <style>
@@ -72,4 +77,5 @@
   .mini { font: 400 10px var(--sans); }
   .autor { font: 600 13px var(--serif); fill: var(--ink); }
   .pista { font: 500 10px var(--sans); fill: var(--using); }
+  .barra { fill: var(--ink); opacity: .55; pointer-events: none; }
 </style>

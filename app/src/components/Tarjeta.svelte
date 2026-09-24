@@ -1,15 +1,15 @@
 <script>
   // Tarjeta libre del lienzo (nota, lista de tareas, nota de voz o foto) dibujada en SVG.
+  import { getContext } from 'svelte'
   import Arrastrable from './Arrastrable.svelte'
   import { medir, COLORES, TINTAS, fechaCorta, duracionTexto } from '../lib/tarjetas.js'
   import { sonando, reproducir } from '../lib/audio.svelte.js'
 
-  let { lista, o, origen = false, resaltado = false, atenuado = false, corcho = false, alTocar, alternar, inicio, mover, fin } = $props()
+  let { lista, o, origen = false, resaltado = false, atenuado = false, alTocar, alternar, inicio, mover, fin } = $props()
 
   const d = $derived(medir(lista, o))
   const giro = $derived(lista === 'notas' ? (o.estilo === 'rayada' ? 1 : o.estilo === 'tarjeta' ? 0 : -2) : lista === 'fotos' ? 1.5 : 0)
-  const PINES = ['#C0392B', '#2F4FB5', '#E0A526', '#2B2B2B']
-  const pin = $derived(PINES[[...o.id].reduce((s, c) => s + c.charCodeAt(0), 0) % PINES.length])
+
   const papel = $derived(o.estilo === 'adhesiva' || !o.estilo ? COLORES[o.color] || COLORES.amarillo : '#FFFDF8')
   const suena = $derived(sonando.id === o.id)
   const parar = e => e.stopPropagation()
@@ -17,12 +17,35 @@
   const etiqueta = { notas: 'Nota', listas: 'Lista de tareas', audios: 'Nota de voz', fotos: 'Foto' }
   const teclaCasilla = (e, i) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); alternar?.(i) } }
   const tocarPlay = () => o.audio && reproducir(o.id, o.audio)
+
+  // Nivel de detalle: lejos, barras en lugar de texto (el texto sería ilegible y es lo más caro de dibujar).
+  const L = getContext('lienzo')
+  const simple = $derived(!!L?.vista?.simple)
+  const barra = (x, y, texto, max, px = 6.4, h = 8) => ({ x, y, w: Math.max(12, Math.min(max, String(texto).length * px)), h })
+  const barras = $derived.by(() => {
+    if (!simple) return []
+    if (lista === 'notas') return [
+      ...d.titulo.map((t, i) => barra(16, d.tituloY[i] - 8, t, d.w - 32, 7)),
+      ...d.lineas.map((t, i) => barra(16, d.y0 + i * d.L.lh - 9, t, d.w - 32, d.L.lh > 20 ? 7 : 6.4, 9))
+    ]
+    if (lista === 'listas') return [
+      ...d.titulo.map((t, i) => barra(14, 30 + i * 19 - 11, t, d.w - 60, 8, 11)),
+      ...d.items.flatMap(it => [{ x: 14, y: it.y + 1, w: 13, h: 13 }, ...it.lineas.map((t, j) => barra(36, it.y + 3 + j * 17, t, d.w - 50, 6.4, 9))])
+    ]
+    if (lista === 'audios') return [{ x: 16, y: 50, w: d.w - 32, h: 24 }, ...d.lineas.map((t, i) => barra(16, d.y0 + i * 16 - 9, t, d.w - 32, 6, 9))]
+    return [...d.titulo.map((t, i) => barra(8, d.tituloY[i] - 9, t, d.iw, 6.8, 9)), ...d.texto.map((t, i) => barra(8, d.textoY[i] - 8, t, d.iw, 6, 8)), ...d.anotacion.map((t, i) => barra(8, d.anotacionY[i] - 12, t, d.iw, 7, 12))]
+  })
+  const fondoSimple = $derived(lista === 'notas' ? papel : lista === 'audios' ? '#2F4FB5' : '#FFFDF8')
 </script>
 
 <Arrastrable transform="translate({o.x} {o.y}) rotate({giro} {d.w / 2} {d.h / 2})" clase={clase} etiqueta={etiqueta[lista]} {alTocar} {inicio} {mover} {fin}>
   <rect x="2" y="5" width={d.w} height={d.h} rx="5" class="sombra" />
 
-  {#if lista === 'notas'}
+  {#if simple && lista !== 'fotos'}
+    <rect width={d.w} height={d.h} rx="6" fill={fondoSimple} class:borde={lista !== 'audios'} />
+    {#each barras as b}<rect x={b.x} y={b.y} width={b.w} height={b.h} rx="3" class="s-barra" class:clara={lista === 'audios'} />{/each}
+
+  {:else if lista === 'notas'}
     <rect width={d.w} height={d.h} rx={o.estilo === 'tarjeta' ? 8 : 3} fill={papel} class:borde={o.estilo && o.estilo !== 'adhesiva'} />
     {#if o.estilo === 'tarjeta'}<rect width={d.w} height="6" rx="3" fill={COLORES[o.color] || COLORES.celeste} />{/if}
     {#if o.estilo === 'rayada'}
@@ -70,6 +93,9 @@
     <clipPath id="clip-{o.id}"><rect x="8" y="8" width={d.iw} height={d.ih} rx="2" /></clipPath>
     <rect x="8" y="8" width={d.iw} height={d.ih} fill="#E4E0D4" />
     <image href={o.imagen} x="8" y="8" width={d.iw} height={d.ih} preserveAspectRatio="xMidYMid slice" clip-path="url(#clip-{o.id})" />
+    {#if simple}
+      {#each barras as b}<rect x={b.x} y={b.y} width={b.w} height={b.h} rx="3" class="s-barra" />{/each}
+    {:else}
     {#if o.trazos?.length}
       <svg x="8" y="8" width={d.iw} height={d.ih} viewBox="0 0 1000 1000" preserveAspectRatio="none" class="trazos">
         {#each o.trazos as t}
@@ -80,14 +106,11 @@
     {#each d.titulo as l, i}<text x="8" y={d.tituloY[i]} class="f-titulo">{l}</text>{/each}
     {#each d.texto as l, i}<text x="8" y={d.textoY[i]} class="f-texto">{l}</text>{/each}
     {#each d.anotacion as l, i}<text x="8" y={d.anotacionY[i]} class="f-mano">{l}</text>{/each}
+    {/if}
   {/if}
 
   {#if origen || resaltado}<rect x="-4" y="-4" width={d.w + 8} height={d.h + 8} rx="10" class="marca" />{/if}
-  {#if corcho}
-    <circle cx={d.w / 2 + 1.5} cy="11" r="7" fill="rgba(0,0,0,.25)" />
-    <circle cx={d.w / 2} cy="9" r="7" fill={pin} />
-    <circle cx={d.w / 2 - 2.2} cy="6.8" r="2" fill="rgba(255,255,255,.55)" />
-  {/if}
+
 </Arrastrable>
 
 <style>
@@ -95,6 +118,8 @@
   :global(.tarjeta.atenuada) { opacity: .28; }
   text { user-select: none; pointer-events: none; }
   .sombra { fill: rgba(33, 31, 26, .12); }
+  .s-barra { fill: var(--ink); opacity: .45; pointer-events: none; }
+  .s-barra.clara { fill: #fff; opacity: .6; }
   .borde { stroke: var(--line); }
   .marca { fill: none; stroke: var(--accent); stroke-width: 2.5; }
   .renglon { stroke: #BCD0E2; stroke-width: 1; }

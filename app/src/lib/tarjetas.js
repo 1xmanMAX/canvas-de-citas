@@ -90,8 +90,18 @@ function foto(f) {
 }
 
 const MEDIR = { notas: nota, listas: lista, audios: audio, fotos: foto }
+// Memo por tarjeta: mover una tarjeta no cambia su tamaño, así que no se vuelve a medir el texto.
+const memo = new WeakMap()
+const firma = (lista, o) => [lista, S.tipografias, o.texto, o.titulo, o.estilo, o.letra, o.creado ? 1 : 0, o.transcripcion,
+  o.anotacion, o.proporcion, o.items?.map(i => (i.hecho ? '1' : '0') + i.t).join('\u0001')].join('\u0002')
 /** Medidas de una tarjeta; depende de S.tipografias para remedir cuando cargan las letras. */
-export const medir = (lista, obj) => (S.tipografias, MEDIR[lista](obj))
+export function medir(lista, obj) {
+  const f = firma(lista, obj), m = memo.get(obj)
+  if (m?.f === f) return m.d
+  const d = MEDIR[lista](obj)
+  memo.set(obj, { f, d })
+  return d
+}
 
 /** Caja { x, y, w, h } de cada tarjeta del tablero, por id. */
 export function cajas(c) {

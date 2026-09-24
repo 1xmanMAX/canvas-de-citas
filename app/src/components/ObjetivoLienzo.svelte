@@ -12,6 +12,7 @@
   import { NODO_W, alturaNodo, limitesDe, rutaConexion } from '../lib/grafo.js'
   import { listaObjetivos, vacio } from '../lib/objetivos.js'
   import Tarjeta from './Tarjeta.svelte'
+  import Chinchetas from './Chinchetas.svelte'
   import EditorTarjeta from './EditorTarjeta.svelte'
   import { LISTAS, cajas, nombreTarjeta, asegurarTablero } from '../lib/tarjetas.js'
   import { nuevaTarjeta, guardarTarjeta, eliminarTarjeta, duplicarTarjeta, alternarTarea, vinculosDe, ancla, rutaHilo } from '../lib/tablero.js'
@@ -38,6 +39,7 @@
   let modal = $state(null) // 'indicadores' | 'fuentes' | { lista, o, nueva } | { indicador } | { conexion }
   let entradaFoto
   let conectando = $state(null)
+  let lejos = $state(false) // zoom lejano: el Lienzo simplifica el dibujo
 
   // --- Datos visibles ---
   const citasProyecto = $derived(S.citasPorProyecto.get(p.id) || [])
@@ -70,6 +72,12 @@
     return ancla(tarj.get(id), false)
   }
   /** Anclaje de las conexiones: en el tablero de corcho, las chinchetas de las tarjetas libres. */
+  // Solo se dibujan las tarjetas cercanas a la vista (ventana del Lienzo).
+  let ventana = $state(null)
+  const cruza = c => !ventana || (c && c.x < ventana.x + ventana.w && c.x + c.w > ventana.x && c.y < ventana.y + ventana.h && c.y + c.h > ventana.y)
+  const pesado = $derived(fuentes.length + indicadores.length + LISTAS.reduce((s, l) => s + (o[l]?.length || 0), 0) > 150)
+  const tarjVista = $derived(Object.fromEntries(LISTAS.map(l => [l, (o[l] || []).filter(t => cruza(tarj.get(t.id)))])))
+  const chinchetas = $derived(corcho ? [...tarj.values()].filter(cruza).map(c => ({ id: c.obj.id, x: c.x, y: c.y, w: c.w })) : [])
   const puntoDe = id => (corcho && tarj.has(id) ? ancla(tarj.get(id), true) : centroDe(id))
 
   function nombreDe(id) {
@@ -218,6 +226,32 @@
   $effect(() => { if (!objetivo) cerrar() })
 </script>
 
+{#snippet conexionesSvg()}
+  {#each o.conexiones as con (con.id)}
+    {@const a = puntoDe(con.desde)}
+    {@const b = puntoDe(con.hasta)}
+    {#if a && b}
+      {@const ruta = corcho ? rutaHilo(a, b) : con.desde === 'objetivo' || con.hasta === 'objetivo'
+        ? { d: `M${a.x} ${a.y}L${b.x} ${b.y}`, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+        : rutaConexion(a, b, caja)}
+      {#if corcho}<path d={ruta.d} class="hilo-sombra" />{/if}
+    <path d={ruta.d} class="conexion" class:hilo={corcho} />
+      {#if con.etiqueta && !lejos}
+        {@const w = (S.tipografias, ancho(con.etiqueta, F.mini)) + 16}
+        <g class="etq" transform="translate({ruta.x - w / 2} {ruta.y - 9})" role="button" tabindex="0" aria-label="Conexión: {con.etiqueta}"
+          onpointerdown={e => e.stopPropagation()} onclick={() => (modal = { conexion: copia(con) })} onkeydown={e => e.key === 'Enter' && (modal = { conexion: copia(con) })}>
+          <rect width={w} height="18" rx="9" />
+          <text x={w / 2} y="12.5" text-anchor="middle">{con.etiqueta}</text>
+        </g>
+      {:else}
+        <circle cx={ruta.x} cy={ruta.y} r={corcho ? 4.5 : 6} class="etq-punto" class:nudo={corcho} role="button" tabindex="0" aria-label="Editar conexión"
+          onpointerdown={e => e.stopPropagation()} onclick={() => (modal = { conexion: copia(con) })} onkeydown={e => e.key === 'Enter' && (modal = { conexion: copia(con) })} />
+      {/if}
+    {/if}
+  {/each}
+
+{/snippet}
+
 <svelte:window onkeydown={teclas} onpaste={pegar} />
 
 {#if objetivo}
@@ -233,7 +267,7 @@
   </header>
 
   <div class="sub-cuerpo">
-    <Lienzo bind:this={lienzo} {limites} {corcho} cursor={conectando ? 'conectando' : ''} alTocarFondo={() => { if (conectando) conectando = null }}>
+    <Lienzo bind:this={lienzo} bind:simple={lejos} bind:ventana pesado={pesado} {limites} {corcho} cursor={conectando ? 'conectando' : ''} alTocarFondo={() => { if (conectando) conectando = null }}>
       <!-- Aristas objetivo → indicadores y fuentes -->
       {#each indicadores as x (x.id)}
         {@const c = centroDe(x.id)}
@@ -244,28 +278,8 @@
         <line x1="0" y1="0" x2={c.x} y2={c.y} class="arista" />
       {/each}
 
-      <!-- Conexiones manuales (curvan alrededor de la tarjeta del objetivo) -->
-      {#each o.conexiones as con (con.id)}
-        {@const a = puntoDe(con.desde)}
-        {@const b = puntoDe(con.hasta)}
-        {#if a && b}
-          {@const ruta = corcho ? rutaHilo(a, b) : con.desde === 'objetivo' || con.hasta === 'objetivo'
-            ? { d: `M${a.x} ${a.y}L${b.x} ${b.y}`, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
-            : rutaConexion(a, b, caja)}
-          <path d={ruta.d} class="conexion" class:hilo={corcho} />
-          {#if con.etiqueta}
-            {@const w = (S.tipografias, ancho(con.etiqueta, F.mini)) + 16}
-            <g class="etq" transform="translate({ruta.x - w / 2} {ruta.y - 9})" role="button" tabindex="0" aria-label="Conexión: {con.etiqueta}"
-              onpointerdown={e => e.stopPropagation()} onclick={() => (modal = { conexion: copia(con) })} onkeydown={e => e.key === 'Enter' && (modal = { conexion: copia(con) })}>
-              <rect width={w} height="18" rx="9" />
-              <text x={w / 2} y="12.5" text-anchor="middle">{con.etiqueta}</text>
-            </g>
-          {:else}
-            <circle cx={ruta.x} cy={ruta.y} r="6" class="etq-punto" role="button" tabindex="0" aria-label="Editar conexión"
-              onpointerdown={e => e.stopPropagation()} onclick={() => (modal = { conexion: copia(con) })} onkeydown={e => e.key === 'Enter' && (modal = { conexion: copia(con) })} />
-          {/if}
-        {/if}
-      {/each}
+      <!-- Conexiones manuales (curvan alrededor del objetivo; en corcho van encima de las tarjetas) -->
+      {#if !corcho}{@render conexionesSvg()}{/if}
 
       <!-- Objetivo al centro -->
       <Arrastrable transform="translate({-OBJ_W / 2} {-objH / 2})" clase="obj {conectando?.desde === 'objetivo' ? 'origen' : ''}"
@@ -296,12 +310,17 @@
 
       <!-- Tarjetas libres: notas, listas, notas de voz y fotos -->
       {#each LISTAS as l (l)}
-        {#each o[l] || [] as t (t.id)}
-          <Tarjeta lista={l} o={t} {corcho} origen={conectando?.desde === t.id}
+        {#each tarjVista[l] as t (t.id)}
+          <Tarjeta lista={l} o={t} origen={conectando?.desde === t.id}
             alTocar={() => tocar(t.id, () => (modal = { lista: l, o: copia(t) }))}
             alternar={i => { alternarTarea(t, i); guardar() }} {...arrastre(t)} />
         {/each}
       {/each}
+
+      {#if corcho}
+        {@render conexionesSvg()}
+        <Chinchetas cajas={chinchetas} />
+      {/if}
     </Lienzo>
 
     <div class="barra" role="toolbar" aria-label="Herramientas del lienzo del objetivo">
@@ -433,8 +452,10 @@
 
   .arista { stroke: var(--ink-soft); stroke-opacity: .3; stroke-width: 1; }
   .arista-ind { stroke: var(--using); stroke-opacity: .55; stroke-width: 1.5; }
-  .conexion { fill: none; stroke: var(--accent); stroke-opacity: .55; stroke-width: 1.5; stroke-dasharray: 5 4; }
-  .conexion.hilo { stroke: #B3261E; stroke-opacity: .85; stroke-width: 2; stroke-dasharray: none; }
+  .conexion { fill: none; stroke: var(--accent); stroke-opacity: .55; stroke-width: 1.5; stroke-dasharray: 5 4; pointer-events: none; }
+  .conexion.hilo { stroke: #B3261E; stroke-opacity: 1; stroke-width: 2.2; stroke-dasharray: none; stroke-linecap: round; }
+  .etq-punto.nudo { fill: #8E1B14; stroke: #B3261E; }
+  .hilo-sombra { fill: none; stroke: rgba(0, 0, 0, .22); stroke-width: 2.6; transform: translate(1.5px, 3px); pointer-events: none; }
   .etq { cursor: pointer; }
   .etq rect { fill: var(--paper); stroke: var(--accent); }
   .etq text { font: 400 10px var(--sans); fill: var(--accent); }

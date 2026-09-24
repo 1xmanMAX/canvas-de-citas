@@ -10,6 +10,7 @@
   import ProyectoForm from '../components/ProyectoForm.svelte'
   import ObjetivoLienzo from '../components/ObjetivoLienzo.svelte'
   import Tarjeta from '../components/Tarjeta.svelte'
+  import Chinchetas from '../components/Chinchetas.svelte'
   import EditorTarjeta from '../components/EditorTarjeta.svelte'
   import { LISTAS, cajas, coincideTarjeta, nombreTarjeta } from '../lib/tarjetas.js'
   import { nuevaTarjeta, guardarTarjeta, eliminarTarjeta, duplicarTarjeta, alternarTarea, vinculosDe, ancla, rutaHilo } from '../lib/tablero.js'
@@ -82,6 +83,23 @@
   }
   const centroDe = id => (id === 'hub' ? { x: 0, y: 0 } : ancla(cajaDe(id), false))
   const puntoDe = id => ancla(cajaDe(id), corcho)
+  // Solo se dibuja lo que cae en la ventana del Lienzo (la vista con margen): el costo depende de
+  // lo que se ve, no del tamaño del tablero.
+  let ventana = $state(null)
+  const cruza = (c, v = ventana) => !v || (c && c.x < v.x + v.w && c.x + c.w > v.x && c.y < v.y + v.h && c.y + c.h > v.y)
+  const entre = (a, b) => ({ x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(a.x - b.x) + 1, h: Math.abs(a.y - b.y) + 1 })
+  // Si lo visible no cambió (p. ej. al arrastrar una tarjeta), se devuelve la misma lista: así el
+  // {#each} no se reconcilia en cada cuadro.
+  const estable = () => { let prev = []; return next => (next.length === prev.length && next.every((x, i) => x === prev[i]) ? prev : (prev = next)) }
+  const [e1, e2, e3] = [estable(), estable(), estable()]
+  const eT = Object.fromEntries(LISTAS.map(l => [l, estable()]))
+  const itemsVista = $derived(e1(items.filter(it => cruza(cajaDe(it.id)))))
+  const aristasVista = $derived(e2(items.filter(it => { const c = centroDe(it.id); return c && cruza(entre({ x: 0, y: 0 }, c)) })))
+  const tarjVista = $derived(Object.fromEntries(LISTAS.map(l => [l, eT[l]((cv[l] || []).filter(o => cruza(tarj.get(o.id))))])))
+  /** Muchos elementos a la vista: el Lienzo puede simplificar el dibujo al alejarse. */
+  const pesado = $derived(itemsVista.length + LISTAS.reduce((s, l) => s + tarjVista[l].length, 0) > 150)
+  const conexionesVista = $derived(e3(cv.conexiones.filter(k => { const a = puntoDe(k.desde), b = puntoDe(k.hasta); return a && b && cruza(entre(a, b)) })))
+  const chinchetas = $derived(corcho ? ['hub', ...itemsVista.map(it => it.id), ...LISTAS.flatMap(l => tarjVista[l].map(o => o.id))].map(id => { const c = cajaDe(id); return c && { id, ...c } }).filter(Boolean) : [])
 
   function nombreDe(id) {
     if (id === 'hub') return `Proyecto: ${p.titulo}`
@@ -104,6 +122,7 @@
   let ficha = $state(false)
   let modal = $state(null) // 'agregar' | 'ficha' | { lista, o, nueva } | { conexion }
   let conectando = $state(null) // null | { desde }
+  let lejos = $state(false) // zoom lejano: el Lienzo simplifica el dibujo
   let entradaFoto
 
   const guardar = () => guardarProyecto(p)
@@ -293,6 +312,34 @@
   const editarConexion = con => (modal = { conexion: copia(con) })
 </script>
 
+{#snippet conexionesSvg()}
+  {#each conexionesVista as con (con.id)}
+    {@const a = puntoDe(con.desde)}
+    {@const b = puntoDe(con.hasta)}
+    {#if a && b}
+      <!-- Si la recta pasaría por debajo del título, se curva alrededor de la tarjeta central.
+           En el tablero de corcho es un hilo rojo que cuelga entre chinchetas. -->
+      {@const ruta = corcho ? rutaHilo(a, b) : con.desde === 'hub' || con.hasta === 'hub'
+        ? { d: `M${a.x} ${a.y}L${b.x} ${b.y}`, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+        : rutaConexion(a, b, { x: -HUB_W / 2, y: -hubH / 2, w: HUB_W, h: hubH + 6 })}
+      {#if corcho}<path d={ruta.d} class="hilo-sombra" />{/if}
+      <path d={ruta.d} class="conexion" class:hilo={corcho} />
+      {#if con.etiqueta && !lejos}
+        {@const w = (S.tipografias, ancho(con.etiqueta, F.mini)) + 16}
+        <g class="etq" transform="translate({ruta.x - w / 2} {ruta.y - 9})" role="button" tabindex="0" aria-label="Conexión: {con.etiqueta}"
+          onpointerdown={e => e.stopPropagation()} onclick={() => editarConexion(con)} onkeydown={e => e.key === 'Enter' && editarConexion(con)}>
+          <rect width={w} height="18" rx="9" />
+          <text x={w / 2} y="12.5" text-anchor="middle">{con.etiqueta}</text>
+        </g>
+      {:else}
+        <circle cx={ruta.x} cy={ruta.y} r={corcho ? 4.5 : 6} class="etq-punto" class:nudo={corcho} role="button" tabindex="0" aria-label="Editar conexión"
+          onpointerdown={e => e.stopPropagation()} onclick={() => editarConexion(con)} onkeydown={e => e.key === 'Enter' && editarConexion(con)} />
+      {/if}
+    {/if}
+  {/each}
+
+{/snippet}
+
 <svelte:window onkeydown={e => e.key === 'Escape' && conectando && (conectando = null)} onpaste={pegar} />
 
 <header class="cabecera">
@@ -359,42 +406,20 @@
     </div>
   </aside>
 
-  <Lienzo bind:this={lienzo} {limites} {corcho} cursor={conectando ? 'conectando' : ''} alTocarFondo={() => { if (conectando) conectando = null }}>
+  <Lienzo bind:this={lienzo} bind:simple={lejos} bind:ventana pesado={pesado} {limites} {corcho} cursor={conectando ? 'conectando' : ''} alTocarFondo={() => { if (conectando) conectando = null }}>
     <!-- Etiquetas de grupo (Por tema) -->
     {#each base.grupos as g}
       <text class="grupo" x={g.x} y={g.y - 4}>{g.nombre.toUpperCase()}</text>
     {/each}
 
     <!-- Aristas nodo central → fuentes -->
-    {#each items as it (it.id)}
+    {#each aristasVista as it (it.id)}
       {@const c = centroDe(it.id)}
       <line x1="0" y1="0" x2={c.x} y2={c.y} class="arista" />
     {/each}
 
-    <!-- Conexiones manuales -->
-    {#each cv.conexiones as con (con.id)}
-      {@const a = puntoDe(con.desde)}
-      {@const b = puntoDe(con.hasta)}
-      {#if a && b}
-        <!-- Si la recta pasaría por debajo del título, se curva alrededor de la tarjeta central.
-             En el tablero de corcho es un hilo rojo que cuelga entre chinchetas. -->
-        {@const ruta = corcho ? rutaHilo(a, b) : con.desde === 'hub' || con.hasta === 'hub'
-          ? { d: `M${a.x} ${a.y}L${b.x} ${b.y}`, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
-          : rutaConexion(a, b, { x: -HUB_W / 2, y: -hubH / 2, w: HUB_W, h: hubH + 6 })}
-        <path d={ruta.d} class="conexion" class:hilo={corcho} />
-        {#if con.etiqueta}
-          {@const w = (S.tipografias, ancho(con.etiqueta, F.mini)) + 16}
-          <g class="etq" transform="translate({ruta.x - w / 2} {ruta.y - 9})" role="button" tabindex="0" aria-label="Conexión: {con.etiqueta}"
-            onpointerdown={e => e.stopPropagation()} onclick={() => editarConexion(con)} onkeydown={e => e.key === 'Enter' && editarConexion(con)}>
-            <rect width={w} height="18" rx="9" />
-            <text x={w / 2} y="12.5" text-anchor="middle">{con.etiqueta}</text>
-          </g>
-        {:else}
-          <circle cx={ruta.x} cy={ruta.y} r="6" class="etq-punto" role="button" tabindex="0" aria-label="Editar conexión"
-            onpointerdown={e => e.stopPropagation()} onclick={() => editarConexion(con)} onkeydown={e => e.key === 'Enter' && editarConexion(con)} />
-        {/if}
-      {/if}
-    {/each}
+    <!-- Conexiones manuales: debajo de las tarjetas (en corcho, encima: ver más abajo) -->
+    {#if !corcho}{@render conexionesSvg()}{/if}
 
     <!-- Nodo central: el proyecto -->
     <Arrastrable transform="translate({-HUB_W / 2} {-hubH / 2})" clase="hub {conectando?.desde === 'hub' ? 'origen' : ''}"
@@ -416,7 +441,7 @@
     </Arrastrable>
 
     <!-- Fuentes -->
-    {#each items as it (it.id)}
+    {#each itemsVista as it (it.id)}
       {@const q0 = posDe(it.id)}
       {@const coin = !!q && coincide(it.f, q)}
       <NodoFuente
@@ -431,23 +456,20 @@
       />
     {/each}
 
-    <!-- Chinchetas sobre la tarjeta central y las fuentes (tablero de corcho) -->
-    {#if corcho}
-      {#each [cajaDe('hub'), ...items.map(it => cajaDe(it.id))] as c}
-        {#if c}
-          <g class="chincheta"><circle cx={c.x + c.w / 2 + 1.5} cy={c.y + 11} r="7" fill="rgba(0,0,0,.25)" /><circle cx={c.x + c.w / 2} cy={c.y + 9} r="7" fill="#C0392B" /><circle cx={c.x + c.w / 2 - 2.2} cy={c.y + 6.8} r="2" fill="rgba(255,255,255,.55)" /></g>
-        {/if}
-      {/each}
-    {/if}
-
     <!-- Tarjetas libres: notas, listas de tareas, notas de voz y fotos -->
     {#each LISTAS as l (l)}
-      {#each cv[l] || [] as o (o.id)}
+      {#each tarjVista[l] as o (o.id)}
         {@const coin = !!q && coincideTarjeta(o, q)}
-        <Tarjeta lista={l} {o} {corcho} origen={conectando?.desde === o.id} resaltado={coin} atenuado={!!q && !coin}
+        <Tarjeta lista={l} {o} origen={conectando?.desde === o.id} resaltado={coin} atenuado={!!q && !coin}
           alTocar={() => tocar(o.id, () => abrirTarjeta(l, o))} alternar={i => alternar(o, i)} {...arrastreLibre(o)} />
       {/each}
     {/each}
+
+    <!-- Tablero de corcho: el hilo rojo pasa sobre las tarjetas y queda clavado en las chinchetas -->
+    {#if corcho}
+      {@render conexionesSvg()}
+      <Chinchetas cajas={chinchetas} />
+    {/if}
   </Lienzo>
 
   <!-- Barra flotante -->
@@ -570,9 +592,11 @@
     border: 2px dashed var(--accent); border-radius: 14px; background: rgba(227, 233, 236, .45);
   }
   .arista { stroke: var(--ink-soft); stroke-opacity: .3; stroke-width: 1; }
-  .conexion { fill: none; stroke: var(--accent); stroke-opacity: .55; stroke-width: 1.5; stroke-dasharray: 5 4; }
-  .conexion.hilo { stroke: #B3261E; stroke-opacity: .85; stroke-width: 2; stroke-dasharray: none; filter: drop-shadow(0 2px 1px rgba(0, 0, 0, .25)); }
-  .chincheta { pointer-events: none; }
+  /* Los hilos no capturan clics: se puede tocar la tarjeta que queda debajo. */
+  .conexion { fill: none; stroke: var(--accent); stroke-opacity: .55; stroke-width: 1.5; stroke-dasharray: 5 4; pointer-events: none; }
+  .conexion.hilo { stroke: #B3261E; stroke-opacity: 1; stroke-width: 2.2; stroke-dasharray: none; stroke-linecap: round; }
+  .etq-punto.nudo { fill: #8E1B14; stroke: #B3261E; }
+  .hilo-sombra { fill: none; stroke: rgba(0, 0, 0, .22); stroke-width: 2.6; transform: translate(1.5px, 3px); pointer-events: none; }
   .etq { cursor: pointer; }
   .etq rect { fill: var(--paper); stroke: var(--accent); }
   .etq text { font: 400 10px var(--sans); fill: var(--accent); }
