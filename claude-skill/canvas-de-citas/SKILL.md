@@ -1,6 +1,6 @@
 ---
 name: canvas-de-citas
-description: Integración total de Claude Code con la app Canvas de Citas de Max (lienzo de su tesis): leer y modificar proyectos, objetivos (OG, OE1…), indicadores, fuentes, citas, documentos PDF, notas, listas de tareas, notas de voz y sus transcripciones, imágenes, gráficos y conexiones, guardados en F:\TESIS TAKE LOOK. Úsala siempre que Max pida agregar bibliografía o fuentes a su tesis o a un objetivo, registrar una cita, poner una nota, tarea, imagen o gráfico en su lienzo/canvas/tablero, conectar ideas, revisar qué tiene en el lienzo, buscar en sus notas o audios, marcar tareas, o resumir el estado de sus fuentes — aunque no mencione la app ni la skill por su nombre.
+description: Integración total de Claude Code con la app Canvas de Citas de Max (lienzo de su tesis): leer y modificar proyectos, objetivos (OG, OE1…), indicadores, fuentes, citas, documentos PDF, notas, listas de tareas, notas de voz y sus transcripciones, imágenes, gráficos y conexiones, guardados en su carpeta de almacenamiento (hoy F:\THE FORGE\THESIS\New folder). Úsala siempre que Max pida agregar bibliografía o fuentes a su tesis o a un objetivo, registrar una cita, poner una nota, tarea, imagen o gráfico en su lienzo/canvas/tablero, conectar ideas, revisar qué tiene en el lienzo, buscar en sus notas o audios, marcar tareas, o resumir el estado de sus fuentes — aunque no mencione la app ni la skill por su nombre.
 ---
 
 # Canvas de Citas
