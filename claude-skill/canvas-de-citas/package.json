@@ -1,0 +1,8 @@
+{
+  "name": "canvas-de-citas-skill",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@embedpdf/pdfium": "^2.15.1"
+  }
+}

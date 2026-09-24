@@ -50,6 +50,16 @@ La lista completa de comandos, opciones y formatos está en `references/comandos
 - `fuente-nueva --proyecto/--objetivo` deja una cita "sin revisar" como marcador; `cita-nueva`
   la completa en vez de duplicarla.
 
+## Leer los papers
+
+- Para leer o citar un paper, usa `leer <fuente_id>` (o `--paginas 4-6`) en vez de abrir el PDF:
+  es texto limpio en Markdown con marcas `## Página N`, mucho más rápido y fiable que leer el PDF.
+  Cita con la paginación impresa de la revista (suele aparecer al inicio de cada página) y, si el
+  texto avisa de capas duplicadas o páginas sin texto, verifica en el PDF.
+- Los papers de Max ya están convertidos en `F:\THE FORGE\THESIS\PAPERS\texto\`; si agrega nuevos,
+  `convertir "F:\THE FORGE\THESIS\PAPERS"` convierte solo lo nuevo.
+- Si falta `node_modules` en la carpeta de la skill, ejecuta `npm i` ahí una vez.
+
 ## Tarjetas, imágenes y gráficos
 
 - **Dónde:** si el pedido menciona un objetivo ("para el OE2", "vincúlalo al OE2"), crea las

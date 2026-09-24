@@ -11,6 +11,7 @@ import {
 import { tamano, ocupadasProyecto, ocupadasObjetivo, lugarLibre } from './disposicion.mjs'
 import { cargarImagen, extraerDataURL } from './imagen.mjs'
 import { grafico } from './grafico.mjs'
+import { aMarkdown } from './convertir.mjs'
 
 // --- Argumentos ---
 const [cmd = 'ayuda', ...resto] = process.argv.slice(2)
@@ -439,10 +440,65 @@ C.extraer = () => {
   if (r.obj.trazos?.length) ok(`(tiene ${r.obj.trazos.length} trazos dibujados encima que no están en el archivo)`)
 }
 
+// --- Papers → Markdown (para leerlos rápido y citar por página) ---
+const DOCS = /\.(pdf|html?)$/i
+
+/** Fuente cuyo documento adjunto es este archivo (por nombre original o ruta). */
+function fuenteDeArchivo(d, archivo) {
+  const base = path.basename(archivo).toLowerCase()
+  return d.fuentes.find(f => (f.documento_nombre || '').toLowerCase() === base || (f.documento_original && path.resolve(ruta(...f.documento_original.split('/'))) === path.resolve(archivo)))
+}
+
+C.convertir = async () => {
+  const origen = path.resolve(pos.join(' ') || fallar('Uso: convertir <archivo o carpeta> [--salida carpeta] [--forzar]'))
+  const esCarpeta = fs.statSync(origen).isDirectory()
+  const archivos = esCarpeta ? fs.readdirSync(origen).filter(a => DOCS.test(a)).map(a => path.join(origen, a)) : [origen]
+  const salida = path.resolve(op.salida || path.join(esCarpeta ? origen : path.dirname(origen), 'texto'))
+  fs.mkdirSync(salida, { recursive: true })
+  let d = null
+  try { d = cargar() } catch {} // sin carpeta de la app también funciona (sin datos de la fuente)
+  let hechos = 0, saltados = 0
+  for (const a of archivos) {
+    const destino = path.join(salida, path.basename(a).replace(/\.[^.]+$/, '.md'))
+    if (!op.forzar && fs.existsSync(destino) && fs.statSync(destino).mtimeMs >= fs.statSync(a).mtimeMs) { saltados++; continue }
+    try {
+      const f = d && fuenteDeArchivo(d, a)
+      const md = await aMarkdown(a, f)
+      fs.writeFileSync(destino, md, 'utf8')
+      const pags = (md.match(/^## Página \d+/gm) || []).length
+      ok(`✓ ${path.basename(destino)}${f ? ` (${f.id})` : ''} · ${pags ? pags + ' págs · ' : ''}${Math.round(md.length / 1000)} mil caracteres${/sin texto|escaneado/.test(md) ? ' · ⚠ páginas sin texto' : ''}`)
+      hechos++
+    } catch (e) { ok(`✗ ${path.basename(a)}: ${e.message}`) }
+  }
+  ok(`${hechos} convertidos${saltados ? `, ${saltados} ya estaban al día` : ''} → ${salida}`)
+}
+
+/** Texto de una fuente (o archivo) en Markdown; con --paginas 3-5 solo esas páginas del PDF. */
+C.leer = async () => {
+  const id = pos.join(' ') || fallar('Uso: leer <fuente_id o archivo> [--paginas 3-5]')
+  let md
+  if (fs.existsSync(id)) md = await aMarkdown(id)
+  else {
+    const d = cargar(), f = d.fuentes.find(x => x.id === id) || fallar(`No existe la fuente ${id}`)
+    if (!f.documento_original) fallar(`${id} no tiene documento adjunto`)
+    const doc = ruta(...f.documento_original.split('/'))
+    if (!fs.existsSync(doc)) fallar(`El documento de ${id} aún no está en la carpeta (${f.documento_original})`)
+    const cache = ruta('fuentes', f.id, 'texto.md') // se regenera si el documento cambió
+    if (fs.existsSync(cache) && fs.statSync(cache).mtimeMs >= fs.statSync(doc).mtimeMs) md = fs.readFileSync(cache, 'utf8')
+    else { md = await aMarkdown(doc, f); fs.writeFileSync(cache, md, 'utf8') }
+  }
+  if (op.paginas) {
+    const [a, b = a] = String(op.paginas).split('-').map(Number)
+    const trozos = md.split(/(?=^## Página \d+)/m).filter(t => { const n = +(/^## Página (\d+)/.exec(t) || [])[1]; return n >= a && n <= b })
+    md = trozos.join('\n') || `(sin páginas ${op.paginas}: el documento no es un PDF o no tiene esas páginas)`
+  }
+  ok(md)
+}
+
 // --- Ejecutar ---
 try {
   const f = C[cmd] || fallar(`Comando desconocido "${cmd}". Usa: ${Object.keys(C).join(', ')}`)
-  f()
+  await f()
 } catch (e) {
   console.error('Error: ' + e.message)
   process.exit(1)
