@@ -2,7 +2,7 @@
 // Con una carpeta elegida, la app guarda sola proyectos.json, fuentes.json, citas.json y los
 // documentos (fuentes/<id>/documento.ext) tras cada cambio, y recarga lo que la skill
 // citas-tesis modifique en esa carpeta (al volver a la ventana y cada pocos segundos).
-import { S, COLECCIONES, avisar, alCambiar, leerMeta, ponerMeta, leerDocumento, idsConDocumento, guardarDocumentoImportado } from './store.svelte.js'
+import { S, COLECCIONES, avisar, alCambiar, leerMeta, ponerMeta, leerDocumento, idsConDocumento, guardarDocumentoImportado, eliminarCita, eliminarFuente, eliminarProyecto } from './store.svelte.js'
 import { serializar, leerArchivos, aplicar } from './io.svelte.js'
 import { generarClaudeMd } from './paraClaude.js'
 
@@ -77,13 +77,30 @@ export const guardarAhora = () => enCola(async () => {
 })
 
 // --- Traer cambios hechos fuera de la app ---
+/**
+ * eliminados.json lo escribe Claude Code (skill canvas-de-citas) al borrar proyectos, fuentes o
+ * citas: al combinar, la app conservaría lo que falta en los JSON, así que se borra aquí por id.
+ */
+async function aplicarEliminados() {
+  const a = await leerRuta(C.dir, 'eliminados.json')
+  if (!a) return false
+  let d
+  try { d = JSON.parse(await a.text()) } catch { return false } // a medio escribir: se reintenta
+  let n = 0
+  for (const id of d.citas || []) if (S.citaPorId.has(id)) { eliminarCita(id); n++ }
+  for (const id of d.fuentes || []) if (S.fuentePorId.has(id)) { eliminarFuente(id); n++ }
+  for (const id of d.proyectos || []) if (S.proyectoPorId.has(id)) { eliminarProyecto(id); n++ }
+  await C.dir.removeEntry('eliminados.json').catch(() => {})
+  return n > 0
+}
+
 async function traerCambios() {
   const archivos = []
   for (const col of COLECCIONES) {
     const a = await leerRuta(C.dir, `${col}.json`)
     if (a && a.lastModified !== escritos[col]) archivos.push(a)
   }
-  if (!archivos.length) return false
+  if (!archivos.length) return aplicarEliminados()
   const datos = await leerArchivos(archivos)
   if (!COLECCIONES.some(c => datos[c])) return false // p. ej. JSON a medio escribir: se reintenta luego
   await aplicar(datos, 'combinar') // dispara el guardado automático, que vuelve a escribir la versión combinada
@@ -93,6 +110,7 @@ async function traerCambios() {
     const a = await leerRuta(C.dir, f.documento_original)
     if (a) await guardarDocumentoImportado(f.id, a.name, a)
   }
+  await aplicarEliminados()
   return true
 }
 

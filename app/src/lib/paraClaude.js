@@ -97,7 +97,12 @@ const INSTRUCCIONES = `## Cómo modificar estos datos (para Claude)
 
 La app **Canvas de Citas** guarda aquí \`proyectos.json\`, \`fuentes.json\` y \`citas.json\` y
 recarga esta carpeta sola (unos 8 s, o al volver a la ventana). Este CLAUDE.md lo regenera la
-app en cada guardado: **no lo edites**, edita los JSON.
+app en cada guardado: **no lo edites**.
+
+**Usa la skill \`canvas-de-citas\`** y su script
+(\`node ~/.claude/skills/canvas-de-citas/scripts/canvas.mjs ayuda\`): agrega y edita fuentes,
+citas, notas, listas, imágenes, gráficos y conexiones con el formato correcto, y borra de forma
+que la app no lo restaure. Lo de abajo describe el formato por si hay que editar a mano.
 
 - **Agregar bibliografía:** añade un objeto a \`fuentes.json\` con un id nuevo \`fuente_NNN\`
   (siguiente número libre, nunca reutilizar), \`tipo_fuente\` (${Object.keys(TIPOS_FUENTE).join(', ')}),
