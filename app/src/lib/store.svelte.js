@@ -213,6 +213,7 @@ export async function adjuntarDocumento(f, archivo) {
   const ext = (archivo.name.split('.').pop() || 'pdf').toLowerCase()
   await db.poner('documentos', { nombre: archivo.name, tipo: archivo.type, blob: archivo }, f.id)
   f.documento_original = `fuentes/${f.id}/documento.${ext}`
+  f.documento_nombre = archivo.name // en la carpeta se guarda como documento.ext: se conserva el nombre real
   guardarFuente(f)
   cambio(f.id)
 }
@@ -220,6 +221,7 @@ export async function adjuntarDocumento(f, archivo) {
 export async function quitarDocumento(f) {
   await db.borrar('documentos', f.id)
   f.documento_original = null
+  delete f.documento_nombre
   guardarFuente(f)
 }
 

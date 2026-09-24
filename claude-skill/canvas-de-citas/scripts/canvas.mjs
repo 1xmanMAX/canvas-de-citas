@@ -283,6 +283,7 @@ C.documento = () => {
   fs.mkdirSync(ruta('fuentes', f.id), { recursive: true })
   fs.copyFileSync(archivo, ruta(...rel.split('/')))
   f.documento_original = rel
+  f.documento_nombre = path.basename(archivo) // la app muestra este nombre en la zona del documento
   guardar(d, ['fuentes'])
   ok(`Documento adjuntado a ${f.id}: ${rel}`)
   ok('La app lo importa si esa fuente aún no tenía documento en este navegador; si ya tenía uno, reemplázalo desde la ficha de la fuente.')

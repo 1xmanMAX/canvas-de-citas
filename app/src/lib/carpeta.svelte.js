@@ -108,7 +108,7 @@ async function traerCambios() {
   for (const f of S.fuentes) {
     if (!f.documento_original || locales.has(f.id)) continue
     const a = await leerRuta(C.dir, f.documento_original)
-    if (a) await guardarDocumentoImportado(f.id, a.name, a)
+    if (a) await guardarDocumentoImportado(f.id, f.documento_nombre || a.name, a)
   }
   await aplicarEliminados()
   return true

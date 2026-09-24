@@ -124,7 +124,7 @@
       <Icono nombre="clip" tam={20} />
       {#if fuente.documento_original}
         <div class="zona-txt">
-          <b>{nombreDoc || fuente.documento_original.split('/').pop()}</b>
+          <b>{fuente.documento_nombre || nombreDoc || fuente.documento_original.split('/').pop()}</b>
           <span class="suave">Suelta otro archivo aquí para reemplazarlo</span>
         </div>
         <span class="fila">
