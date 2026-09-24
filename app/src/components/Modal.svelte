@@ -39,6 +39,7 @@
   }
   dialog::backdrop { background: rgba(33, 31, 26, .55); }
   .modal { padding: 28px 32px; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; max-height: inherit; }
+  .modal > :global(*) { flex-shrink: 0; }
   .arriba { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   h2 { margin: 0; font-size: 21px; line-height: 1.3; }
   @media (max-width: 820px) {

@@ -8,7 +8,10 @@
   import { S, guardarFuente, adjuntarDocumento, vincularFuente, guardarProyecto, avisar } from '../lib/store.svelte.js'
   import { autorCorto, anio } from '../lib/citas.js'
   import { serializar } from '../lib/io.svelte.js'
-  import { comprimir } from '../lib/imagen.js'
+  import { comprimirFoto } from '../lib/imagen.js'
+  import { nuevaTarjeta } from '../lib/tablero.js'
+  import { asegurarTablero } from '../lib/tarjetas.js'
+  import { analizar, aDataURL } from '../lib/audio.svelte.js'
   import {
     R, mirar, abrirRecepcion, cerrarRecepcion, recibirDe, abrirEnvio, cerrarEnvio, enviarA,
     limpiarEnvio, ponerEnCola, leerRecibido, descartarRecibido, claseDe
@@ -81,15 +84,22 @@
         if (!f) return avisar('Elige una fuente')
         await adjuntarDocumento(f, archivo)
         avisar(`Documento adjuntado a ${autorCorto(f)} (${anio(f)})`)
-      } else if (que === 'foto' || que === 'nota') {
+      } else if (que === 'foto' || que === 'nota' || que === 'audio') {
         const p = S.proyectoPorId.get(pid)
         if (!p) return avisar('Elige un proyecto')
-        const c = p.canvas, id = `${que}_${Date.now().toString(36)}`
-        const x = Math.round(260 + Math.random() * 120), y = Math.round(-200 + Math.random() * 120)
-        if (que === 'foto') c.fotos.push({ id, titulo: sinExt, imagen: await comprimir(archivo), x, y })
-        else c.notas.push({ id, texto: (await archivo.text()).trim().slice(0, 4000), x, y })
+        const c = asegurarTablero(p.canvas)
+        const x = Math.round(360 + Math.random() * 120), y = Math.round(-120 + Math.random() * 120)
+        if (que === 'foto') c.fotos.push(nuevaTarjeta('fotos', x, y, { ...(await comprimirFoto(archivo)), titulo: sinExt }))
+        else if (que === 'nota') c.notas.push(nuevaTarjeta('notas', x, y, { texto: (await archivo.text()).trim().slice(0, 4000) }))
+        else {
+          const ext = (r.nombre.split('.').pop() || '').toLowerCase()
+          const tipo = archivo.type || { m4a: 'audio/mp4', mp3: 'audio/mpeg', ogg: 'audio/ogg', opus: 'audio/ogg', wav: 'audio/wav', webm: 'audio/webm', aac: 'audio/aac', amr: 'audio/amr', '3gp': 'audio/3gpp' }[ext] || 'audio/mpeg'
+          const blob = new Blob([archivo], { type: tipo })
+          const info = await analizar(blob).catch(() => ({ duracion: 0, onda: [] }))
+          c.audios.push(nuevaTarjeta('audios', x, y, { ...info, audio: await aDataURL(blob), transcripcion: '' }))
+        }
         guardarProyecto(p)
-        avisar(`${que === 'foto' ? 'Foto' : 'Nota'} agregada a "${p.titulo}"`)
+        avisar(`${{ foto: 'Foto', nota: 'Nota', audio: 'Nota de voz' }[que]} agregada a "${p.titulo}"`)
       } else if (que === 'importar') {
         importarArchivos([archivo])
       } else if (que === 'guardar') {
@@ -202,11 +212,12 @@
                     </select>
                     <button class="btn chico" onclick={() => procesar(r, 'adjuntar')}>Adjuntar</button>
                   {/if}
-                {:else if (clase === 'imagen' || clase === 'texto') && proyectos.length}
+                {:else if (clase === 'imagen' || clase === 'texto' || clase === 'audio') && proyectos.length}
+                  {@const accion = { imagen: ['foto', 'Foto al lienzo'], texto: ['nota', 'Nota al lienzo'], audio: ['audio', 'Nota de voz al lienzo'] }[clase]}
                   <select value={elegido(r.nombre, proyectos)} onchange={ev => (destino[r.nombre] = ev.currentTarget.value)} aria-label="Proyecto">
                     {#each proyectos as p}<option value={p.id}>{p.titulo}</option>{/each}
                   </select>
-                  <button class="btn chico primario" onclick={() => procesar(r, clase === 'imagen' ? 'foto' : 'nota')}>{clase === 'imagen' ? 'Foto al lienzo' : 'Nota al lienzo'}</button>
+                  <button class="btn chico primario" onclick={() => procesar(r, accion[0])}>{accion[1]}</button>
                 {:else if clase === 'json'}
                   <button class="btn chico primario" onclick={() => procesar(r, 'importar')}>Importar datos</button>
                 {/if}

@@ -7,3 +7,12 @@ export async function comprimir(archivo) {
   bmp.close?.()
   return tela.toDataURL('image/jpeg', 0.78)
 }
+
+/** Como comprimir(), pero devuelve también la proporción (ancho / alto) para dibujar la tarjeta. */
+export async function comprimirFoto(archivo) {
+  const imagen = await comprimir(archivo)
+  const img = new Image()
+  img.src = imagen
+  await img.decode()
+  return { imagen, proporcion: Math.round((img.naturalWidth / img.naturalHeight) * 1000) / 1000 }
+}

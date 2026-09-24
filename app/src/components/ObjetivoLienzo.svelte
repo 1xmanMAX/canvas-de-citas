@@ -11,6 +11,11 @@
   import { F, envolver, ancho } from '../lib/texto.js'
   import { NODO_W, alturaNodo, limitesDe, rutaConexion } from '../lib/grafo.js'
   import { listaObjetivos, vacio } from '../lib/objetivos.js'
+  import Tarjeta from './Tarjeta.svelte'
+  import EditorTarjeta from './EditorTarjeta.svelte'
+  import { LISTAS, cajas, nombreTarjeta, asegurarTablero } from '../lib/tarjetas.js'
+  import { nuevaTarjeta, guardarTarjeta, eliminarTarjeta, duplicarTarjeta, alternarTarea, vinculosDe, ancla, rutaHilo } from '../lib/tablero.js'
+  import { comprimirFoto } from '../lib/imagen.js'
 
   let { p, clave, abrirFuente, cerrar } = $props()
 
@@ -19,14 +24,19 @@
   const VACIO = vacio()
   const o = $derived(cv.objetivos[clave] || VACIO)
   /** Crea el sub-lienzo la primera vez que se le agrega algo. */
-  const asegurar = () => (cv.objetivos[clave] ||= vacio())
+  // Se relee desde cv.objetivos: el valor de `||=` es el objeto crudo, no su versión reactiva.
+  const asegurar = () => {
+    cv.objetivos[clave] ||= vacio()
+    return asegurarTablero(cv.objetivos[clave])
+  }
   const guardar = () => guardarProyecto(p)
   const copia = x => $state.snapshot(x)
   const idLocal = prefijo => `${prefijo}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`
 
   let grande = $state(false)
   let lienzo
-  let modal = $state(null) // 'indicadores' | 'fuentes' | { nota } | { indicador } | { conexion }
+  let modal = $state(null) // 'indicadores' | 'fuentes' | { lista, o, nueva } | { indicador } | { conexion }
+  let entradaFoto
   let conectando = $state(null)
 
   // --- Datos visibles ---
@@ -41,13 +51,14 @@
   const fuentes = $derived(o.fuentes.map(x => ({ ...x, f: S.fuentePorId.get(x.id) })).filter(x => x.f))
 
   // --- Medidas ---
-  const OBJ_W = 380, IND_W = 210, NOTA_W = 168
+  const OBJ_W = 380, IND_W = 210
   const objLineas = $derived((S.tipografias, envolver(objetivo?.texto || '', F.hub, OBJ_W - 48, 6)))
   const objH = $derived(22 + 20 + 16 + objLineas.length * 27 + 18)
   const indLineas = x => (S.tipografias, envolver(x.texto, F.nota, IND_W - 28, 5))
   const indAlto = x => 38 + indLineas(x).length * 17
-  const notaLineas = n => (S.tipografias, envolver(n.texto || 'Nota vacía', F.nota, NOTA_W - 32, 14))
-  const notaAlto = n => 28 + notaLineas(n).length * 18.75
+  const tarj = $derived(cajas(o))
+  const corcho = $derived(!!cv.corcho)
+  const hayTarjetas = $derived(LISTAS.some(l => o[l]?.length))
   const altoFuente = f => alturaNodo(false, !!f.etiquetas?.length)
 
   function centroDe(id) {
@@ -56,18 +67,29 @@
     if (i) return { x: i.x + IND_W / 2, y: i.y + indAlto(i) / 2 }
     const f = fuentes.find(x => x.id === id)
     if (f) return { x: f.x + NODO_W / 2, y: f.y + altoFuente(f.f) / 2 }
-    const n = o.notas.find(x => x.id === id)
-    if (n) return { x: n.x + NOTA_W / 2, y: n.y + notaAlto(n) / 2 }
-    return null
+    return ancla(tarj.get(id), false)
+  }
+  /** Anclaje de las conexiones: en el tablero de corcho, las chinchetas de las tarjetas libres. */
+  const puntoDe = id => (corcho && tarj.has(id) ? ancla(tarj.get(id), true) : centroDe(id))
+
+  function nombreDe(id) {
+    if (id === 'objetivo') return objetivo?.rotulo || 'Objetivo'
+    const i = indicadores.find(x => x.id === id)
+    if (i) return `Indicador: ${i.texto}`
+    const f = S.fuentePorId.get(id)
+    if (f) return `${autorCorto(f)} (${anio(f)})`
+    const t = tarj.get(id)
+    return t ? nombreTarjeta(t.lista, t.obj) : id
   }
 
   const caja = $derived({ x: -OBJ_W / 2, y: -objH / 2, w: OBJ_W, h: objH })
-  const limites = $derived(limitesDe([
+  const ocupadas = $derived([
     caja,
     ...indicadores.map(x => ({ x: x.x, y: x.y, w: IND_W, h: indAlto(x) })),
     ...fuentes.map(x => ({ x: x.x, y: x.y, w: NODO_W, h: altoFuente(x.f) })),
-    ...o.notas.map(n => ({ x: n.x, y: n.y, w: NOTA_W, h: notaAlto(n) }))
-  ], 40))
+    ...[...tarj.values()].map(({ x, y, w, h }) => ({ x, y, w, h }))
+  ])
+  const limites = $derived(limitesDe(ocupadas, 40))
 
   // --- Vincular indicadores y fuentes (nuevos se apilan a la izquierda / derecha del objetivo) ---
   function siguienteY(lista, alto) {
@@ -125,25 +147,37 @@
     }
   }
 
-  function nuevaNota(texto = '') {
+  // --- Tarjetas libres (notas, listas, notas de voz, fotos) ---
+  function crear(lista, datos) {
     const c = lienzo.centro()
-    modal = { nota: { id: idLocal('nota'), texto, x: Math.round(c.x - NOTA_W / 2), y: Math.round(c.y - 50) }, nueva: true }
+    modal = { lista, o: nuevaTarjeta(lista, c.x, c.y, datos, ocupadas), nueva: true }
   }
 
-  function guardarNota(n, nueva) {
-    const s = asegurar(), datos = copia(n)
-    if (nueva) s.notas.push(datos)
-    else Object.assign(s.notas.find(x => x.id === datos.id), datos)
+  async function nuevaFoto(e) {
+    const input = e.currentTarget
+    const archivo = input.files?.[0]
+    input.value = ''
+    if (!archivo) return
+    try { crear('fotos', await comprimirFoto(archivo)) } catch { avisar('No se pudo leer la imagen') }
+  }
+
+  function guardarModal() {
+    guardarTarjeta(asegurar(), modal.lista, modal.o, modal.nueva, ocupadas)
     guardar()
     modal = null
   }
-
-  function eliminarNota(id) {
+  function eliminarModal() {
+    eliminarTarjeta(asegurar(), modal.lista, modal.o.id)
+    guardar()
+    modal = null
+  }
+  function duplicarModal() {
     const s = asegurar()
-    s.notas = s.notas.filter(x => x.id !== id)
-    s.conexiones = s.conexiones.filter(c => c.desde !== id && c.hasta !== id)
+    guardarTarjeta(s, modal.lista, modal.o, false)
+    const d = duplicarTarjeta(s, modal.lista, modal.o)
     guardar()
-    modal = null
+    modal = { lista: modal.lista, o: copia(d) }
+    avisar('Tarjeta duplicada')
   }
 
   function guardarConexion(c, nueva) {
@@ -168,8 +202,8 @@
     const texto = e.clipboardData?.getData('text/plain') || ''
     if (!texto.trim()) return
     e.preventDefault()
-    const c = lienzo.centro(), s = asegurar()
-    s.notas.push({ id: idLocal('nota'), texto: texto.trim().slice(0, 4000), x: Math.round(c.x - NOTA_W / 2), y: Math.round(c.y - 30) })
+    const c = lienzo.centro()
+    asegurar().notas.push(nuevaTarjeta('notas', c.x, c.y, { texto: texto.trim().slice(0, 4000) }, ocupadas))
     guardar()
     avisar('Nota agregada')
   }
@@ -199,7 +233,7 @@
   </header>
 
   <div class="sub-cuerpo">
-    <Lienzo bind:this={lienzo} {limites} cursor={conectando ? 'conectando' : ''} alTocarFondo={() => { if (conectando) conectando = null }}>
+    <Lienzo bind:this={lienzo} {limites} {corcho} cursor={conectando ? 'conectando' : ''} alTocarFondo={() => { if (conectando) conectando = null }}>
       <!-- Aristas objetivo → indicadores y fuentes -->
       {#each indicadores as x (x.id)}
         {@const c = centroDe(x.id)}
@@ -212,13 +246,13 @@
 
       <!-- Conexiones manuales (curvan alrededor de la tarjeta del objetivo) -->
       {#each o.conexiones as con (con.id)}
-        {@const a = centroDe(con.desde)}
-        {@const b = centroDe(con.hasta)}
+        {@const a = puntoDe(con.desde)}
+        {@const b = puntoDe(con.hasta)}
         {#if a && b}
-          {@const ruta = con.desde === 'objetivo' || con.hasta === 'objetivo'
+          {@const ruta = corcho ? rutaHilo(a, b) : con.desde === 'objetivo' || con.hasta === 'objetivo'
             ? { d: `M${a.x} ${a.y}L${b.x} ${b.y}`, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
             : rutaConexion(a, b, caja)}
-          <path d={ruta.d} class="conexion" />
+          <path d={ruta.d} class="conexion" class:hilo={corcho} />
           {#if con.etiqueta}
             {@const w = (S.tipografias, ancho(con.etiqueta, F.mini)) + 16}
             <g class="etq" transform="translate({ruta.x - w / 2} {ruta.y - 9})" role="button" tabindex="0" aria-label="Conexión: {con.etiqueta}"
@@ -260,15 +294,13 @@
           alAbrir={() => tocar(x.id, () => abrirFuente(x.id))} {...arrastre(o.fuentes.find(y => y.id === x.id))} />
       {/each}
 
-      <!-- Notas -->
-      {#each o.notas as n (n.id)}
-        {@const h = notaAlto(n)}
-        <Arrastrable transform="translate({n.x} {n.y}) rotate(-2 {NOTA_W / 2} {h / 2})" clase="nota {conectando?.desde === n.id ? 'origen' : ''}"
-          etiqueta="Nota" alTocar={() => tocar(n.id, () => (modal = { nota: copia(n) }))} {...arrastre(n)}>
-          <rect x="2" y="6" width={NOTA_W} height={h} rx="4" fill="rgba(33,31,26,.10)" />
-          <rect width={NOTA_W} height={h} rx="4" class="nota-papel" />
-          {#each notaLineas(n) as l, i}<text x="16" y={27 + i * 18.75} class="nota-txt" class:vacia={!n.texto}>{l}</text>{/each}
-        </Arrastrable>
+      <!-- Tarjetas libres: notas, listas, notas de voz y fotos -->
+      {#each LISTAS as l (l)}
+        {#each o[l] || [] as t (t.id)}
+          <Tarjeta lista={l} o={t} {corcho} origen={conectando?.desde === t.id}
+            alTocar={() => tocar(t.id, () => (modal = { lista: l, o: copia(t) }))}
+            alternar={i => { alternarTarea(t, i); guardar() }} {...arrastre(t)} />
+        {/each}
       {/each}
     </Lienzo>
 
@@ -276,7 +308,11 @@
       <button class="btn chico" onclick={() => (modal = 'indicadores')}><Icono nombre="objetivo" tam={13} />Indicadores</button>
       <button class="btn chico" onclick={() => (modal = 'fuentes')}><Icono nombre="libro" tam={13} />Fuentes</button>
       <div class="div"></div>
-      <button class="icono-btn" aria-label="Añadir nota" title="Añadir nota" onclick={() => nuevaNota()}><Icono nombre="nota" /></button>
+      <button class="icono-btn" aria-label="Añadir nota" title="Nota" onclick={() => crear('notas')}><Icono nombre="nota" /></button>
+      <button class="icono-btn" aria-label="Añadir lista de tareas" title="Lista de tareas" onclick={() => crear('listas')}><Icono nombre="tareas" /></button>
+      <button class="icono-btn" aria-label="Grabar nota de voz" title="Nota de voz" onclick={() => crear('audios')}><Icono nombre="mic" /></button>
+      <button class="icono-btn" aria-label="Añadir foto" title="Foto" onclick={() => entradaFoto.click()}><Icono nombre="foto" /></button>
+      <input bind:this={entradaFoto} type="file" accept="image/*" hidden onchange={nuevaFoto} />
       <button class="icono-btn" aria-label="Conectar elementos" title="Conectar elementos" aria-pressed={!!conectando}
         onclick={() => (conectando = conectando ? null : { desde: null })}><Icono nombre="enlace" /></button>
     </div>
@@ -288,7 +324,7 @@
       </div>
     {/if}
 
-    {#if !indicadores.length && !fuentes.length && !o.notas.length}
+    {#if !indicadores.length && !fuentes.length && !hayTarjetas}
       <div class="vacio">
         <p class="serif">Desarrolla este objetivo por separado</p>
         <p class="suave">Vincula los indicadores que lo miden, agrega las fuentes que lo sustentan y toma notas.</p>
@@ -338,15 +374,11 @@
       <button class="btn" onclick={() => (modal = null)}>Cerrar</button>
     </div>
   </Modal>
-{:else if modal?.nota}
-  <Modal titulo={modal.nueva ? 'Nueva nota' : 'Nota'} onclose={() => (modal = null)} ancho={440}>
-    <!-- svelte-ignore a11y_autofocus -->
-    <textarea rows="5" bind:value={modal.nota.texto} autofocus aria-label="Texto de la nota"></textarea>
-    <div class="fila entre">
-      {#if !modal.nueva}<button class="btn peligro" onclick={() => eliminarNota(modal.nota.id)}>Eliminar</button>{:else}<span></span>{/if}
-      <button class="btn primario" onclick={() => guardarNota(modal.nota, modal.nueva)}>Guardar</button>
-    </div>
-  </Modal>
+{:else if modal?.lista}
+  {#key modal.o.id}
+    <EditorTarjeta lista={modal.lista} bind:o={modal.o} nueva={modal.nueva} vinculos={modal.nueva ? [] : vinculosDe(o, modal.o.id, nombreDe)}
+      onguardar={guardarModal} oneliminar={eliminarModal} onduplicar={duplicarModal} onclose={() => (modal = null)} />
+  {/key}
 {:else if modal?.conexion}
   <Modal titulo={modal.nueva ? 'Nueva conexión' : 'Conexión'} onclose={() => (modal = null)} ancho={420}>
     <!-- svelte-ignore a11y_autofocus -->
@@ -374,6 +406,7 @@
     position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5;
     display: flex; align-items: center; gap: 4px; background: var(--paper); border: 1px solid var(--line);
     border-radius: 12px; padding: 6px; box-shadow: 0 4px 14px rgba(33, 31, 26, .12); white-space: nowrap;
+    max-width: calc(100% - 16px); overflow-x: auto; scrollbar-width: none;
   }
   .barra .btn { display: inline-flex; align-items: center; gap: 6px; }
   .div { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
@@ -401,6 +434,7 @@
   .arista { stroke: var(--ink-soft); stroke-opacity: .3; stroke-width: 1; }
   .arista-ind { stroke: var(--using); stroke-opacity: .55; stroke-width: 1.5; }
   .conexion { fill: none; stroke: var(--accent); stroke-opacity: .55; stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .conexion.hilo { stroke: #B3261E; stroke-opacity: .85; stroke-width: 2; stroke-dasharray: none; }
   .etq { cursor: pointer; }
   .etq rect { fill: var(--paper); stroke: var(--accent); }
   .etq text { font: 400 10px var(--sans); fill: var(--accent); }
@@ -409,19 +443,16 @@
   :global(.obj.origen) .obj-caja { stroke-width: 4; }
   .obj-rotulo { font: 600 11px var(--sans); fill: var(--accent); letter-spacing: .06em; }
   .obj-texto { font: 600 20px var(--serif); fill: var(--ink); }
-  :global(.ind), :global(.obj-panel .nota) { cursor: grab; }
+  :global(.ind) { cursor: grab; }
   .ind-caja { fill: var(--using-bg); stroke: var(--using); stroke-opacity: .5; }
   :global(.ind.origen) .ind-caja { stroke-opacity: 1; stroke-width: 2; }
   .ind-rotulo { font: 600 9.5px var(--sans); fill: var(--using); letter-spacing: .08em; pointer-events: none; }
   .ind-texto { font: 400 12.5px var(--sans); fill: var(--ink); pointer-events: none; }
-  .nota-papel { fill: var(--nota); }
-  :global(.obj-panel .nota.origen) .nota-papel { stroke: var(--accent); stroke-width: 2; }
-  .nota-txt { font: 400 12.5px var(--sans); fill: var(--nota-ink); pointer-events: none; }
-  .nota-txt.vacia { opacity: .5; }
+
   text { user-select: none; }
 
   @media (max-width: 820px) {
     .obj-panel { width: 100%; min-width: 0; border-left: none; z-index: 25; }
-    .barra { gap: 2px; padding: 4px; }
+    .barra { gap: 2px; padding: 4px; max-width: calc(100% - 16px); overflow-x: auto; scrollbar-width: none; }
   }
 </style>

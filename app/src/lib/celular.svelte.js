@@ -107,6 +107,7 @@ export function claseDe(nombre, mime = '') {
   const ext = (nombre.split('.').pop() || '').toLowerCase()
   if (ext === 'json') return 'json'
   if (mime?.startsWith('image/') || ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext)) return 'imagen'
+  if (mime?.startsWith('audio/') || ['m4a', 'mp3', 'ogg', 'opus', 'wav', 'webm', 'aac', 'amr', '3gp'].includes(ext)) return 'audio'
   if (['txt', 'md'].includes(ext)) return 'texto'
   if (['pdf', 'html', 'htm', 'docx', 'doc', 'epub'].includes(ext)) return 'documento'
   return 'otro'

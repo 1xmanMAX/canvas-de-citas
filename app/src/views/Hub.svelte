@@ -9,13 +9,18 @@
   import AgregarFuente from '../components/AgregarFuente.svelte'
   import ProyectoForm from '../components/ProyectoForm.svelte'
   import ObjetivoLienzo from '../components/ObjetivoLienzo.svelte'
+  import Tarjeta from '../components/Tarjeta.svelte'
+  import EditorTarjeta from '../components/EditorTarjeta.svelte'
+  import { LISTAS, cajas, coincideTarjeta, nombreTarjeta } from '../lib/tarjetas.js'
+  import { nuevaTarjeta, guardarTarjeta, eliminarTarjeta, duplicarTarjeta, alternarTarea, vinculosDe, ancla, rutaHilo } from '../lib/tablero.js'
+  import { analizar, aDataURL } from '../lib/audio.svelte.js'
   import { listaObjetivos, objetivosPorIndicador } from '../lib/objetivos.js'
   import { S, guardarProyecto, avisar } from '../lib/store.svelte.js'
   import { estadoDeCitas, autorCorto, anio, coincide, TIPOS_PROYECTO, ESTADOS_USO } from '../lib/citas.js'
   import { F, envolver, ancho } from '../lib/texto.js'
   import { NODO_W, alturaNodo, radial, porTema, limitesDe, rutaConexion } from '../lib/grafo.js'
   import { descargarBib } from '../lib/io.svelte.js'
-  import { comprimir } from '../lib/imagen.js'
+  import { comprimirFoto } from '../lib/imagen.js'
   import { R } from '../lib/celular.svelte.js'
 
   let { p, fid = null, oid = null, abrirDatos, abrirCelular, atras } = $props()
@@ -64,34 +69,40 @@
   const base = $derived((S.tipografias, cv.modo === 'tema' ? porTema(items, it => it.f.tema, HUB_W, hubH) : { pos: radial(items), grupos: [] }))
   const posDe = id => (cv.modo === 'libre' && cv.posiciones[id]) || base.pos.get(id)
 
-  const NOTA_W = 168
-  const notaLineas = n => (S.tipografias, envolver(n.texto || 'Nota vacía', F.nota, NOTA_W - 32, 14))
-  const notaAlto = n => 28 + notaLineas(n).length * 18.75
-  const fotoLineas = f => (S.tipografias, envolver(f.titulo || '', F.chico, 120, 3))
+  // Tarjetas libres (notas, listas, notas de voz, fotos) y sus cajas.
+  const tarj = $derived(cajas(cv))
+  const corcho = $derived(!!cv.corcho)
+  const hayTarjetas = $derived(LISTAS.some(l => cv[l]?.length))
 
-  function centroDe(id) {
-    if (id === 'hub') return { x: 0, y: 0 }
+  function cajaDe(id) {
+    if (id === 'hub') return { x: -HUB_W / 2, y: -hubH / 2, w: HUB_W, h: hubH }
     const it = itemPorId.get(id)
-    if (it) { const q = posDe(id); return q && { x: q.x + NODO_W / 2, y: q.y + it.h / 2 } }
-    const n = cv.notas.find(x => x.id === id)
-    if (n) return { x: n.x + NOTA_W / 2, y: n.y + notaAlto(n) / 2 }
-    const f = cv.fotos.find(x => x.id === id)
-    if (f) return { x: f.x + 60, y: f.y + 45 }
-    return null
+    if (it) { const q = posDe(id); return q && { x: q.x, y: q.y, w: NODO_W, h: it.h } }
+    return tarj.get(id) || null
+  }
+  const centroDe = id => (id === 'hub' ? { x: 0, y: 0 } : ancla(cajaDe(id), false))
+  const puntoDe = id => ancla(cajaDe(id), corcho)
+
+  function nombreDe(id) {
+    if (id === 'hub') return `Proyecto: ${p.titulo}`
+    const f = S.fuentePorId.get(id)
+    if (f) return `${autorCorto(f)} (${anio(f)})`
+    const t = tarj.get(id)
+    return t ? nombreTarjeta(t.lista, t.obj) : id
   }
 
-  const limites = $derived(limitesDe([
+  const ocupadas = $derived([
     { x: -HUB_W / 2, y: -hubH / 2, w: HUB_W, h: hubH },
     ...items.map(it => { const q = posDe(it.id); return { x: q.x, y: q.y, w: NODO_W, h: it.h } }),
-    ...cv.notas.map(n => ({ x: n.x, y: n.y, w: NOTA_W, h: notaAlto(n) })),
-    ...cv.fotos.map(f => ({ x: f.x, y: f.y, w: 120, h: 140 }))
-  ], 40))
+    ...[...tarj.values()].map(({ x, y, w, h }) => ({ x, y, w, h }))
+  ])
+  const limites = $derived(limitesDe(ocupadas, 40))
 
   // --- Interacción ---
   let lienzo
   let q = $state('')
   let ficha = $state(false)
-  let modal = $state(null) // 'agregar' | 'ficha' | { nota } | { foto } | { conexion }
+  let modal = $state(null) // 'agregar' | 'ficha' | { lista, o, nueva } | { conexion }
   let conectando = $state(null) // null | { desde }
   let entradaFoto
 
@@ -149,44 +160,67 @@
   const cerrarObjetivo = () => atras(`#/p/${p.id}`)
   const fuenteAbierta = $derived(fid ? S.fuentePorId.get(fid) : null)
 
-  function nuevaNota() {
+  // --- Tarjetas: crear, editar, duplicar ---
+  function crear(lista, datos) {
     const c = lienzo.centro()
-    modal = { nota: { id: 'nota_' + Date.now().toString(36), texto: '', x: Math.round(c.x - NOTA_W / 2), y: Math.round(c.y - 50) }, nueva: true }
+    modal = { lista, o: nuevaTarjeta(lista, c.x, c.y, datos, ocupadas), nueva: true }
   }
+  const abrirTarjeta = (lista, o) => (modal = { lista, o: copia(o) })
 
   async function nuevaFoto(e) {
     const input = e.currentTarget
     const archivo = input.files?.[0]
     input.value = ''
     if (!archivo) return
-    try {
-      const c = lienzo.centro()
-      const foto = { id: 'foto_' + Date.now().toString(36), titulo: '', imagen: await comprimir(archivo), x: Math.round(c.x - 60), y: Math.round(c.y - 70) }
-      modal = { foto, nueva: true }
-    } catch { avisar('No se pudo leer la imagen') }
+    try { crear('fotos', await comprimirFoto(archivo)) } catch { avisar('No se pudo leer la imagen') }
   }
 
-  // --- Pegar (Ctrl+V) o soltar texto / imágenes sobre el lienzo ---
-  const idLocal = prefijo => `${prefijo}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`
+  function guardarModal() {
+    guardarTarjeta(cv, modal.lista, modal.o, modal.nueva, ocupadas)
+    guardar()
+    modal = null
+  }
+  function eliminarModal() {
+    eliminarTarjeta(cv, modal.lista, modal.o.id)
+    guardar()
+    modal = null
+  }
+  function duplicarModal() {
+    guardarTarjeta(cv, modal.lista, modal.o, false)
+    const d = duplicarTarjeta(cv, modal.lista, modal.o)
+    guardar()
+    modal = { lista: modal.lista, o: copia(d) }
+    avisar('Tarjeta duplicada')
+  }
+  function alternar(o, i) {
+    alternarTarea(o, i)
+    guardar()
+  }
+
+  // --- Pegar (Ctrl+V) o soltar texto / imágenes / audios sobre el lienzo ---
   let soltando = $state(false)
   let tSoltar
 
-  async function insertar(imagenes, texto, x, y) {
-    let fotos = 0
-    for (const archivo of imagenes) {
+  /** Crea tarjetas a partir de archivos (imágenes y audios) o texto, a partir del punto (x, y). */
+  async function insertar(archivos, texto, x, y) {
+    let n = 0
+    for (const archivo of archivos) {
       try {
-        const titulo = /^image\.\w+$/i.test(archivo.name) ? '' : archivo.name.replace(/\.[^.]+$/, '')
-        cv.fotos.push({ id: idLocal('foto'), titulo, imagen: await comprimir(archivo), x: Math.round(x - 60), y: Math.round(y - 45) })
-        fotos++
-        x += 30
-        y += 30
+        const titulo = /^(image|audio|recording)\.\w+$/i.test(archivo.name) ? '' : archivo.name.replace(/\.[^.]+$/, '')
+        if (archivo.type.startsWith('audio/')) {
+          cv.audios.push(nuevaTarjeta('audios', x, y, { ...(await analizar(archivo)), audio: await aDataURL(archivo), transcripcion: titulo }, ocupadas))
+        } else {
+          cv.fotos.push(nuevaTarjeta('fotos', x, y, { ...(await comprimirFoto(archivo)), titulo }, ocupadas))
+        }
+        n++
       } catch { avisar(`No se pudo leer ${archivo.name}`) }
     }
-    if (!imagenes.length && texto.trim()) {
-      cv.notas.push({ id: idLocal('nota'), texto: texto.trim().slice(0, 4000), x: Math.round(x - NOTA_W / 2), y: Math.round(y - 30) })
+    if (!archivos.length && texto.trim()) {
+      cv.notas.push(nuevaTarjeta('notas', x, y, { texto: texto.trim().slice(0, 4000) }, ocupadas))
+      n++
     }
     guardar()
-    avisar(fotos ? `${fotos === 1 ? 'Foto agregada' : `${fotos} fotos agregadas`}` : 'Nota agregada')
+    avisar(n === 1 ? 'Tarjeta agregada' : `${n} tarjetas agregadas`)
   }
 
   function pegar(e) {
@@ -194,7 +228,7 @@
     if (e.target.closest?.('input, textarea, [contenteditable]')) return
     const dt = e.clipboardData
     if (!dt) return
-    const imagenes = [...dt.files].filter(f => f.type.startsWith('image/'))
+    const imagenes = [...dt.files].filter(f => /^(image|audio)\//.test(f.type))
     const texto = imagenes.length ? '' : dt.getData('text/plain')
     if (!imagenes.length && !texto.trim()) return
     e.preventDefault()
@@ -206,7 +240,7 @@
   function recibible(dt) {
     const archivos = [...(dt?.files || [])]
     if (archivos.some(f => /\.json$/i.test(f.name))) return null
-    const imagenes = archivos.filter(f => f.type.startsWith('image/'))
+    const imagenes = archivos.filter(f => /^(image|audio)\//.test(f.type))
     const texto = imagenes.length ? '' : dt?.getData('text/plain') || ''
     return imagenes.length || texto.trim() ? { imagenes, texto } : null
   }
@@ -230,20 +264,6 @@
     insertar(r.imagenes, r.texto, p.x, p.y)
   }
 
-  function guardarElemento(lista, obj, nueva) {
-    const datos = copia(obj)
-    if (nueva) cv[lista].push(datos)
-    else Object.assign(cv[lista].find(x => x.id === datos.id), datos)
-    guardar()
-    modal = null
-  }
-
-  function eliminarElemento(lista, id) {
-    cv[lista] = cv[lista].filter(x => x.id !== id)
-    cv.conexiones = cv.conexiones.filter(c => c.desde !== id && c.hasta !== id)
-    guardar()
-    modal = null
-  }
 
   function guardarConexion(c, nueva) {
     const datos = copia(c)
@@ -266,7 +286,10 @@
     requestAnimationFrame(() => lienzo?.encuadrar())
   }
 
-  const conexionesDe = id => cv.conexiones.filter(c => c.desde === id || c.hasta === id).length
+  function alternarCorcho() {
+    cv.corcho = !cv.corcho
+    guardar()
+  }
   const editarConexion = con => (modal = { conexion: copia(con) })
 </script>
 
@@ -332,11 +355,11 @@
     </div>
     <div class="separador"></div>
     <div class="suave ayuda">
-      Arrastra las tarjetas para acomodarlas (pasa a modo Libre). Desliza con dos dedos para mover el lienzo y pellizca para hacer zoom (con ratón: Ctrl + rueda). Toca una fuente para ver sus citas. Pega (Ctrl+V) o arrastra texto o imágenes al lienzo para crear notas y fotos.
+      Arrastra las tarjetas para acomodarlas (pasa a modo Libre). Desliza con dos dedos para mover el lienzo y pellizca para hacer zoom (con ratón: Ctrl + rueda). Toca una fuente para ver sus citas. Crea notas, listas de tareas, notas de voz y fotos desde la barra; también puedes pegar (Ctrl+V) o arrastrar texto, imágenes y audios al lienzo. El buscador también encuentra texto en notas, tareas y transcripciones. La chincheta cambia a tablero de corcho.
     </div>
   </aside>
 
-  <Lienzo bind:this={lienzo} {limites} cursor={conectando ? 'conectando' : ''} alTocarFondo={() => { if (conectando) conectando = null }}>
+  <Lienzo bind:this={lienzo} {limites} {corcho} cursor={conectando ? 'conectando' : ''} alTocarFondo={() => { if (conectando) conectando = null }}>
     <!-- Etiquetas de grupo (Por tema) -->
     {#each base.grupos as g}
       <text class="grupo" x={g.x} y={g.y - 4}>{g.nombre.toUpperCase()}</text>
@@ -350,14 +373,15 @@
 
     <!-- Conexiones manuales -->
     {#each cv.conexiones as con (con.id)}
-      {@const a = centroDe(con.desde)}
-      {@const b = centroDe(con.hasta)}
+      {@const a = puntoDe(con.desde)}
+      {@const b = puntoDe(con.hasta)}
       {#if a && b}
-        <!-- Si la recta pasaría por debajo del título, se curva alrededor de la tarjeta central. -->
-        {@const ruta = con.desde === 'hub' || con.hasta === 'hub'
+        <!-- Si la recta pasaría por debajo del título, se curva alrededor de la tarjeta central.
+             En el tablero de corcho es un hilo rojo que cuelga entre chinchetas. -->
+        {@const ruta = corcho ? rutaHilo(a, b) : con.desde === 'hub' || con.hasta === 'hub'
           ? { d: `M${a.x} ${a.y}L${b.x} ${b.y}`, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
           : rutaConexion(a, b, { x: -HUB_W / 2, y: -hubH / 2, w: HUB_W, h: hubH + 6 })}
-        <path d={ruta.d} class="conexion" />
+        <path d={ruta.d} class="conexion" class:hilo={corcho} />
         {#if con.etiqueta}
           {@const w = (S.tipografias, ancho(con.etiqueta, F.mini)) + 16}
           <g class="etq" transform="translate({ruta.x - w / 2} {ruta.y - 9})" role="button" tabindex="0" aria-label="Conexión: {con.etiqueta}"
@@ -407,40 +431,35 @@
       />
     {/each}
 
-    <!-- Notas adhesivas -->
-    {#each cv.notas as n (n.id)}
-      {@const h = notaAlto(n)}
-      <Arrastrable transform="translate({n.x} {n.y}) rotate(-2 {NOTA_W / 2} {h / 2})" clase="nota {conectando?.desde === n.id ? 'origen' : ''}"
-        etiqueta="Nota" alTocar={() => tocar(n.id, () => (modal = { nota: copia(n) }))} {...arrastreLibre(n)}>
-        <rect x="2" y="6" width={NOTA_W} height={h} rx="4" fill="rgba(33,31,26,.10)" />
-        <rect width={NOTA_W} height={h} rx="4" class="nota-papel" />
-        {#each notaLineas(n) as l, i}<text x="16" y={27 + i * 18.75} class="nota-txt" class:vacia={!n.texto}>{l}</text>{/each}
-      </Arrastrable>
-    {/each}
+    <!-- Chinchetas sobre la tarjeta central y las fuentes (tablero de corcho) -->
+    {#if corcho}
+      {#each [cajaDe('hub'), ...items.map(it => cajaDe(it.id))] as c}
+        {#if c}
+          <g class="chincheta"><circle cx={c.x + c.w / 2 + 1.5} cy={c.y + 11} r="7" fill="rgba(0,0,0,.25)" /><circle cx={c.x + c.w / 2} cy={c.y + 9} r="7" fill="#C0392B" /><circle cx={c.x + c.w / 2 - 2.2} cy={c.y + 6.8} r="2" fill="rgba(255,255,255,.55)" /></g>
+        {/if}
+      {/each}
+    {/if}
 
-    <!-- Fotos -->
-    {#each cv.fotos as f (f.id)}
-      {@const lineas = fotoLineas(f)}
-      {@const nc = conexionesDe(f.id)}
-      <Arrastrable transform="translate({f.x} {f.y})" clase="foto {conectando?.desde === f.id ? 'origen' : ''}"
-        etiqueta="Foto: {f.titulo}" alTocar={() => tocar(f.id, () => (modal = { foto: copia(f) }))} {...arrastreLibre(f)}>
-        <clipPath id="clip-{f.id}"><rect width="120" height="90" rx="10" /></clipPath>
-        <rect width="120" height="90" rx="10" fill="#E4E0D4" />
-        <image href={f.imagen} width="120" height="90" preserveAspectRatio="xMidYMid slice" clip-path="url(#clip-{f.id})" />
-        <rect width="120" height="90" rx="10" class="foto-borde" />
-        {#each lineas as l, i}<text x="0" y={106 + i * 15} class="foto-txt">{l}</text>{/each}
-        {#if nc}<text x="0" y={110 + lineas.length * 15} class="foto-con">{nc} {nc === 1 ? 'conexión' : 'conexiones'}</text>{/if}
-      </Arrastrable>
+    <!-- Tarjetas libres: notas, listas de tareas, notas de voz y fotos -->
+    {#each LISTAS as l (l)}
+      {#each cv[l] || [] as o (o.id)}
+        {@const coin = !!q && coincideTarjeta(o, q)}
+        <Tarjeta lista={l} {o} {corcho} origen={conectando?.desde === o.id} resaltado={coin} atenuado={!!q && !coin}
+          alTocar={() => tocar(o.id, () => abrirTarjeta(l, o))} alternar={i => alternar(o, i)} {...arrastreLibre(o)} />
+      {/each}
     {/each}
   </Lienzo>
 
   <!-- Barra flotante -->
   <div class="barra" role="toolbar" aria-label="Herramientas del lienzo">
-    <button class="icono-btn" aria-label="Añadir nota" title="Añadir nota" onclick={nuevaNota}><Icono nombre="nota" /></button>
-    <button class="icono-btn" aria-label="Añadir foto" title="Añadir foto" onclick={() => entradaFoto.click()}><Icono nombre="foto" /></button>
+    <button class="icono-btn" aria-label="Añadir nota" title="Nota" onclick={() => crear('notas')}><Icono nombre="nota" /></button>
+    <button class="icono-btn" aria-label="Añadir lista de tareas" title="Lista de tareas" onclick={() => crear('listas')}><Icono nombre="tareas" /></button>
+    <button class="icono-btn" aria-label="Grabar nota de voz" title="Nota de voz" onclick={() => crear('audios')}><Icono nombre="mic" /></button>
+    <button class="icono-btn" aria-label="Añadir foto" title="Foto" onclick={() => entradaFoto.click()}><Icono nombre="foto" /></button>
     <input bind:this={entradaFoto} type="file" accept="image/*" hidden onchange={nuevaFoto} />
     <button class="icono-btn" aria-label="Conectar elementos" title="Conectar elementos" aria-pressed={!!conectando}
       onclick={() => (conectando = conectando ? null : { desde: null })}><Icono nombre="enlace" /></button>
+    <button class="icono-btn" aria-label="Tablero de corcho" title="Tablero de corcho" aria-pressed={corcho} onclick={alternarCorcho}><Icono nombre="chincheta" /></button>
     <div class="div"></div>
     <div class="segmentado">
       <button aria-pressed={cv.modo === 'radial'} onclick={() => cambiarModo('radial')}>Radial</button>
@@ -458,7 +477,7 @@
     </div>
   {/if}
 
-  {#if !items.length && !cv.notas.length && !cv.fotos.length}
+  {#if !items.length && !hayTarjetas}
     <div class="vacio-hub">
       <p class="serif">Este proyecto aún no tiene fuentes</p>
       <p class="suave">Agrégalas aquí o importa los JSON que genera la skill <b>citas-tesis</b>.</p>
@@ -482,24 +501,11 @@
   <AgregarFuente proyectoId={p.id} onclose={() => (modal = null)} />
 {:else if modal === 'ficha'}
   <ProyectoForm proyecto={p} onclose={() => (modal = null)} />
-{:else if modal?.nota}
-  <Modal titulo={modal.nueva ? 'Nueva nota' : 'Nota'} onclose={() => (modal = null)} ancho={440}>
-    <!-- svelte-ignore a11y_autofocus -->
-    <textarea rows="5" bind:value={modal.nota.texto} autofocus aria-label="Texto de la nota"></textarea>
-    <div class="fila entre">
-      {#if !modal.nueva}<button class="btn peligro" onclick={() => eliminarElemento('notas', modal.nota.id)}>Eliminar</button>{:else}<span></span>{/if}
-      <button class="btn primario" onclick={() => guardarElemento('notas', modal.nota, modal.nueva)}>Guardar</button>
-    </div>
-  </Modal>
-{:else if modal?.foto}
-  <Modal titulo={modal.nueva ? 'Nueva foto' : 'Foto'} onclose={() => (modal = null)} ancho={560}>
-    <img src={modal.foto.imagen} alt={modal.foto.titulo} class="foto-grande" />
-    <label class="campo"><span>Descripción</span><input type="text" bind:value={modal.foto.titulo} placeholder="Foto: ensayo en laboratorio, feb. 2026" /></label>
-    <div class="fila entre">
-      {#if !modal.nueva}<button class="btn peligro" onclick={() => eliminarElemento('fotos', modal.foto.id)}>Eliminar</button>{:else}<span></span>{/if}
-      <button class="btn primario" onclick={() => guardarElemento('fotos', modal.foto, modal.nueva)}>Guardar</button>
-    </div>
-  </Modal>
+{:else if modal?.lista}
+  {#key modal.o.id}
+    <EditorTarjeta lista={modal.lista} bind:o={modal.o} nueva={modal.nueva} vinculos={modal.nueva ? [] : vinculosDe(cv, modal.o.id, nombreDe)}
+      onguardar={guardarModal} oneliminar={eliminarModal} onduplicar={duplicarModal} onclose={() => (modal = null)} />
+  {/key}
 {:else if modal?.conexion}
   <Modal titulo={modal.nueva ? 'Nueva conexión' : 'Conexión'} onclose={() => (modal = null)} ancho={420}>
     <!-- svelte-ignore a11y_autofocus -->
@@ -565,6 +571,8 @@
   }
   .arista { stroke: var(--ink-soft); stroke-opacity: .3; stroke-width: 1; }
   .conexion { fill: none; stroke: var(--accent); stroke-opacity: .55; stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .conexion.hilo { stroke: #B3261E; stroke-opacity: .85; stroke-width: 2; stroke-dasharray: none; filter: drop-shadow(0 2px 1px rgba(0, 0, 0, .25)); }
+  .chincheta { pointer-events: none; }
   .etq { cursor: pointer; }
   .etq rect { fill: var(--paper); stroke: var(--accent); }
   .etq text { font: 400 10px var(--sans); fill: var(--accent); }
@@ -576,21 +584,13 @@
   .hub-chip { font: 600 11px var(--sans); fill: var(--accent); letter-spacing: .04em; }
   .hub-titulo { font: 600 20px var(--serif); fill: var(--ink); }
   .hub-sub { font: 400 12px var(--sans); fill: var(--ink-soft); }
-  :global(.nota), :global(.foto) { cursor: grab; }
-  .nota-papel { fill: var(--nota); }
-  :global(.nota.origen) .nota-papel, :global(.foto.origen) .foto-borde { stroke: var(--accent); stroke-width: 2; }
-  .nota-txt { font: 400 12.5px var(--sans); fill: var(--nota-ink); pointer-events: none; }
-  .nota-txt.vacia { opacity: .5; }
-  .foto-borde { fill: none; stroke: var(--line); }
-  .foto-txt { font: 400 11px var(--sans); fill: var(--ink-soft); pointer-events: none; }
-  .foto-con { font: 400 10px var(--sans); fill: var(--accent); pointer-events: none; }
-  .foto-grande { width: 100%; max-height: 50dvh; object-fit: contain; border-radius: 10px; background: var(--paper-dim); }
+
   text { user-select: none; }
 
   @media (max-width: 820px) {
     .buscar { width: 120px; }
     .barra { top: 10px; left: 50%; }
-    .barra { gap: 2px; padding: 4px; }
+    .barra { gap: 2px; padding: 4px; overflow-x: auto; scrollbar-width: none; }
     .barra .div { margin: 0 1px; }
     .barra .segmentado button { padding: 6px 7px; }
     .pista-conexion { left: 50%; top: 62px; }

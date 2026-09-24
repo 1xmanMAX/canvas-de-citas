@@ -4,6 +4,7 @@
 import { S } from './store.svelte.js'
 import { listaObjetivos } from './objetivos.js'
 import { TIPOS_FUENTE, ESTADOS_USO, ESTADOS_VERIF, autorCorto, anio, paginaTexto } from './citas.js'
+import { LISTAS, nombreTarjeta, duracionTexto } from './tarjetas.js'
 
 const una = t => String(t ?? '').replace(/\s+/g, ' ').trim()
 const ref = f => (f ? `${autorCorto(f)} (${anio(f)}) \`${f.id}\`` : '(fuente borrada)')
@@ -11,13 +12,30 @@ const ref = f => (f ? `${autorCorto(f)} (${anio(f)}) \`${f.id}\`` : '(fuente bor
 function nombreNodo(id, p, o) {
   const f = S.fuentePorId.get(id)
   if (f) return ref(f)
-  const nota = [...(o?.notas || []), ...p.canvas.notas].find(n => n.id === id)
-  if (nota) return `nota «${una(nota.texto).slice(0, 50)}»`
   const ind = o?.indicadores.find(x => x.id === id)
   if (ind) return `indicador «${una(ind.texto)}»`
-  const foto = p.canvas.fotos.find(x => x.id === id)
-  if (foto) return `imagen «${una(foto.titulo)}»`
-  return `\`${id}\``
+  for (const c of [o, p.canvas]) for (const l of LISTAS) {
+    const t = c?.[l]?.find(x => x.id === id)
+    if (t) return `${nombreTarjeta(l, t)} \`${id}\``
+  }
+  return id === 'hub' ? 'el proyecto' : id === 'objetivo' ? 'el objetivo' : `\`${id}\``
+}
+
+/** Notas, listas de tareas, notas de voz (con transcripción) y fotos de un lienzo. */
+function tarjetas(c, sangria = '') {
+  const L = []
+  for (const n of c.notas || []) L.push(`${sangria}- Nota${n.titulo ? ` «${una(n.titulo)}»` : ''}: ${una(n.texto)}`)
+  for (const l of c.listas || []) {
+    L.push(`${sangria}- Lista de tareas «${una(l.titulo) || 'sin título'}» \`${l.id}\``)
+    for (const it of l.items || []) L.push(`${sangria}  - [${it.hecho ? 'x' : ' '}] ${una(it.t)}`)
+  }
+  for (const a of c.audios || []) L.push(`${sangria}- Nota de voz (${duracionTexto(a.duracion)}${a.creado ? `, ${a.creado.slice(0, 10)}` : ''}): ${a.transcripcion ? `«${una(a.transcripcion)}»` : '(sin transcripción)'}`)
+  for (const f of c.fotos || []) {
+    L.push(`${sangria}- Foto «${una(f.titulo) || 'sin título'}»${f.trazos?.length ? ' (con marcas dibujadas)' : ''}`)
+    if (f.texto) L.push(`${sangria}  - Texto: ${una(f.texto)}`)
+    if (f.anotacion) L.push(`${sangria}  - Anotación: ${una(f.anotacion)}`)
+  }
+  return L
 }
 
 function conexiones(l, p, o) {
@@ -36,7 +54,7 @@ function proyecto(p) {
       if (!o) continue
       if (o.indicadores.length) L.push(`  - Indicadores: ${o.indicadores.map(x => una(x.texto)).join('; ')}`)
       if (o.fuentes.length) L.push(`  - Fuentes: ${o.fuentes.map(x => ref(S.fuentePorId.get(x.id))).join('; ')}`)
-      for (const n of o.notas) L.push(`  - Nota: ${una(n.texto)}`)
+      L.push(...tarjetas(o, '  '))
       if (o.conexiones.length) L.push('  - Conexiones:', ...conexiones(o.conexiones, p, o).map(x => '  ' + x))
     }
     L.push('')
@@ -57,9 +75,8 @@ function proyecto(p) {
     }
     L.push('')
   }
-  const notas = p.canvas.notas
-  if (notas.length) L.push('### Notas del lienzo', '', ...notas.map(n => `- ${una(n.texto)}`), '')
-  if (p.canvas.fotos.length) L.push('### Imágenes del lienzo', '', ...p.canvas.fotos.map(x => `- ${una(x.titulo) || x.id}`), '')
+  const libres = tarjetas(p.canvas)
+  if (libres.length) L.push('### Notas, tareas, audios y fotos del lienzo', '', ...libres, '')
   if (p.canvas.conexiones.length) L.push('### Conexiones', '', ...conexiones(p.canvas.conexiones, p).map(x => x.slice(2)), '')
   return L
 }
@@ -97,6 +114,12 @@ app en cada guardado: **no lo edites**, edita los JSON.
   \`{ "indicadores": [], "fuentes": [], "notas": [], "conexiones": [] }\`. Separa las posiciones
   (x, y) unos 260 px para que las tarjetas no se encimen. La fuente también debe estar vinculada
   al proyecto en \`citas.json\`.
+- **Agregar una nota o una lista de tareas al lienzo:** en el proyecto (o en \`canvas.objetivos.<clave>\`)
+  añade a \`canvas.notas\` \`{ "id": "nota_<algo único>", "titulo": "", "texto": "…", "estilo": "adhesiva", "letra": "sans", "color": "amarillo", "creado": "<ISO>", "x": 0, "y": 0 }\`
+  (estilo: adhesiva | rayada | tarjeta; letra: sans | serif | mono | mano) o a \`canvas.listas\`
+  \`{ "id": "lista_<algo único>", "titulo": "…", "items": [{ "t": "tarea", "hecho": false }], "creado": "<ISO>", "x": 0, "y": 0 }\`.
+  Las notas de voz (\`canvas.audios\`) y fotos (\`canvas.fotos\`) llevan el archivo incrustado: no las crees, solo
+  puedes corregir su \`transcripcion\`, \`titulo\`, \`texto\` o \`anotacion\`.
 - Escribe JSON válido y completo (la app ignora un archivo a medio escribir y reintenta).
 - No borres campos que no conozcas: la app guarda ahí posiciones del lienzo y otros datos.
 `

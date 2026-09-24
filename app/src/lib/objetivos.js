@@ -10,9 +10,9 @@ export function listaObjetivos(p) {
   return l
 }
 
-export const vacio = () => ({ indicadores: [], fuentes: [], notas: [], conexiones: [] })
+export const vacio = () => ({ indicadores: [], fuentes: [], notas: [], listas: [], audios: [], fotos: [], conexiones: [] })
 
-const tieneContenido = o => !!(o && (o.indicadores.length || o.fuentes.length || o.notas.length))
+const tieneContenido = o => !!(o && ['indicadores', 'fuentes', 'notas', 'listas', 'audios', 'fotos'].some(l => o[l]?.length))
 const corto = clave => (clave === 'og' ? 'OG' : clave.toUpperCase())
 
 /** Objetivos (cortos) a los que está vinculado cada indicador: Map texto → ['OE1', …]. */

@@ -3,7 +3,7 @@
   import { setContext } from 'svelte'
   import Icono from './Icono.svelte'
 
-  let { limites, children, capa, alTocarFondo, cursor = '' } = $props()
+  let { limites, children, capa, alTocarFondo, cursor = '', corcho = false } = $props()
 
   let svg
   let W = $state(0), H = $state(0)
@@ -157,6 +157,7 @@
 
 <div
   class="lienzo {cursor}"
+  class:corcho
   bind:clientWidth={W}
   bind:clientHeight={H}
   style="background-size:{22 * k}px {22 * k}px;background-position:{tx}px {ty}px"
@@ -188,6 +189,7 @@
     background-color: var(--paper);
     background-image: radial-gradient(circle, var(--line) 1px, transparent 1px);
   }
+  .corcho { background-color: #C8A078; background-image: radial-gradient(circle, rgba(92, 58, 26, .38) 1.1px, transparent 1.4px); }
   svg { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
   svg:active { cursor: grabbing; }
   .conectando svg { cursor: crosshair; }

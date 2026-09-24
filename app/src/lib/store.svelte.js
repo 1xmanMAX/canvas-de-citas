@@ -63,6 +63,8 @@ export function asegurarProyecto(p) {
   c.posiciones ||= {}
   c.notas ||= []
   c.fotos ||= []
+  c.listas ||= []
+  c.audios ||= []
   c.conexiones ||= []
   c.objetivos ||= {} // sub-lienzos por objetivo (lib/objetivos.js)
   return p
