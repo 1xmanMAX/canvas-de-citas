@@ -2,7 +2,7 @@
   // Panel lateral para leer documentos sin salir de la app: PDF (visor del navegador o pdf.js),
   // HTML (aislado, sin scripts), Markdown y texto. Desde un HTML, lo seleccionado se vuelve nota.
   import Icono from './Icono.svelte'
-  import { V, cerrarVisor, adjuntarAbierto, notaDesdeSeleccion } from '../lib/visor.svelte.js'
+  import { V, cerrarVisor, adjuntarAbierto, notaDesdeSeleccion, fotoDesdeRecorte } from '../lib/visor.svelte.js'
   import { S } from '../lib/store.svelte.js'
   import { autorCorto, anio } from '../lib/citas.js'
 
@@ -16,6 +16,7 @@
   const fuente = $derived(V.fuenteId ? S.fuentePorId.get(V.fuenteId) : null)
   let texto = $state('')
   let seleccion = $state('')
+  let seleccionPag = $state(null)
   let destino = $state('')
   const fuentes = $derived([...S.fuentes].sort((x, y) => autorCorto(x).localeCompare(autorCorto(y), 'es')))
 
@@ -64,7 +65,9 @@
   function seleccionLocal() { seleccion = document.getSelection()?.toString().trim() || '' }
 
   function teclas(e) {
-    if (e.key === 'Escape' && a && !document.querySelector('dialog[open]')) cerrarVisor()
+    if (e.key !== 'Escape' || !a || document.querySelector('dialog[open]')) return
+    if (V.recortando) V.recortando = false // Esc cancela el recorte antes de cerrar el visor
+    else cerrarVisor()
   }
 </script>
 
@@ -79,7 +82,7 @@
         {#if fuente}<span class="suave">{autorCorto(fuente)} ({anio(fuente)})</span>{/if}
       </div>
       {#if seleccion}
-        <button class="btn chico primario" onclick={() => { notaDesdeSeleccion(seleccion); seleccion = '' }} title="Crear una nota en el lienzo con el texto seleccionado">
+        <button class="btn chico primario" onclick={() => { notaDesdeSeleccion(seleccion, seleccionPag); seleccion = '' }} title="Crear una nota en el lienzo con el texto seleccionado">
           <Icono nombre="nota" tam={13} />Nota con la cita
         </button>
       {/if}
@@ -105,7 +108,7 @@
     <div class="v-cuerpo">
       {#if a.tipo === 'pdf'}
         {#if VisorPdf}
-          {#key a.url}<VisorPdf blob={a.blob} onseleccion={t => (seleccion = t)} />{/key}
+          {#key a.url}<VisorPdf blob={a.blob} onseleccion={(t, pag) => { seleccion = t; seleccionPag = pag }} onrecorte={fotoDesdeRecorte} />{/key}
         {:else}
           <p class="suave cargando">Cargando lector de PDF…</p>
         {/if}

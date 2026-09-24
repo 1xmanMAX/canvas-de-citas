@@ -2,7 +2,7 @@
 // Se abre con el documento de una fuente o con cualquier archivo del equipo.
 import { S, leerDocumento, avisar, adjuntarDocumento, guardarProyecto } from './store.svelte.js'
 import { nuevaTarjeta, guardarTarjeta } from './tablero.js'
-import { asegurarTablero, idLocal } from './tarjetas.js'
+import { asegurarTablero, idLocal, cajas } from './tarjetas.js'
 import { autorCorto, anio } from './citas.js'
 
 export const ACEPTADOS = /\.(pdf|html?|md|markdown|txt)$/i
@@ -13,6 +13,7 @@ class EstadoVisor {
   fuenteId = $state(null)
   proyectoId = $state(null)
   grande = $state(false)
+  recortando = $state(false) // herramienta de recorte activa en el lector de PDF
 }
 export const V = new EstadoVisor()
 
@@ -51,6 +52,7 @@ export function cerrarVisor() {
   if (V.archivo?.url) URL.revokeObjectURL(V.archivo.url)
   V.archivo = null
   V.fuenteId = null
+  V.recortando = false
 }
 
 /** Adjunta el archivo abierto a una fuente (queda en su ficha y en la carpeta). */
@@ -63,23 +65,42 @@ export async function adjuntarAbierto(fid) {
   avisar(`Adjuntado a ${autorCorto(f)} (${anio(f)})`)
 }
 
+/** "Autor (año), pág. N" (o el nombre del archivo si no está adjunto a una fuente). */
+function referencia(pagina) {
+  const f = V.fuenteId ? S.fuentePorId.get(V.fuenteId) : null
+  const base = f ? `${autorCorto(f)} (${anio(f)})` : V.archivo?.nombre || ''
+  return pagina ? `${base}, pág. ${pagina}` : base
+}
+
 /**
- * Crea una nota en el lienzo del proyecto con el texto seleccionado y la conecta con la fuente.
- * Se coloca junto a la fuente (o cerca del centro si la fuente no tiene posición fija).
+ * Agrega una tarjeta de cita al lienzo del proyecto, junto a la fuente (en un hueco libre) y
+ * conectada a ella con un hilo "cita".
  */
-export function notaDesdeSeleccion(texto) {
+function tarjetaCita(lista, datos, aviso) {
   const p = S.proyectoPorId.get(V.proyectoId)
-  if (!p) return avisar('Abre el documento desde un proyecto para crear notas')
+  if (!p) return avisar('Abre el documento desde un proyecto para citar en el lienzo')
   const c = asegurarTablero(p.canvas)
   const f = V.fuenteId ? S.fuentePorId.get(V.fuenteId) : null
   const pos = (f && c.posiciones?.[f.id]) || { x: 420, y: -120 }
-  const cita = texto.replace(/\s+/g, ' ').trim().slice(0, 1200)
-  const n = nuevaTarjeta('notas', pos.x + 260, pos.y + 40 + Math.random() * 60, {
-    titulo: f ? `${autorCorto(f)} (${anio(f)})` : V.archivo?.nombre || '',
-    texto: `“${cita}”`, estilo: 'rayada', letra: 'serif'
-  })
-  guardarTarjeta(c, 'notas', n, true)
-  if (f) c.conexiones.push({ id: idLocal('con'), desde: f.id, hasta: n.id, etiqueta: 'cita' })
+  const ocupadas = [...cajas(c).values()].map(({ x, y, w, h }) => ({ x, y, w, h }))
+  if (f) ocupadas.push({ x: pos.x, y: pos.y, w: 150, h: 80 })
+  const t = nuevaTarjeta(lista, pos.x + 330, pos.y + 40, datos, ocupadas)
+  guardarTarjeta(c, lista, t, true)
+  if (f) c.conexiones.push({ id: idLocal('con'), desde: f.id, hasta: t.id, etiqueta: 'cita' })
   guardarProyecto(p)
-  avisar('Nota creada en el lienzo')
+  avisar(aviso)
+}
+
+/** Nota con el texto seleccionado (y su página, si se conoce). */
+export function notaDesdeSeleccion(texto, pagina = null) {
+  const cita = texto.replace(/\s+/g, ' ').trim().slice(0, 1200)
+  tarjetaCita('notas', { titulo: referencia(pagina), texto: `“${cita}”`, estilo: 'rayada', letra: 'serif' }, 'Nota creada en el lienzo')
+}
+
+/** Tarjeta de imagen con el área recortada de un PDF (gráfico, tabla, escaneo…). */
+export function fotoDesdeRecorte({ imagen, proporcion, texto, pagina }) {
+  tarjetaCita('fotos', {
+    titulo: referencia(pagina), imagen, proporcion, trazos: [],
+    texto: texto ? `“${texto.slice(0, 1500)}”` : ''
+  }, 'Recorte citado en el lienzo')
 }

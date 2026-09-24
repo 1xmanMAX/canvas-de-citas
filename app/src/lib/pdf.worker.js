@@ -28,6 +28,7 @@ function cerrarDoc() {
   paginas.clear()
   cola.clear()
   if (dispPtr) { free(dispPtr); dispPtr = 0 }
+  if (pagPtr) { free(pagPtr); pagPtr = 0 }
   if (doc) P.FPDF_CloseDocument(doc)
   if (datosPtr) free(datosPtr)
   doc = datosPtr = 0
@@ -104,6 +105,50 @@ function aVista(page, n, x, y) {
 function rectVista(page, n, l, t, r, b) {
   const [x1, y1] = aVista(page, n, l, t), [x2, y2] = aVista(page, n, r, b)
   return { x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) }
+}
+
+/** Inversa de aVista: puntos de la página dibujada → coordenadas de página de PDF. */
+let pagPtr = 0
+function aPagina(page, n, x, y) {
+  pagPtr ||= malloc(16)
+  const { w, h } = tamanos[n]
+  P.FPDF_DeviceToPage(page, 0, 0, Math.round(w * K), Math.round(h * K), 0, Math.round(x * K), Math.round(y * K), pagPtr, pagPtr + 8)
+  return [leerDouble(pagPtr), leerDouble(pagPtr + 8)]
+}
+
+/**
+ * Recorte de un área de la página n (r en puntos, arriba-izquierda): imagen nítida de esa zona
+ * (WebP, o JPEG si el navegador no codifica WebP) y el texto que contenga (vacío en escaneos).
+ */
+async function recorte(n, r) {
+  const { page, text } = pagina(n, true)
+  const { w: pw, h: ph } = tamanos[n]
+  const s = Math.min(3, 1400 / r.w, Math.sqrt(3e6 / (r.w * r.h))) // px por punto: nítido pero liviano (va en proyectos.json)
+  const w = Math.max(1, Math.round(r.w * s)), h = Math.max(1, Math.round(r.h * s))
+  const bmp = P.FPDFBitmap_Create(w, h, 1)
+  P.FPDFBitmap_FillRect(bmp, 0, 0, w, h, 0xffffffff)
+  // Se dibuja la página completa desplazada: solo la zona del recorte cae dentro del bitmap.
+  P.FPDF_RenderPageBitmap(bmp, page, -Math.round(r.x * s), -Math.round(r.y * s), Math.round(pw * s), Math.round(ph * s), 0, 0x01 | 0x10)
+  const buf = P.FPDFBitmap_GetBuffer(bmp), stride = P.FPDFBitmap_GetStride(bmp)
+  const px = new Uint8ClampedArray(w * h * 4), heap = mem()
+  for (let y = 0; y < h; y++) px.set(heap.subarray(buf + y * stride, buf + y * stride + w * 4), y * w * 4)
+  P.FPDFBitmap_Destroy(bmp)
+  const lienzo = new OffscreenCanvas(w, h)
+  lienzo.getContext('2d').putImageData(new ImageData(px, w, h), 0, 0)
+  let blob = await lienzo.convertToBlob({ type: 'image/webp', quality: 0.85 })
+  if (blob.type !== 'image/webp') blob = await lienzo.convertToBlob({ type: 'image/jpeg', quality: 0.9 })
+  // Texto dentro del área.
+  const [x1, y1] = aPagina(page, n, r.x, r.y), [x2, y2] = aPagina(page, n, r.x + r.w, r.y + r.h)
+  const L = Math.min(x1, x2), R = Math.max(x1, x2), T = Math.max(y1, y2), B = Math.min(y1, y2)
+  let texto = ''
+  const largo = P.FPDFText_GetBoundedText(text, L, T, R, B, 0, 0)
+  if (largo > 0) {
+    const p = malloc((largo + 1) * 2)
+    P.FPDFText_GetBoundedText(text, L, T, R, B, p, largo)
+    texto = P.pdfium.UTF16ToString(p).replace(/￾\s*/g, '').replace(/\s+/g, ' ').trim()
+    free(p)
+  }
+  return { blob, w, h, texto }
 }
 
 /** Segmentos de texto de la página n: [{ x, y, w, h, t }] en puntos, origen arriba a la izquierda. */
@@ -189,6 +234,8 @@ onmessage = async ({ data: m }) => {
       programar()
     } else if (m.tipo === 'descartar') {
       for (const k of [...cola.keys()]) if (!m.conservar.includes(+k.split(':')[0])) cola.delete(k)
+    } else if (m.tipo === 'recorte') {
+      if (m.doc === docActual && doc) postMessage({ tipo: 'recorte', doc: m.doc, n: m.n, ...(await recorte(m.n, m.rect)) })
     } else if (m.tipo === 'texto') {
       if (m.doc === docActual && doc) postMessage({ tipo: 'texto', n: m.n, doc: m.doc, segs: texto(m.n) })
     } else if (m.tipo === 'buscar') {

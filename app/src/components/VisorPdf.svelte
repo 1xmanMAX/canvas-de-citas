@@ -5,8 +5,9 @@
   // capa SVG invisible encima (seleccionar, copiar, "Nota con la cita") y la búsqueda se resalta.
   import { onDestroy, untrack } from 'svelte'
   import Icono from './Icono.svelte'
+  import { V } from '../lib/visor.svelte.js'
 
-  let { blob, onseleccion } = $props()
+  let { blob, onseleccion, onrecorte } = $props()
 
   const HUECO = 12, MARGEN = 12
   let cont = $state()
@@ -49,6 +50,10 @@
       buscando = false
       buscado = m.q
       if (resultados.length) irAResultado(0)
+    } else if (m.tipo === 'recorte') {
+      const r = new FileReader()
+      r.onload = () => onrecorte?.({ imagen: r.result, proporcion: Math.round((m.w / m.h) * 1000) / 1000, texto: m.texto, pagina: m.n + 1 })
+      r.readAsDataURL(m.blob)
     } else if (m.tipo === 'error') {
       if (cargando) { error = m.mensaje; cargando = false }
     }
@@ -213,16 +218,44 @@
     return m
   })
 
-  // --- Selección de texto → nota ---
+  // --- Selección de texto → nota (con la página donde empieza la selección) ---
   $effect(() => {
     const cambio = () => {
       const s = document.getSelection()
       const dentro = s?.rangeCount && cont?.contains(s.anchorNode)
-      onseleccion?.(dentro ? s.toString().replace(/\s+/g, ' ').trim() : '')
+      const nodo = dentro && (s.anchorNode.nodeType === 1 ? s.anchorNode : s.anchorNode.parentElement)
+      const pagina = nodo?.closest?.('.pag-pdf')?.dataset.n
+      onseleccion?.(dentro ? s.toString().replace(/\s+/g, ' ').trim() : '', pagina ? +pagina + 1 : null)
     }
     document.addEventListener('selectionchange', cambio)
     return () => document.removeEventListener('selectionchange', cambio)
   })
+
+  // --- Recortar un área (gráfico, tabla, página escaneada) → tarjeta de imagen en el lienzo ---
+  let marco = $state(null) // { n, x0, y0, x1, y1 } en px dentro de la página
+  function recorteAbajo(e, n) {
+    if (!V.recortando || e.button === 2) return
+    e.preventDefault()
+    e.stopPropagation()
+    const r = e.currentTarget.getBoundingClientRect()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    marco = { n, r, x0: e.clientX - r.left, y0: e.clientY - r.top, x1: e.clientX - r.left, y1: e.clientY - r.top }
+  }
+  function recorteMueve(e) {
+    if (!marco) return
+    marco.x1 = Math.min(marco.r.width, Math.max(0, e.clientX - marco.r.left))
+    marco.y1 = Math.min(marco.r.height, Math.max(0, e.clientY - marco.r.top))
+  }
+  function recorteArriba() {
+    if (!marco) return
+    const { n, x0, y0, x1, y1 } = marco
+    marco = null
+    const rect = { x: Math.min(x0, x1) / escala, y: Math.min(y0, y1) / escala, w: Math.abs(x1 - x0) / escala, h: Math.abs(y1 - y0) / escala }
+    if (rect.w < 8 || rect.h < 8) return // un clic sin arrastrar no recorta
+    V.recortando = false
+    worker.postMessage({ tipo: 'recorte', doc: docId, n, rect })
+  }
+  const cajaMarco = $derived(marco && { x: Math.min(marco.x0, marco.x1), y: Math.min(marco.y0, marco.y1), w: Math.abs(marco.x1 - marco.x0), h: Math.abs(marco.y1 - marco.y0) })
 
   function teclas(e) {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') { e.preventDefault(); document.getElementById('pdf-buscar')?.focus() }
@@ -247,6 +280,10 @@
     <input type="number" min="1" max={tamanos.length} value={actualPag} aria-label="Página" onchange={e => irAPagina(+e.currentTarget.value)} />
     / {tamanos.length}
   </span>
+  <button class="btn chico" class:activo={V.recortando} aria-pressed={V.recortando} onclick={() => (V.recortando = !V.recortando)}
+    title="Recortar un área (gráfico, tabla o texto escaneado) y citarla en el lienzo">
+    <Icono nombre="recorte" tam={14} />{V.recortando ? 'Arrastra sobre la página…' : 'Recortar'}
+  </button>
   <span class="zoom-pdf">
     <button class="icono-btn mini" aria-label="Alejar" onclick={() => zoom(1 / 1.2)}>−</button>
     <button class="porc" title="Ajustar al ancho" onclick={ajustarAncho}>{Math.round(escala * 100)}%</button>
@@ -254,15 +291,18 @@
   </span>
 </div>
 
-<div class="pdf" bind:this={cont} bind:clientWidth={W} bind:clientHeight={H} onscroll={alDesplazar}
+<div class="pdf" class:recortando={V.recortando} bind:this={cont} bind:clientWidth={W} bind:clientHeight={H} onscroll={alDesplazar}
   onpointerdown={dedoAbajo} onpointermove={dedoMueve} onpointerup={dedoArriba} onpointercancel={dedoArriba} role="document">
   {#if cargando}<p class="estado">Abriendo PDF…</p>{/if}
   {#if error}<p class="estado error">{error}</p>{/if}
   <div class="lamina" style="height:{alto}px;width:{ancho}px">
     {#each visibles as n (n)}
       {@const t = tamanos[n]}
-      <div class="pag-pdf" style="top:{tops[n]}px;left:{(ancho - t.w * escala) / 2}px;width:{t.w * escala}px;height:{t.h * escala}px" aria-label="Página {n + 1}">
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="pag-pdf" data-n={n} style="top:{tops[n]}px;left:{(ancho - t.w * escala) / 2}px;width:{t.w * escala}px;height:{t.h * escala}px" aria-label="Página {n + 1}"
+        onpointerdown={e => recorteAbajo(e, n)} onpointermove={recorteMueve} onpointerup={recorteArriba} onpointercancel={() => (marco = null)}>
         <canvas use:lienzo={n}></canvas>
+        {#if cajaMarco && marco.n === n}<div class="marco-recorte" style="left:{cajaMarco.x}px;top:{cajaMarco.y}px;width:{cajaMarco.w}px;height:{cajaMarco.h}px"></div>{/if}
         {#if (textos[n] || resaltes[n]) && !enZoom}
           <svg class="capa-texto" viewBox="0 0 {t.w} {t.h}" preserveAspectRatio="none">
             {#each resaltes[n] || [] as r}<rect x={r.x} y={r.y} width={r.w} height={r.h} class="resalte" class:actual={r.actual} />{/each}
@@ -292,6 +332,11 @@
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
   .capa-texto { position: absolute; inset: 0; width: 100%; height: 100%; }
   .capa-texto text { fill: transparent; font-family: sans-serif; white-space: pre; cursor: text; }
+  .recortando .pag-pdf { cursor: crosshair; touch-action: none; }
+  .recortando .capa-texto { pointer-events: none; }
+  .marco-recorte { position: absolute; border: 2px dashed #C0392B; background: rgba(192, 57, 43, .12); pointer-events: none; }
+  .btn.activo { background: var(--accent); color: var(--paper); border-color: var(--accent); }
+  .barra-pdf .btn { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
   .capa-texto text::selection { fill: transparent; background: rgba(46, 75, 94, .35); }
   .resalte { fill: rgba(242, 194, 48, .45); }
   .resalte.actual { fill: rgba(235, 104, 52, .55); }
