@@ -9,6 +9,7 @@
     "preview": "vite preview --host",
     "icons": "node scripts/icons.js",
     "test": "node --test \"tests/unit/**/*.test.js\"",
+    "test:integracion": "node --test \"tests/integracion/**/*.test.js\"",
     "test:e2e": "node tests/e2e/todas.mjs"
   },
   "dependencies": {
