@@ -2,9 +2,10 @@
 // Uso: npm run build && npm run test:e2e        · Solo algunas: npm run test:e2e -- visor pdf
 // Capturas en tests/e2e/capturas/. Chrome: se busca solo; si no, define CHROME_PATH.
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
-import { spawnSync } from 'node:child_process'
-import { APP, FIXTURES, SALIDA, servidor, navegador, pagina, esperar, clicTexto, conEjemplo, lienzoGuardado, adjuntar, suite } from './comun.mjs'
+import { spawn, spawnSync } from 'node:child_process'
+import { APP, FIXTURES, SALIDA, URL_APP, servidor, navegador, pagina, esperar, clicTexto, conEjemplo, lienzoGuardado, adjuntar, suite } from './comun.mjs'
 
 const PDF = path.join(FIXTURES, 'paper.pdf'), HTML = path.join(FIXTURES, 'paper.html'), IMG = path.join(APP, 'public', 'icon-512.png')
 if (!fs.existsSync(PDF)) spawnSync(process.execPath, [path.join(FIXTURES, 'crear.mjs')], { stdio: 'inherit' })
@@ -162,6 +163,43 @@ const SUITES = {
       await pg.waitForFunction(() => [...document.querySelectorAll('.pag-pdf canvas')].some(c => c.width > 0), { timeout: 20000 })
     })
     if (pg.errores.length) s.fallas.push(...pg.errores.filter(e => !/crossref/i.test(e)))
+    return s
+  },
+
+  // Sincronización: la app (como "celular") contra canvas-sincro sobre una carpeta temporal.
+  async sincro(b) {
+    const s = suite('Sincronización con la PC')
+    const crate = path.resolve(APP, '../receptor/sincro')
+    if (spawnSync('cargo', ['build', '--release', '--quiet'], { cwd: crate, stdio: 'inherit' }).status !== 0) { s.fallas.push('cargo build'); return s }
+    const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'canvas-e2e-'))
+    fs.writeFileSync(path.join(carpeta, 'proyectos.json'), JSON.stringify({ proyectos: [{ id: 'proyecto_001', tipo: 'tesis', titulo: 'Tesis en la PC', objetivos_especificos: [], indicadores: [], canvas: { modo: 'radial', posiciones: {}, notas: [], fotos: [], listas: [], audios: [], conexiones: [], objetivos: {} } }] }, null, 2) + '\n')
+    const bin = path.join(crate, 'target', 'release', process.platform === 'win32' ? 'canvas-sincro.exe' : 'canvas-sincro')
+    const srv = spawn(bin, ['--carpeta', carpeta, '--puerto', '0'])
+    const info = JSON.parse(await new Promise(res => srv.stdout.once('data', d => res(String(d).split('\n')[0]))))
+    const codigo = `canvas-sync://127.0.0.1:${info.puerto}/#${info.clave}`
+    const pg = await pagina(b)
+    try {
+      await pg.goto(URL_APP, { waitUntil: 'networkidle0' }); await esperar(600)
+      await s.paso('trae el proyecto de la PC', async () => {
+        await clicTexto(pg, 'Configuración') // en Proyectos (escritorio) el botón lleva texto
+        await pg.type('dialog[open] input[placeholder^="canvas-sync"]', codigo)
+        await clicTexto(pg, 'Sincronizar')
+        await pg.waitForFunction(() => /Última:/.test(document.querySelector('.sincro .estado')?.textContent || ''), { timeout: 15000 })
+        await pg.keyboard.press('Escape'); await esperar(400)
+        if (!(await pg.evaluate(() => document.body.textContent.includes('Tesis en la PC')))) throw new Error('no llegó el proyecto')
+      })
+      await s.paso('una nota creada aquí llega a la carpeta de la PC', async () => {
+        await pg.evaluate(() => (location.hash = '#/p/proyecto_001')); await esperar(800)
+        await pg.click('button[aria-label="Añadir nota"]')
+        await pg.type('dialog[open] textarea', 'Nota desde el celular')
+        await clicTexto(pg, 'Guardar'); await esperar(300)
+        await pg.click('button[aria-label="Configuración"]')
+        await clicTexto(pg, 'Sincronizar'); await esperar(2500)
+        const disco = fs.readFileSync(path.join(carpeta, 'proyectos.json'), 'utf8')
+        if (!disco.includes('Nota desde el celular')) throw new Error('no llegó a la PC')
+      })
+    } finally { srv.kill() }
+    if (pg.errores.length) s.fallas.push(...pg.errores)
     return s
   }
 }

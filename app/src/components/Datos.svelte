@@ -7,6 +7,7 @@
   import { descargarTodo, descargarBib, leerArchivos, aplicar } from '../lib/io.svelte.js'
   import { C, establecerCarpeta, reconectar, dejarDeUsarCarpeta, guardarAhora } from '../lib/carpeta.svelte.js'
   import { haceCuanto } from '../lib/citas.js'
+  import Sincronizar from './Sincronizar.svelte'
 
   let { onclose, archivosIniciales = null } = $props()
   let previa = $state(null) // datos leídos pendientes de confirmar
@@ -120,6 +121,8 @@
       </div>
       <p class="suave nota">Puedes elegir uno, dos o los tres archivos. También puedes arrastrarlos sobre la ventana.</p>
     </section>
+
+    <Sincronizar />
   {/if}
 </Modal>
 
