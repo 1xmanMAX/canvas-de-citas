@@ -8,7 +8,9 @@
   import Modal from '../components/Modal.svelte'
   import FuenteForm from '../components/FuenteForm.svelte'
   import AgregarFuente from '../components/AgregarFuente.svelte'
-  import { S, copiar, guardarFuente, eliminarFuente } from '../lib/store.svelte.js'
+  import { S, copiar, guardarFuente, eliminarFuente, adjuntarDocumento, avisar } from '../lib/store.svelte.js'
+  import { abrirDocumentoFuente } from '../lib/visor.svelte.js'
+  import { referenciasDe, doiDe, enBiblioteca, analizarReferencia, completarConCrossref, conectarReferencia } from '../lib/referencias.js'
   import { TIPOS_FUENTE, ESTADOS_VERIF, autorCorto, anio, apellido, coincide, urlFuente, sugerirBibliografia, esMarcador, paginaTexto } from '../lib/citas.js'
   import { NODO_W, alturaNodo, enFilas, limitesDe } from '../lib/grafo.js'
   import { descargarBib } from '../lib/io.svelte.js'
@@ -62,6 +64,52 @@
 
   const fuente = $derived(sel ? S.fuentePorId.get(sel) : null)
   const citasSel = $derived(fuente ? (S.citasPorFuente.get(fuente.id) || []).filter(c => !esMarcador(c) && (!proyecto || c.proyecto_id === proyecto)) : [])
+
+  // --- Documento, referencias del paper, relaciones y puntos clave ---
+  let amplio = $state(false)
+  let refs = $state([])
+  let refsEstado = $state('') // '' | 'cargando' | 'sin-documento' | 'error'
+  let filtroRefs = $state('')
+  $effect(() => {
+    const f = fuente, doc = f?.documento_original
+    refs = []
+    filtroRefs = ''
+    if (!f) return
+    if (!doc) { refsEstado = 'sin-documento'; return }
+    refsEstado = 'cargando'
+    referenciasDe(f).then(r => { if (sel === f.id) { refs = r.refs; refsEstado = r.error || '' } })
+      .catch(() => { if (sel === f.id) refsEstado = 'error' })
+  })
+  const refsVisibles = $derived(refs.map((texto, i) => ({ i, texto, doi: doiDe(texto), bib: enBiblioteca(texto, fuente?.id) }))
+    .filter(r => !filtroRefs || r.texto.toLowerCase().includes(filtroRefs.toLowerCase())))
+  const citaA = $derived((fuente?.referencias_citadas || []).map(id => S.fuentePorId.get(id)).filter(Boolean))
+  const citadaEn = $derived((fuente?.citada_en || []).map(id => S.fuentePorId.get(id)).filter(Boolean))
+  const TIPOS_PUNTO = { hallazgo: 'Hallazgo', dato: 'Dato', metodo: 'Método', definicion: 'Definición', marco: 'Marco teórico', vacio: 'Vacío', limitacion: 'Limitación', cita: 'Cita textual' }
+
+  /** Proyecto para el visor (las citas que se tomen van a su lienzo): el filtrado, o el primero de la fuente. */
+  const proyectoDe = f => proyecto || (S.citasPorFuente.get(f.id) || [])[0]?.proyecto_id || null
+  const verDocumento = () => abrirDocumentoFuente(fuente, proyectoDe(fuente))
+
+  async function adjuntar(e) {
+    const a = e.currentTarget.files?.[0]
+    e.currentTarget.value = ''
+    if (!a) return
+    if (!/\.(pdf|html?|md|markdown|txt)$/i.test(a.name)) return avisar('Solo PDF, HTML, Markdown o TXT')
+    await adjuntarDocumento(fuente, a)
+    avisar('Documento adjuntado')
+  }
+
+  let preparando = $state(-1)
+  async function agregarReferencia(r) {
+    preparando = r.i
+    const datos = await completarConCrossref(analizarReferencia(r.texto))
+    preparando = -1
+    modal = { referencia: { ...datos, entrada_bibliografia: r.texto, notas_correccion: `Citada en ${autorCorto(fuente)} (${anio(fuente)})` }, paper: fuente }
+  }
+  function conectarExistente(r) {
+    conectarReferencia(fuente, r.bib)
+    avisar(`Conectada: ${autorCorto(fuente)} cita a ${autorCorto(r.bib)} (${anio(r.bib)})`)
+  }
 
   function borrar() {
     const n = (S.citasPorFuente.get(fuente.id) || []).length
@@ -161,15 +209,33 @@
   {/if}
 
   {#if fuente}
-    <aside class="panel derecho detalle abierto" style="width:380px">
+    <aside class="panel derecho detalle abierto" style="width:{amplio ? 'min(760px, 62vw)' : '420px'}">
       <div class="fila entre">
         <span class="pastilla {verifDe(fuente)}"><span class="punto"></span>{ESTADOS_VERIF[verifDe(fuente)]}{fuente.fuente_verificacion ? ` · ${fuente.fuente_verificacion}` : ''}</span>
-        <button class="icono-btn" aria-label="Cerrar detalle" onclick={() => (sel = null)}><Icono nombre="cerrar" tam={18} trazo={2} /></button>
+        <span class="fila">
+          <button class="icono-btn solo-escritorio" aria-label={amplio ? 'Panel angosto' : 'Panel amplio'} title={amplio ? 'Panel angosto' : 'Ver en panel amplio'} onclick={() => (amplio = !amplio)}><Icono nombre={amplio ? 'reducir' : 'agrandar'} tam={16} /></button>
+          <button class="icono-btn" aria-label="Cerrar detalle" onclick={() => (sel = null)}><Icono nombre="cerrar" tam={18} trazo={2} /></button>
+        </span>
       </div>
       <div>
         <div class="serif titulo-d">{fuente.titulo}</div>
-        <div class="suave meta">{(fuente.autores || []).join('; ') || 'Sin autor'} · {anio(fuente)} · {TIPOS_FUENTE[tipoDe(fuente)]}</div>
+        <div class="suave meta">{(fuente.autores || []).join('; ') || 'Sin autor'} · {anio(fuente)} · {TIPOS_FUENTE[tipoDe(fuente)]}{fuente.revista_o_editorial ? ` · ${fuente.revista_o_editorial}` : ''}</div>
       </div>
+
+      <!-- Documento: se abre en el visor rápido -->
+      {#if fuente.documento_original}
+        <button class="doc" onclick={verDocumento} title="Abrir en el visor">
+          <Icono nombre="doc" tam={20} />
+          <span class="doc-txt"><b>{fuente.documento_nombre || fuente.documento_original.split('/').pop()}</b><span class="suave">{(fuente.documento_original.split('.').pop() || '').toUpperCase()} · abrir en el visor</span></span>
+          <Icono nombre="chevron" tam={16} />
+        </button>
+      {:else}
+        <label class="doc vacio-doc">
+          <Icono nombre="clip" tam={18} />
+          <span class="doc-txt"><b>Sin documento</b><span class="suave">Adjuntar PDF, HTML o Markdown</span></span>
+          <input type="file" accept=".pdf,.html,.htm,.md,.markdown,.txt" hidden onchange={adjuntar} />
+        </label>
+      {/if}
       <div class="separador"></div>
 
       <div class="bloque">
@@ -198,6 +264,56 @@
         <div class="caja-cita bib">{fuente.entrada_bibliografia || sugerirBibliografia(fuente)}</div>
       </div>
 
+      {#if fuente.puntos?.length}
+        <div class="bloque">
+          <div class="rotulo">Puntos clave ({fuente.puntos.length})</div>
+          <ul class="puntos">
+            {#each fuente.puntos as p (p.id)}
+              <li><span class="chip-p">{TIPOS_PUNTO[p.tipo] || p.tipo}</span> {p.texto}<span class="suave">{p.pagina ? ` · p. ${p.pagina}` : ''}{p.objetivos?.length ? ` · ${p.objetivos.join(', ').toUpperCase()}` : ''}</span></li>
+            {/each}
+          </ul>
+        </div>
+      {/if}
+
+      {#if citaA.length || citadaEn.length}
+        <div class="bloque">
+          {#if citaA.length}<div class="rotulo">Cita a ({citaA.length})</div>
+            <div class="chips">{#each citaA as f (f.id)}<button class="chip-f" onclick={() => (sel = f.id)}>{autorCorto(f)} ({anio(f)})</button>{/each}</div>{/if}
+          {#if citadaEn.length}<div class="rotulo">Citada en ({citadaEn.length})</div>
+            <div class="chips">{#each citadaEn as f (f.id)}<button class="chip-f" onclick={() => (sel = f.id)}>{autorCorto(f)} ({anio(f)})</button>{/each}</div>{/if}
+        </div>
+      {/if}
+
+      <div class="bloque">
+        <div class="fila entre">
+          <div class="rotulo">Referencias del paper{refs.length ? ` (${refs.length})` : ''}</div>
+          {#if refs.length && !amplio}<button class="btn chico fantasma" onclick={() => (amplio = true)}>Lista amplia</button>{/if}
+        </div>
+        {#if refsEstado === 'cargando'}<div class="suave n">Leyendo la bibliografía del documento…</div>
+        {:else if refsEstado === 'sin-documento'}<div class="suave n">Adjunta el documento para ver la bibliografía que cita.</div>
+        {:else if refsEstado === 'error'}<div class="suave n">No se pudo leer el documento.</div>
+        {:else if !refs.length}<div class="suave n">No se encontró la sección de referencias en el documento.</div>
+        {:else}
+          {#if refs.length > 12}<input class="filtro-refs" type="search" bind:value={filtroRefs} placeholder="Filtrar referencias (autor, año, tema…)" aria-label="Filtrar referencias" />{/if}
+          <ol class="refs" class:amplio>
+            {#each refsVisibles as r (r.i)}
+              <li value={r.i + 1}>
+                <span class="ref-txt">{r.texto}</span>
+                <span class="ref-acc">
+                  {#if r.doi}<a class="btn chico fantasma" href="https://doi.org/{r.doi}" target="_blank" rel="noopener">DOI ↗</a>{/if}
+                  {#if r.bib}
+                    <button class="chip-f" onclick={() => (sel = r.bib.id)} title="Ir a esta fuente">En biblioteca: {autorCorto(r.bib)} ({anio(r.bib)})</button>
+                    {#if !(fuente.referencias_citadas || []).includes(r.bib.id)}<button class="btn chico" onclick={() => conectarExistente(r)}>Conectar</button>{/if}
+                  {:else}
+                    <button class="btn chico" disabled={preparando === r.i} onclick={() => agregarReferencia(r)}>{preparando === r.i ? 'Buscando…' : '+ Agregar'}</button>
+                  {/if}
+                </span>
+              </li>
+            {/each}
+          </ol>
+        {/if}
+      </div>
+
       {#if fuente.notas_correccion}
         <div class="bloque">
           <div class="rotulo">Notas de corrección</div>
@@ -220,6 +336,12 @@
 {:else if modal === 'nueva'}
   <Modal titulo="Nueva fuente en la biblioteca" onclose={() => (modal = null)} ancho={680}>
     <FuenteForm onguardar={d => { sel = guardarFuente(d).id; modal = null }} />
+  </Modal>
+{:else if modal?.referencia}
+  <Modal titulo="Agregar referencia citada por {autorCorto(modal.paper)} ({anio(modal.paper)})" onclose={() => (modal = null)} ancho={680}>
+    <p class="suave n">Revisa los datos antes de guardar{modal.referencia.fuente_verificacion === 'CrossRef' ? ' (completados con CrossRef)' : ' (extraídos del texto: pueden necesitar corrección)'}. Quedará conectada al paper y vinculada a sus proyectos.</p>
+    <FuenteForm fuente={modal.referencia} textoBoton="Guardar y conectar" oncancelar={() => (modal = null)}
+      onguardar={d => { const paper = modal.paper; const ref = guardarFuente(d); conectarReferencia(paper, ref); modal = null; avisar(`${autorCorto(ref)} (${anio(ref)}) agregada y conectada`) }} />
   </Modal>
 {:else if modal?.editar}
   <Modal titulo="Editar fuente" onclose={() => (modal = null)} ancho={680}>
@@ -251,6 +373,23 @@
   .bib { font-size: 13px; background: var(--paper); }
   .texto { font-size: 13px; line-height: 1.5; }
   .crece { flex-grow: 1; }
+  .doc { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); text-align: left; cursor: pointer; color: var(--ink); }
+  .doc:hover { border-color: var(--accent); }
+  .vacio-doc { border-style: dashed; color: var(--ink-soft); }
+  .doc-txt { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; font-size: 13px; line-height: 1.35; }
+  .doc-txt b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .doc-txt .suave { font-size: 11.5px; }
+  .puntos { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.45; }
+  .chip-p { font-size: 10.5px; font-weight: 600; border-radius: 999px; padding: 1px 7px; background: var(--accent-soft); color: var(--accent); }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip-f { font-size: 12px; border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; background: var(--paper); color: var(--accent); cursor: pointer; }
+  .chip-f:hover { border-color: var(--accent); }
+  .filtro-refs { padding: 6px 10px; font-size: 13px; }
+  .refs { margin: 0; padding-left: 26px; display: flex; flex-direction: column; gap: 10px; font-size: 12.5px; line-height: 1.5; max-height: 46vh; overflow-y: auto; }
+  .refs.amplio { max-height: none; font-size: 13.5px; }
+  .refs li::marker { color: var(--ink-soft); font-size: 11px; }
+  .ref-txt { display: block; }
+  .ref-acc { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; align-items: center; }
   @media (max-width: 820px) {
     .busca { max-width: none; }
     .detalle { top: auto !important; height: 70%; width: 100% !important; transform: none; border-left: none; border-top: 1px solid var(--line); border-radius: 16px 16px 0 0; }

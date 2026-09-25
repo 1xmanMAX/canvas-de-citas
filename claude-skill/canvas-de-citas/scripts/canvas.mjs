@@ -450,7 +450,23 @@ function fuenteDeArchivo(d, archivo) {
 }
 
 C.convertir = async () => {
-  const origen = path.resolve(pos.join(' ') || fallar('Uso: convertir <archivo o carpeta> [--salida carpeta] [--forzar]'))
+  // Sin argumentos: el texto de lectura de TODAS las fuentes con documento, dentro de la carpeta
+  // de la app (fuentes/<id>/texto.md). Los documentos solo existen ahí: no se copian a otro lado.
+  if (!pos.length) {
+    const d = cargar()
+    let hechos = 0, fallos = 0
+    for (const f of d.fuentes.filter(x => x.documento_original)) {
+      try {
+        const cache = ruta('fuentes', f.id, 'texto.md')
+        if (op.forzar && fs.existsSync(cache)) fs.rmSync(cache)
+        const md = await mdDeFuente(f)
+        ok(`✓ ${f.id} ${refF(f)} · ${Math.round(md.length / 1000)} mil caracteres`)
+        hechos++
+      } catch (e) { ok(`✗ ${f.id}: ${e.message}`); fallos++ }
+    }
+    return ok(`${hechos} fuentes con texto de lectura listo${fallos ? `, ${fallos} con problemas` : ''} (en fuentes/<id>/texto.md de la carpeta de la app)`)
+  }
+  const origen = path.resolve(pos.join(' ') || fallar('Uso: convertir [<archivo o carpeta>] [--salida carpeta] [--forzar]'))
   const esCarpeta = fs.statSync(origen).isDirectory()
   const archivos = esCarpeta ? fs.readdirSync(origen).filter(a => DOCS.test(a)).map(a => path.join(origen, a)) : [origen]
   const salida = path.resolve(op.salida || path.join(esCarpeta ? origen : path.dirname(origen), 'texto'))

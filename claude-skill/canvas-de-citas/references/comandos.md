@@ -58,7 +58,8 @@ Datos por tipo de gráfico:
 |---|---|
 | `leer <fuente_id> [--paginas 3-5]` | Texto del documento adjunto de una fuente en Markdown, con `## Página N` (páginas del PDF). Se guarda en caché en `fuentes/<id>/texto.md` |
 | `leer <ruta.pdf/html>` | Lo mismo con cualquier archivo |
-| `convertir <carpeta o archivo> [--salida carpeta] [--forzar]` | Convierte PDFs y HTML a `.md` (por defecto en `<carpeta>/texto/`), con cabecera de la fuente (título, autores, DOI, id) si el archivo está adjunto en la app. Solo reconvierte lo que cambió |
+| `convertir` | Prepara el texto de lectura (`fuentes/<id>/texto.md`) de todas las fuentes con documento, dentro de la carpeta de la app |
+| `convertir <carpeta o archivo> [--salida carpeta] [--forzar]` | Convierte PDFs y HTML sueltos a `.md` (por defecto en `<carpeta>/texto/`), con cabecera de la fuente (título, autores, DOI, id) si el archivo está adjunto en la app. Solo reconvierte lo que cambió |
 
 El número tras `## Página` es la página del PDF; la paginación de la revista suele aparecer al
 inicio del texto de cada página (p. ej. "457"). Si el `.md` avisa de "capas de texto duplicadas",

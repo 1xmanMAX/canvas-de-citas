@@ -234,6 +234,18 @@ onmessage = async ({ data: m }) => {
       programar()
     } else if (m.tipo === 'descartar') {
       for (const k of [...cola.keys()]) if (!m.conservar.includes(+k.split(':')[0])) cola.delete(k)
+    } else if (m.tipo === 'textoCompleto') {
+      // Texto de todas las páginas (para extraer la bibliografía del paper).
+      if (m.doc === docActual && doc) {
+        const paginas = []
+        for (let n = 0; n < tamanos.length; n++) {
+          const { text } = pagina(n, true), c = P.FPDFText_CountChars(text)
+          let t = ''
+          if (c > 0) { const b = malloc((c + 1) * 2); P.FPDFText_GetText(text, 0, c, b); t = P.pdfium.UTF16ToString(b); free(b) }
+          paginas.push(t.replace(/￾\s*/g, ''))
+        }
+        postMessage({ tipo: 'textoCompleto', doc: m.doc, paginas })
+      }
     } else if (m.tipo === 'recorte') {
       if (m.doc === docActual && doc) postMessage({ tipo: 'recorte', doc: m.doc, n: m.n, rect: m.rect, ...(await recorte(m.n, m.rect)) })
     } else if (m.tipo === 'texto') {
