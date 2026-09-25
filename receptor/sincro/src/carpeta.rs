@@ -135,4 +135,61 @@ impl Carpeta {
     pub fn escribir_doc(&self, destino: &Path, bytes: &[u8]) -> io::Result<()> {
         self.escribir_atomico(destino, bytes)
     }
+
+    // --- Grupo de sincronización: en `.sincro/` (junto a los datos, fuera de `fuentes/`) ---
+
+    fn dir_sincro(&self) -> PathBuf {
+        self.raiz.join(".sincro")
+    }
+
+    /// Id de aparato válido (lo genera la app): letras, números, `_` y `-`.
+    pub fn id_valido(id: &str) -> bool {
+        !id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    }
+
+    /// Los datos tal como quedaron en la última sincronización de ese aparato.
+    pub fn base_de(&self, id: &str) -> Option<Value> {
+        if !Self::id_valido(id) {
+            return None;
+        }
+        serde_json::from_slice(&fs::read(self.dir_sincro().join(format!("base-{id}.json"))).ok()?).ok()
+    }
+
+    pub fn guardar_base(&self, id: &str, datos: &Value) -> io::Result<()> {
+        if !Self::id_valido(id) {
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "id de aparato inválido"));
+        }
+        self.escribir_atomico(&self.dir_sincro().join(format!("base-{id}.json")), &serde_json::to_vec(datos)?)
+    }
+
+    /// `[{id, nombre, visto, sincronizado}]` de los aparatos que se han conectado.
+    pub fn grupo(&self) -> Value {
+        fs::read(self.dir_sincro().join("grupo.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_else(|| json!([]))
+    }
+
+    /// Anota que el aparato se conectó (y, si `sincronizo`, que terminó una sincronización).
+    pub fn anotar_aparato(&self, id: &str, nombre: &str, ahora_ms: u64, sincronizo: bool) -> io::Result<()> {
+        if !Self::id_valido(id) {
+            return Ok(());
+        }
+        let mut g = self.grupo();
+        let lista = g.as_array_mut().expect("grupo es una lista");
+        let i = match lista.iter().position(|a| a["id"] == id) {
+            Some(i) => i,
+            None => {
+                lista.push(json!({"id": id}));
+                lista.len() - 1
+            }
+        };
+        let a = &mut lista[i];
+        let nombre: String = nombre.chars().take(60).collect();
+        if !nombre.trim().is_empty() {
+            a["nombre"] = json!(nombre.trim());
+        }
+        a["visto"] = json!(ahora_ms);
+        if sincronizo {
+            a["sincronizado"] = json!(ahora_ms);
+        }
+        self.escribir_atomico(&self.dir_sincro().join("grupo.json"), &Self::json_bonito(&g)?)
+    }
 }

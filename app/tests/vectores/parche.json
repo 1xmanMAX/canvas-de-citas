@@ -1,0 +1,694 @@
+[
+  {
+    "nombre": "sin cambios",
+    "a": {
+      "proyectos": [
+        {
+          "id": "proyecto_001",
+          "titulo": "Tesis",
+          "canvas": {
+            "modo": "libre",
+            "posiciones": {},
+            "notas": [],
+            "conexiones": [],
+            "objetivos": {}
+          }
+        }
+      ],
+      "fuentes": [
+        {
+          "id": "f1",
+          "titulo": "T f1",
+          "anio": 2020,
+          "autores": [
+            "Pérez, A."
+          ]
+        }
+      ],
+      "citas": []
+    },
+    "b": {
+      "proyectos": [
+        {
+          "id": "proyecto_001",
+          "titulo": "Tesis",
+          "canvas": {
+            "modo": "libre",
+            "posiciones": {},
+            "notas": [],
+            "conexiones": [],
+            "objetivos": {}
+          }
+        }
+      ],
+      "fuentes": [
+        {
+          "id": "f1",
+          "titulo": "T f1",
+          "anio": 2020,
+          "autores": [
+            "Pérez, A."
+          ]
+        }
+      ],
+      "citas": []
+    },
+    "ops": [],
+    "canonico": "{\"citas\":[],\"fuentes\":[{\"anio\":2020,\"autores\":[\"Pérez, A.\"],\"id\":\"f1\",\"titulo\":\"T f1\"}],\"proyectos\":[{\"canvas\":{\"conexiones\":[],\"modo\":\"libre\",\"notas\":[],\"objetivos\":{},\"posiciones\":{}},\"id\":\"proyecto_001\",\"titulo\":\"Tesis\"}]}",
+    "huella": "7f2b2afcf886d988004ba265d4729446"
+  },
+  {
+    "nombre": "un campo de una fuente",
+    "a": {
+      "proyectos": [],
+      "fuentes": [
+        {
+          "id": "f1",
+          "titulo": "T f1",
+          "anio": 2020,
+          "autores": [
+            "Pérez, A."
+          ]
+        },
+        {
+          "id": "f2",
+          "titulo": "T f2",
+          "anio": 2020,
+          "autores": [
+            "Pérez, A."
+          ]
+        }
+      ],
+      "citas": []
+    },
+    "b": {
+      "proyectos": [],
+      "fuentes": [
+        {
+          "id": "f1",
+          "titulo": "T f1",
+          "anio": 2020,
+          "autores": [
+            "Pérez, A."
+          ]
+        },
+        {
+          "id": "f2",
+          "titulo": "T f2",
+          "anio": 2024,
+          "autores": [
+            "Pérez, A."
+          ]
+        }
+      ],
+      "citas": []
+    },
+    "ops": [
+      {
+        "r": [
+          "fuentes",
+          {
+            "id": "f2"
+          },
+          "anio"
+        ],
+        "v": 2024
+      }
+    ],
+    "canonico": "{\"citas\":[],\"fuentes\":[{\"anio\":2020,\"autores\":[\"Pérez, A.\"],\"id\":\"f1\",\"titulo\":\"T f1\"},{\"anio\":2024,\"autores\":[\"Pérez, A.\"],\"id\":\"f2\",\"titulo\":\"T f2\"}],\"proyectos\":[]}",
+    "huella": "d1de3560e71250f63a7836ae3923fd60"
+  },
+  {
+    "nombre": "fuente nueva y fuente borrada",
+    "a": {
+      "proyectos": [],
+      "fuentes": [
+        {
+          "id": "f1",
+          "titulo": "T f1",
+          "anio": 2020,
+          "autores": [
+            "Pérez, A."
+          ]
+        },
+        {
+          "id": "f2",
+          "titulo": "T f2",
+          "anio": 2020,
+          "autores": [
+            "Pérez, A."
+          ]
+        }
+      ],
+      "citas": []
+    },
+    "b": {
+      "proyectos": [],
+      "fuentes": [
+        {
+          "id": "f2",
+          "titulo": "T f2",
+          "anio": 2020,
+          "autores": [
+            "Pérez, A."
+          ]
+        },
+        {
+          "id": "f3",
+          "titulo": "T f3",
+          "anio": 2020,
+          "autores": [
+            "Pérez, A."
+          ]
+        }
+      ],
+      "citas": []
+    },
+    "ops": [
+      {
+        "r": [
+          "fuentes",
+          {
+            "id": "f1"
+          }
+        ],
+        "x": 1
+      },
+      {
+        "r": [
+          "fuentes",
+          {
+            "id": "f3"
+          }
+        ],
+        "v": {
+          "id": "f3",
+          "titulo": "T f3",
+          "anio": 2020,
+          "autores": [
+            "Pérez, A."
+          ]
+        }
+      }
+    ],
+    "canonico": "{\"citas\":[],\"fuentes\":[{\"anio\":2020,\"autores\":[\"Pérez, A.\"],\"id\":\"f2\",\"titulo\":\"T f2\"},{\"anio\":2020,\"autores\":[\"Pérez, A.\"],\"id\":\"f3\",\"titulo\":\"T f3\"}],\"proyectos\":[]}",
+    "huella": "f4a17f5c646584a26ac85842fb030624"
+  },
+  {
+    "nombre": "nota movida en el lienzo",
+    "a": {
+      "proyectos": [
+        {
+          "id": "proyecto_001",
+          "titulo": "Tesis",
+          "canvas": {
+            "modo": "libre",
+            "posiciones": {},
+            "notas": [
+              {
+                "id": "n1",
+                "texto": "A",
+                "x": 0,
+                "y": 0
+              },
+              {
+                "id": "n2",
+                "texto": "B",
+                "x": 5,
+                "y": 5
+              }
+            ],
+            "conexiones": [],
+            "objetivos": {}
+          }
+        }
+      ],
+      "fuentes": [],
+      "citas": []
+    },
+    "b": {
+      "proyectos": [
+        {
+          "id": "proyecto_001",
+          "titulo": "Tesis",
+          "canvas": {
+            "modo": "libre",
+            "posiciones": {},
+            "notas": [
+              {
+                "id": "n1",
+                "texto": "A",
+                "x": 40,
+                "y": -12.5
+              },
+              {
+                "id": "n2",
+                "texto": "B",
+                "x": 5,
+                "y": 5
+              }
+            ],
+            "conexiones": [],
+            "objetivos": {}
+          }
+        }
+      ],
+      "fuentes": [],
+      "citas": []
+    },
+    "ops": [
+      {
+        "r": [
+          "proyectos",
+          {
+            "id": "proyecto_001"
+          },
+          "canvas",
+          "notas",
+          {
+            "id": "n1"
+          },
+          "x"
+        ],
+        "v": 40
+      },
+      {
+        "r": [
+          "proyectos",
+          {
+            "id": "proyecto_001"
+          },
+          "canvas",
+          "notas",
+          {
+            "id": "n1"
+          },
+          "y"
+        ],
+        "v": -12.5
+      }
+    ],
+    "canonico": "{\"citas\":[],\"fuentes\":[],\"proyectos\":[{\"canvas\":{\"conexiones\":[],\"modo\":\"libre\",\"notas\":[{\"id\":\"n1\",\"texto\":\"A\",\"x\":40,\"y\":-12.5},{\"id\":\"n2\",\"texto\":\"B\",\"x\":5,\"y\":5}],\"objetivos\":{},\"posiciones\":{}},\"id\":\"proyecto_001\",\"titulo\":\"Tesis\"}]}",
+    "huella": "3c90eac2a5d20bf02a7ee9191c72902d"
+  },
+  {
+    "nombre": "posiciones y sub-lienzos",
+    "a": {
+      "proyectos": [
+        {
+          "id": "proyecto_001",
+          "titulo": "Tesis",
+          "canvas": {
+            "modo": "libre",
+            "posiciones": {
+              "f1": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "notas": [],
+            "conexiones": [],
+            "objetivos": {
+              "oe1": {
+                "notas": []
+              }
+            }
+          }
+        }
+      ],
+      "fuentes": [],
+      "citas": []
+    },
+    "b": {
+      "proyectos": [
+        {
+          "id": "proyecto_001",
+          "titulo": "Tesis",
+          "canvas": {
+            "modo": "libre",
+            "posiciones": {
+              "f2": {
+                "x": 1,
+                "y": 2
+              }
+            },
+            "notas": [],
+            "conexiones": [],
+            "objetivos": {
+              "oe1": {
+                "notas": [
+                  {
+                    "id": "n9",
+                    "texto": "ñandú \"comillas\"\n"
+                  }
+                ]
+              },
+              "oe2": {
+                "notas": []
+              }
+            }
+          }
+        }
+      ],
+      "fuentes": [],
+      "citas": []
+    },
+    "ops": [
+      {
+        "r": [
+          "proyectos",
+          {
+            "id": "proyecto_001"
+          },
+          "canvas",
+          "posiciones",
+          "f2"
+        ],
+        "v": {
+          "x": 1,
+          "y": 2
+        }
+      },
+      {
+        "r": [
+          "proyectos",
+          {
+            "id": "proyecto_001"
+          },
+          "canvas",
+          "posiciones",
+          "f1"
+        ],
+        "x": 1
+      },
+      {
+        "r": [
+          "proyectos",
+          {
+            "id": "proyecto_001"
+          },
+          "canvas",
+          "objetivos",
+          "oe1",
+          "notas",
+          {
+            "id": "n9"
+          }
+        ],
+        "v": {
+          "id": "n9",
+          "texto": "ñandú \"comillas\"\n"
+        }
+      },
+      {
+        "r": [
+          "proyectos",
+          {
+            "id": "proyecto_001"
+          },
+          "canvas",
+          "objetivos",
+          "oe2"
+        ],
+        "v": {
+          "notas": []
+        }
+      }
+    ],
+    "canonico": "{\"citas\":[],\"fuentes\":[],\"proyectos\":[{\"canvas\":{\"conexiones\":[],\"modo\":\"libre\",\"notas\":[],\"objetivos\":{\"oe1\":{\"notas\":[{\"id\":\"n9\",\"texto\":\"ñandú \\\"comillas\\\"\\n\"}]},\"oe2\":{\"notas\":[]}},\"posiciones\":{\"f2\":{\"x\":1,\"y\":2}}},\"id\":\"proyecto_001\",\"titulo\":\"Tesis\"}]}",
+    "huella": "10cc636e54a36bca0b23d9bc4734fbf0"
+  },
+  {
+    "nombre": "reordenar",
+    "a": {
+      "proyectos": [],
+      "fuentes": [
+        {
+          "id": "f1",
+          "titulo": "T f1",
+          "anio": 2020,
+          "autores": [
+            "Pérez, A."
+          ]
+        },
+        {
+          "id": "f2",
+          "titulo": "T f2",
+          "anio": 2020,
+          "autores": [
+            "Pérez, A."
+          ]
+        },
+        {
+          "id": "f3",
+          "titulo": "T f3",
+          "anio": 2020,
+          "autores": [
+            "Pérez, A."
+          ]
+        }
+      ],
+      "citas": []
+    },
+    "b": {
+      "proyectos": [],
+      "fuentes": [
+        {
+          "id": "f3",
+          "titulo": "T f3",
+          "anio": 2020,
+          "autores": [
+            "Pérez, A."
+          ]
+        },
+        {
+          "id": "f1",
+          "titulo": "T f1",
+          "anio": 2020,
+          "autores": [
+            "Pérez, A."
+          ]
+        },
+        {
+          "id": "f2",
+          "titulo": "T f2",
+          "anio": 2020,
+          "autores": [
+            "Pérez, A."
+          ]
+        }
+      ],
+      "citas": []
+    },
+    "ops": [
+      {
+        "r": [
+          "fuentes"
+        ],
+        "orden": [
+          "f3",
+          "f1",
+          "f2"
+        ]
+      }
+    ],
+    "canonico": "{\"citas\":[],\"fuentes\":[{\"anio\":2020,\"autores\":[\"Pérez, A.\"],\"id\":\"f3\",\"titulo\":\"T f3\"},{\"anio\":2020,\"autores\":[\"Pérez, A.\"],\"id\":\"f1\",\"titulo\":\"T f1\"},{\"anio\":2020,\"autores\":[\"Pérez, A.\"],\"id\":\"f2\",\"titulo\":\"T f2\"}],\"proyectos\":[]}",
+    "huella": "e44e7d18ba1ed9484117c63c777bdf61"
+  },
+  {
+    "nombre": "cambio de tipo y null",
+    "a": {
+      "proyectos": [],
+      "fuentes": [
+        {
+          "id": "f1",
+          "titulo": "T f1",
+          "anio": 2020,
+          "autores": [
+            "Pérez, A."
+          ],
+          "doi": null,
+          "paginas": [
+            1,
+            2
+          ],
+          "notas": "x"
+        }
+      ],
+      "citas": []
+    },
+    "b": {
+      "proyectos": [],
+      "fuentes": [
+        {
+          "id": "f1",
+          "titulo": "T f1",
+          "anio": 2020,
+          "autores": [
+            "Pérez, A."
+          ],
+          "doi": "10.1/x",
+          "paginas": "1-2",
+          "notas": null
+        }
+      ],
+      "citas": []
+    },
+    "ops": [
+      {
+        "r": [
+          "fuentes",
+          {
+            "id": "f1"
+          },
+          "doi"
+        ],
+        "v": "10.1/x"
+      },
+      {
+        "r": [
+          "fuentes",
+          {
+            "id": "f1"
+          },
+          "paginas"
+        ],
+        "v": "1-2"
+      },
+      {
+        "r": [
+          "fuentes",
+          {
+            "id": "f1"
+          },
+          "notas"
+        ],
+        "v": null
+      }
+    ],
+    "canonico": "{\"citas\":[],\"fuentes\":[{\"anio\":2020,\"autores\":[\"Pérez, A.\"],\"doi\":\"10.1/x\",\"id\":\"f1\",\"notas\":null,\"paginas\":\"1-2\",\"titulo\":\"T f1\"}],\"proyectos\":[]}",
+    "huella": "ac376019c216624eb2fb840a80ace70b"
+  },
+  {
+    "nombre": "campo quitado y lista sin ids",
+    "a": {
+      "proyectos": [],
+      "fuentes": [
+        {
+          "id": "f1",
+          "titulo": "T f1",
+          "anio": 2020,
+          "autores": [
+            "A",
+            "B"
+          ],
+          "extra": true
+        }
+      ],
+      "citas": []
+    },
+    "b": {
+      "proyectos": [],
+      "fuentes": [
+        {
+          "id": "f1",
+          "titulo": "T f1",
+          "anio": 2020,
+          "autores": [
+            "A",
+            "C"
+          ]
+        }
+      ],
+      "citas": []
+    },
+    "ops": [
+      {
+        "r": [
+          "fuentes",
+          {
+            "id": "f1"
+          },
+          "autores"
+        ],
+        "v": [
+          "A",
+          "C"
+        ]
+      },
+      {
+        "r": [
+          "fuentes",
+          {
+            "id": "f1"
+          },
+          "extra"
+        ],
+        "x": 1
+      }
+    ],
+    "canonico": "{\"citas\":[],\"fuentes\":[{\"anio\":2020,\"autores\":[\"A\",\"C\"],\"id\":\"f1\",\"titulo\":\"T f1\"}],\"proyectos\":[]}",
+    "huella": "902e3255bb02f6b8cf0d792dcbd20cb5"
+  },
+  {
+    "nombre": "citas nuevas al final",
+    "a": {
+      "proyectos": [],
+      "fuentes": [],
+      "citas": [
+        {
+          "id": "c1",
+          "texto": "uno"
+        }
+      ]
+    },
+    "b": {
+      "proyectos": [],
+      "fuentes": [],
+      "citas": [
+        {
+          "id": "c1",
+          "texto": "uno"
+        },
+        {
+          "id": "c2",
+          "texto": "dos",
+          "pagina": 3
+        },
+        {
+          "id": "c3",
+          "texto": "tres"
+        }
+      ]
+    },
+    "ops": [
+      {
+        "r": [
+          "citas",
+          {
+            "id": "c2"
+          }
+        ],
+        "v": {
+          "id": "c2",
+          "texto": "dos",
+          "pagina": 3
+        }
+      },
+      {
+        "r": [
+          "citas",
+          {
+            "id": "c3"
+          }
+        ],
+        "v": {
+          "id": "c3",
+          "texto": "tres"
+        }
+      }
+    ],
+    "canonico": "{\"citas\":[{\"id\":\"c1\",\"texto\":\"uno\"},{\"id\":\"c2\",\"pagina\":3,\"texto\":\"dos\"},{\"id\":\"c3\",\"texto\":\"tres\"}],\"fuentes\":[],\"proyectos\":[]}",
+    "huella": "16dbaf71015d3f1e0cbba4ce763ed94b"
+  }
+]

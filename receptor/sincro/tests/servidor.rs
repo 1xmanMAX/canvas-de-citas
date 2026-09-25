@@ -83,3 +83,61 @@ fn hola_confirma_la_clave() {
     assert_eq!(r.estado, 200);
     assert_eq!(leer(&s, &r), json!({"app": "canvas-sincro", "v": 1}));
 }
+
+// --- v2: grupo de sincronización con parches ---
+
+fn pedir(s: &Sincro, ruta: &str, cuerpo: serde_json::Value) -> (u16, serde_json::Value) {
+    let r = s.atender("POST", ruta, Some(&prueba(s, ruta)), s.clave.cifrar_json(&cuerpo).as_bytes(), false);
+    let v = if r.cuerpo.is_empty() { json!(null) } else { s.clave.descifrar_json(std::str::from_utf8(&r.cuerpo).unwrap()).unwrap_or(json!(null)) };
+    (r.estado, v)
+}
+
+#[test]
+fn v2_primero_todo_luego_solo_lo_que_cambio() {
+    let (d, s) = sincro(1 << 20);
+    // Primera vez: sin base común → todo.
+    let (e, r) = pedir(&s, "/sync/v2/leer", json!({"dispositivo": "cel1", "nombre": "Celular", "base": null}));
+    assert_eq!(e, 200);
+    assert_eq!(r["modo"], "completo");
+    let datos = r["datos"].clone();
+    assert_eq!(datos["fuentes"][0]["id"], "fuente_001");
+
+    // El aparato agrega una cita y lo envía como parche.
+    let mut nuevo = datos.clone();
+    nuevo["citas"] = json!([{"id": "cita_001", "texto": "hola"}]);
+    let ops = canvas_sincro::parche::diferencias(&datos, &nuevo);
+    let huella = canvas_sincro::parche::huella(&nuevo);
+    let (e, w) = pedir(&s, "/sync/v2/escribir", json!({"dispositivo": "cel1", "etiqueta": r["etiqueta"], "parche": ops, "huella": huella}));
+    assert_eq!(e, 200);
+    assert_eq!(w["huella"], huella.as_str());
+    assert_eq!(w["escritas"], json!(["citas"]), "solo reescribe la colección tocada");
+    assert!(std::fs::read_to_string(d.path().join("citas.json")).unwrap().contains("cita_001"));
+    assert!(!d.path().join("proyectos.json").exists());
+
+    // La PC cambia algo por su cuenta (la app de Comet o la skill).
+    std::fs::write(d.path().join("fuentes.json"), "{\"fuentes\":[{\"id\":\"fuente_001\",\"titulo\":\"Nuevo\"}]}").unwrap();
+    let (_, r2) = pedir(&s, "/sync/v2/leer", json!({"dispositivo": "cel1", "base": huella}));
+    assert_eq!(r2["modo"], "parche");
+    assert_eq!(r2["parche"], json!([{"r": ["fuentes", {"id": "fuente_001"}, "titulo"], "v": "Nuevo"}]));
+    // El grupo recuerda el aparato y su nombre.
+    assert_eq!(r2["grupo"][0]["id"], "cel1");
+    assert_eq!(r2["grupo"][0]["nombre"], "Celular");
+    assert!(r2["grupo"][0]["sincronizado"].is_u64());
+}
+
+#[test]
+fn v2_otra_base_o_etiqueta_vieja() {
+    let (_d, s) = sincro(1 << 20);
+    let (_, r) = pedir(&s, "/sync/v2/leer", json!({"dispositivo": "lap", "base": "no-coincide"}));
+    assert_eq!(r["modo"], "completo");
+    let (e, _) = pedir(&s, "/sync/v2/escribir", json!({"dispositivo": "lap", "etiqueta": "vieja", "parche": []}));
+    assert_eq!(e, 409);
+    // Parche sobre algo que no existe o huella distinta: 422 y nada se escribe.
+    let (e, _) = pedir(&s, "/sync/v2/escribir", json!({"dispositivo": "lap", "etiqueta": r["etiqueta"], "parche": [{"r": ["fuentes", {"id": "no"}, "x"], "v": 1}]}));
+    assert_eq!(e, 422);
+    let (e, _) = pedir(&s, "/sync/v2/escribir", json!({"dispositivo": "lap", "etiqueta": r["etiqueta"], "parche": [], "huella": "otra"}));
+    assert_eq!(e, 422);
+    // Ids de aparato raros: 400.
+    let (e, _) = pedir(&s, "/sync/v2/leer", json!({"dispositivo": "../x"}));
+    assert_eq!(e, 400);
+}

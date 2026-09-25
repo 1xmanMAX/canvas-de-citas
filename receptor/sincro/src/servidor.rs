@@ -2,7 +2,8 @@
 //! Servidor HTTP de sincronización (red local). Todo lo que viaja va cifrado con la clave de
 //! vinculación; cada petición demuestra conocerla con la cabecera X-Canvas-Prueba.
 use crate::carpeta::Carpeta;
-use crate::cifrado::Clave;
+use crate::cifrado::{ahora_ms, Clave};
+use crate::parche;
 use serde_json::json;
 use std::io::Read;
 use std::net::UdpSocket;
@@ -112,6 +113,8 @@ impl Sincro {
         match (metodo, ruta) {
             // Liviano: el celular lo usa para encontrar la PC si cambió su IP.
             ("GET", "/sync/hola") => Respuesta::texto(200, self.clave.cifrar_json(&json!({"app": "canvas-sincro", "v": 1}))),
+            ("POST", "/sync/v2/leer") => self.leer_v2(cuerpo),
+            ("POST", "/sync/v2/escribir") => self.escribir_v2(cuerpo),
             ("GET", "/sync/estado") => match self.carpeta.leer() {
                 Ok(v) => Respuesta::texto(200, self.clave.cifrar_json(&v)),
                 Err(e) => Respuesta::texto(500, e.to_string()),
@@ -148,6 +151,106 @@ impl Sincro {
     }
 }
 
+fn solo_datos(v: &serde_json::Value) -> serde_json::Value {
+    json!({"proyectos": v["proyectos"], "fuentes": v["fuentes"], "citas": v["citas"]})
+}
+
+impl Sincro {
+    fn cuerpo_json(&self, cuerpo: &[u8]) -> Result<serde_json::Value, Respuesta> {
+        let texto = std::str::from_utf8(cuerpo).map_err(|_| Respuesta::vacia(400))?;
+        self.clave.descifrar_json(texto).map_err(|_| Respuesta::vacia(401))
+    }
+
+    fn cifrada(&self, v: serde_json::Value) -> Respuesta {
+        Respuesta::texto(200, self.clave.cifrar_json(&v))
+    }
+
+    /// v2 (grupo de sincronización): `{dispositivo, nombre, base}` → solo lo que cambió desde la
+    /// base de ese aparato (`modo: "parche"`), o todo si no hay base común (`modo: "completo"`).
+    fn leer_v2(&self, cuerpo: &[u8]) -> Respuesta {
+        let pedido = match self.cuerpo_json(cuerpo) {
+            Ok(v) => v,
+            Err(r) => return r,
+        };
+        let id = pedido["dispositivo"].as_str().unwrap_or("");
+        if !Carpeta::id_valido(id) {
+            return Respuesta::vacia(400);
+        }
+        let actual = match self.carpeta.leer() {
+            Ok(v) => v,
+            Err(e) => return Respuesta::texto(500, e.to_string()),
+        };
+        let datos = solo_datos(&actual);
+        let _ = self.carpeta.anotar_aparato(id, pedido["nombre"].as_str().unwrap_or(""), ahora_ms(), false);
+        let mut r = json!({
+            "etiqueta": actual["etiqueta"],
+            "huella": parche::huella(&datos),
+            "docs": actual["docs"],
+            "grupo": self.carpeta.grupo(),
+        });
+        match self.carpeta.base_de(id).filter(|b| pedido["base"].as_str() == Some(parche::huella(b).as_str())) {
+            Some(base) => {
+                r["modo"] = json!("parche");
+                r["parche"] = json!(parche::diferencias(&base, &datos));
+            }
+            None => {
+                r["modo"] = json!("completo");
+                r["datos"] = datos;
+            }
+        }
+        self.cifrada(r)
+    }
+
+    /// v2: `{dispositivo, etiqueta, parche | datos, huella, eliminados}`. El parche es sobre lo que
+    /// el aparato leyó (misma etiqueta); si la PC cambió entre medio, 409. Si el resultado no da la
+    /// huella esperada, 422 y no se escribe (el aparato reintenta enviando todo).
+    fn escribir_v2(&self, cuerpo: &[u8]) -> Respuesta {
+        let v = match self.cuerpo_json(cuerpo) {
+            Ok(v) => v,
+            Err(r) => return r,
+        };
+        let id = v["dispositivo"].as_str().unwrap_or("");
+        if !Carpeta::id_valido(id) {
+            return Respuesta::vacia(400);
+        }
+        let _candado = ESCRITURA.lock().unwrap_or_else(|e| e.into_inner());
+        if v["etiqueta"].as_str() != Some(self.carpeta.etiqueta().as_str()) {
+            return Respuesta::texto(409, self.clave.cifrar_json(&json!({"error": "cambio"})));
+        }
+        let actual = match self.carpeta.leer() {
+            Ok(a) => solo_datos(&a),
+            Err(e) => return Respuesta::texto(500, e.to_string()),
+        };
+        // Solo se reescriben las colecciones que el parche toca.
+        let (resultado, tocadas): (serde_json::Value, Vec<&str>) = if v.get("datos").is_some_and(|d| d.is_object()) {
+            (solo_datos(&v["datos"]), crate::carpeta::COLECCIONES.to_vec())
+        } else {
+            let ops = v["parche"].as_array().cloned().unwrap_or_default();
+            let mut r = actual.clone();
+            if parche::aplicar(&mut r, &ops).is_err() {
+                return Respuesta::texto(422, self.clave.cifrar_json(&json!({"error": "parche"})));
+            }
+            if v["huella"].as_str().is_some_and(|h| h != parche::huella(&r)) {
+                return Respuesta::texto(422, self.clave.cifrar_json(&json!({"error": "huella"})));
+            }
+            let tocadas = crate::carpeta::COLECCIONES.iter().copied().filter(|c| ops.iter().any(|op| op["r"][0] == *c)).collect();
+            (r, tocadas)
+        };
+        let mut escribir = serde_json::Map::new();
+        for c in &tocadas {
+            escribir.insert((*c).into(), resultado[*c].clone());
+        }
+        if let Err(e) = self.carpeta.escribir(&serde_json::Value::Object(escribir), &v["eliminados"]) {
+            return Respuesta::texto(500, e.to_string());
+        }
+        if let Err(e) = self.carpeta.guardar_base(id, &resultado) {
+            return Respuesta::texto(500, e.to_string());
+        }
+        let _ = self.carpeta.anotar_aparato(id, "", ahora_ms(), true);
+        self.cifrada(json!({"etiqueta": self.carpeta.etiqueta(), "huella": parche::huella(&resultado), "escritas": tocadas, "grupo": self.carpeta.grupo()}))
+    }
+}
+
 fn cabecera(k: &str, v: &str) -> Header {
     Header::from_bytes(k.as_bytes(), v.as_bytes()).expect("cabecera válida")
 }
@@ -167,7 +270,7 @@ fn atender_http(s: &Sincro, mut rq: Request) {
         .with_header(cabecera("Content-Type", r.tipo))
         .with_header(cabecera("Cache-Control", "no-store"))
         .with_header(cabecera("Access-Control-Allow-Origin", "*"))
-        .with_header(cabecera("Access-Control-Allow-Methods", "GET, PUT, OPTIONS"))
+        .with_header(cabecera("Access-Control-Allow-Methods", "GET, PUT, POST, OPTIONS"))
         .with_header(cabecera("Access-Control-Allow-Headers", "content-type, x-canvas-prueba"))
         .with_header(cabecera("Access-Control-Allow-Private-Network", "true"));
     let _ = rq.respond(resp);
