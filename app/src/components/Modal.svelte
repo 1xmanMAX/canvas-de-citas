@@ -31,7 +31,7 @@
 <style>
   dialog {
     width: min(var(--ancho), calc(100vw - 24px));
-    max-height: min(820px, calc(100dvh - 24px));
+    max-height: min(820px, calc(100dvh - 24px - var(--sa-arriba) - var(--sa-abajo)));
     padding: 0; border: none; border-radius: 16px;
     background: var(--paper); color: var(--ink);
     box-shadow: 0 20px 50px rgba(0, 0, 0, .35);
@@ -43,7 +43,7 @@
   .arriba { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   h2 { margin: 0; font-size: 21px; line-height: 1.3; }
   @media (max-width: 820px) {
-    dialog { width: 100vw; max-width: 100vw; max-height: 92dvh; margin: auto 0 0; border-radius: 16px 16px 0 0; }
-    .modal { padding: 20px 18px calc(20px + env(safe-area-inset-bottom)); }
+    dialog { width: 100vw; max-width: 100vw; max-height: calc(92dvh - var(--sa-arriba)); margin: auto 0 0; border-radius: 16px 16px 0 0; }
+    .modal { padding: 20px calc(18px + var(--sa-der)) calc(20px + var(--sa-abajo)) calc(18px + var(--sa-izq)); }
   }
 </style>

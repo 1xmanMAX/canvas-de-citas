@@ -84,11 +84,11 @@ export async function cargar() {
   navigator.storage?.persist?.().catch(() => {})
 }
 
-// --- Aviso de cambios (lo usa la carpeta de almacenamiento para guardar sola) ---
-let oyente = null
-export const alCambiar = fn => (oyente = fn)
+// --- Aviso de cambios (la carpeta de almacenamiento guarda sola; la sincronización se programa) ---
+const oyentes = new Set()
+export const alCambiar = fn => oyentes.add(fn)
 /** @param {string} [docId] fuente cuyo documento original cambió */
-const cambio = docId => oyente?.(docId)
+const cambio = docId => oyentes.forEach(fn => fn(docId))
 
 let temporizador
 export function avisar(texto) {

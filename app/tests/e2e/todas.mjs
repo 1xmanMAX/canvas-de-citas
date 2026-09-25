@@ -2,9 +2,10 @@
 // Uso: npm run build && npm run test:e2e        · Solo algunas: npm run test:e2e -- visor pdf
 // Capturas en tests/e2e/capturas/. Chrome: se busca solo; si no, define CHROME_PATH.
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
-import { spawnSync } from 'node:child_process'
-import { APP, FIXTURES, SALIDA, servidor, navegador, pagina, esperar, clicTexto, conEjemplo, lienzoGuardado, adjuntar, suite } from './comun.mjs'
+import { spawn, spawnSync } from 'node:child_process'
+import { APP, FIXTURES, SALIDA, URL_APP, servidor, navegador, pagina, esperar, clicTexto, conEjemplo, lienzoGuardado, adjuntar, suite } from './comun.mjs'
 
 const PDF = path.join(FIXTURES, 'paper.pdf'), HTML = path.join(FIXTURES, 'paper.html'), IMG = path.join(APP, 'public', 'icon-512.png')
 if (!fs.existsSync(PDF)) spawnSync(process.execPath, [path.join(FIXTURES, 'crear.mjs')], { stdio: 'inherit' })
@@ -16,6 +17,26 @@ const SUITES = {
   async lienzo(b) {
     const s = suite('Lienzo y tarjetas'), pg = await pagina(b)
     await conEjemplo(pg)
+    await s.paso('pellizco con un dedo sobre una fuente: hace zoom y no la mueve ni la abre', async () => {
+      const cdp = await pg.createCDPSession()
+      const nodo = await pg.$('g.nodo')
+      const antes = await nodo.evaluate(g => g.getAttribute('transform'))
+      const r = await nodo.boundingBox()
+      const zoom = () => pg.$eval('.zoom .porc', b => parseInt(b.textContent))
+      const k0 = await zoom()
+      const a = { x: r.x + r.width / 2, y: r.y + r.height / 2 }, b = { x: a.x + 60, y: a.y + 40 }
+      const toque = (type, puntos) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: puntos.map((p, i) => ({ x: p.x, y: p.y, id: i })) })
+      await toque('touchStart', [a]); await esperar(30)
+      await toque('touchStart', [a, b]); await esperar(30)
+      for (let i = 1; i <= 8; i++) { await toque('touchMove', [{ x: a.x - 10 * i, y: a.y - 6 * i }, { x: b.x + 10 * i, y: b.y + 6 * i }]); await esperar(20) }
+      await toque('touchEnd', []); await esperar(400)
+      const k1 = await zoom()
+      if (!(k1 > k0 * 1.3)) throw new Error(`no hizo zoom (${k0}% → ${k1}%)`)
+      if (await nodo.evaluate(g => g.getAttribute('transform')) !== antes) throw new Error('movió la fuente')
+      if (await pg.$('dialog[open]')) throw new Error('abrió la fuente')
+      await cdp.detach()
+      await pg.click('.zoom .porc'); await esperar(400) // vuelve a encuadrar para los pasos siguientes
+    })
     await s.paso('nota manuscrita en ficha rayada', async () => {
       await pg.click('button[aria-label="Añadir nota"]')
       await pg.type('dialog[open] input[placeholder^="Extended"]', 'Extended Mind, p. 114')
@@ -162,6 +183,295 @@ const SUITES = {
       await pg.waitForFunction(() => [...document.querySelectorAll('.pag-pdf canvas')].some(c => c.width > 0), { timeout: 20000 })
     })
     if (pg.errores.length) s.fallas.push(...pg.errores.filter(e => !/crossref/i.test(e)))
+    return s
+  },
+
+  // Agrupadores: recuadro punteado con nombre que se ajusta a su contenido y lo lleva consigo.
+  async agrupador(b) {
+    const s = suite('Agrupadores del lienzo'), pg = await pagina(b)
+    await conEjemplo(pg)
+    const dentro = (g, c) => { const x = c.x + c.w / 2, y = c.y + c.h / 2; return x >= g.x && x <= g.x + g.w && y >= g.y && y <= g.y + g.h }
+    const datos = async () => {
+      const cv = await lienzoGuardado(pg), g = cv.agrupadores[0]
+      const pos = { ...Object.fromEntries(cv.notas.map(n => [n.id, { x: n.x, y: n.y }])), ...cv.posiciones }
+      return { cv, g, pos }
+    }
+    /** Arrastra con el ratón desde el centro de `el` (ElementHandle) dx, dy píxeles. */
+    const arrastrar = async (el, dx, dy) => {
+      const r = await el.boundingBox(), x = r.x + Math.min(r.width / 2, 30), y = r.y + Math.min(r.height / 2, 14)
+      await pg.mouse.move(x, y); await pg.mouse.down()
+      for (let i = 1; i <= 10; i++) await pg.mouse.move(x + (dx * i) / 10, y + (dy * i) / 10)
+      await pg.mouse.up(); await esperar(400)
+    }
+    const nota = texto => pg.evaluateHandle(t => [...document.querySelectorAll('g[aria-label="Nota"]')].find(g => g.textContent.includes(t)), texto)
+    const zoom = async () => (await pg.$eval('.zoom .porc', b => parseInt(b.textContent))) / 100
+    let ids = []
+    await s.paso('crear un agrupador con dos fuentes y una nota: quedan dentro', async () => {
+      await pg.click('button[aria-label="Añadir nota"]')
+      await pg.type('dialog[open] textarea', 'Idea para el marco'); await clicTexto(pg, 'Guardar'); await esperar(300)
+      await pg.click('button[aria-label="Agrupar elementos"]')
+      await pg.type('dialog[open] input[placeholder^="Marco"]', 'Marco teórico')
+      const casillas = await pg.$$('dialog[open] .lista input[type=checkbox]')
+      if (casillas.length < 3) throw new Error('faltan elementos en la lista')
+      await casillas[0].click(); await casillas[1].click(); await casillas.at(-1).click()
+      await clicTexto(pg, 'Crear agrupador'); await esperar(500)
+      const { cv, g, pos } = await datos()
+      if (g?.titulo !== 'Marco teórico' || cv.modo !== 'libre') throw new Error('datos: ' + JSON.stringify(g))
+      if (g.miembros?.length !== 3) throw new Error('miembros: ' + JSON.stringify(g.miembros))
+      for (const id of g.miembros) if (!dentro(g, { ...pos[id], w: 150, h: 50 })) throw new Error(`${id} quedó fuera del recuadro`)
+      ids = [...g.miembros].sort()
+      const t = await pg.$eval('g.agrupador.frente .titulo text', e => e.textContent)
+      if (!t.includes('Marco teórico') || !t.includes('3')) throw new Error('título: ' + t)
+      await pg.screenshot({ path: path.join(SALIDA, 'agrupador-nuevo.png') })
+    })
+    await s.paso('arrastrar el nombre mueve el recuadro con todo su contenido', async () => {
+      const a = await datos()
+      await arrastrar(await pg.$('g.agrupador.frente .titulo'), 150, 80)
+      const d = await datos(), dx = d.g.x - a.g.x, dy = d.g.y - a.g.y
+      if (!dx || !dy) throw new Error('no se movió')
+      for (const id of ids) if (d.pos[id].x - a.pos[id].x !== dx || d.pos[id].y - a.pos[id].y !== dy) throw new Error(`${id} no se movió con el recuadro`)
+      for (const id of Object.keys(a.pos).filter(id => !ids.includes(id))) if (d.pos[id].x !== a.pos[id].x) throw new Error(`${id} se movió sin estar dentro`)
+      if ([...d.g.miembros].sort().join() !== ids.join()) throw new Error('cambió quién está dentro')
+    })
+    await s.paso('mover algo de dentro reajusta el recuadro', async () => {
+      const a = await datos()
+      await arrastrar(await nota('Idea para el marco'), 90, 70)
+      const d = await datos()
+      if (!d.g.miembros.some(id => id.startsWith('nota'))) throw new Error('la nota salió del grupo')
+      if (!(d.g.w > a.g.w || d.g.h > a.g.h)) throw new Error(`el recuadro no creció: ${a.g.w}×${a.g.h} → ${d.g.w}×${d.g.h}`)
+      const vis = await pg.$eval('g.agrupador.fondo .marco', r => ({ w: +r.getAttribute('width'), h: +r.getAttribute('height') }))
+      if (vis.w !== d.g.w || vis.h !== d.g.h) throw new Error('lo dibujado no coincide con lo guardado')
+    })
+    await s.paso('arrastrarlo lejos lo saca y soltarlo encima lo vuelve a meter', async () => {
+      const a = await datos(), k = await zoom()
+      await arrastrar(await nota('Idea para el marco'), -(a.g.w + 250) * k, 0)
+      let d = await datos()
+      if (d.g.miembros.some(id => id.startsWith('nota'))) throw new Error('no salió del grupo')
+      if (d.g.miembros.length !== 2) throw new Error('miembros: ' + d.g.miembros)
+      const titulo = await (await pg.$('g.agrupador.frente .titulo')).boundingBox()
+      const n = await (await nota('Idea para el marco')).boundingBox()
+      await arrastrar(await nota('Idea para el marco'), titulo.x + 40 - n.x, titulo.y + 60 - n.y)
+      d = await datos()
+      if (d.g.miembros.length !== 3) throw new Error('no volvió a entrar: ' + d.g.miembros)
+    })
+    await s.paso('quitar un elemento desde el editor lo saca del recuadro', async () => {
+      await pg.click('g.agrupador.frente .titulo'); await pg.waitForSelector('dialog[open] .lista', { timeout: 5000 })
+      await (await pg.$('dialog[open] .lista input[type=checkbox]:checked')).click()
+      await clicTexto(pg, 'Guardar'); await esperar(400)
+      const { g, pos } = await datos()
+      if (g.miembros.length !== 2) throw new Error('miembros: ' + g.miembros)
+      const fuera = ids.find(id => !g.miembros.includes(id) && pos[id])
+      if (fuera && dentro(g, { ...pos[fuera], w: 150, h: 50 })) throw new Error('quedó dibujado dentro')
+      await pg.screenshot({ path: path.join(SALIDA, 'agrupador.png') })
+    })
+    await s.paso('también en el lienzo de un objetivo', async () => {
+      await clicTexto(pg, 'OE1', '', 'span')
+      await pg.waitForSelector('.obj-panel', { timeout: 5000 })
+      for (const t of ['Primera del OE1', 'Segunda del OE1']) {
+        await pg.click('.obj-panel button[aria-label="Añadir nota"]')
+        await pg.type('dialog[open] textarea', t); await clicTexto(pg, 'Guardar'); await esperar(300)
+      }
+      await pg.click('.obj-panel button[aria-label="Agrupar elementos"]')
+      await pg.type('dialog[open] input[placeholder^="Marco"]', 'Ideas OE1')
+      for (const c of await pg.$$('dialog[open] .lista input[type=checkbox]')) await c.click()
+      await clicTexto(pg, 'Crear agrupador'); await esperar(500)
+      const oe1 = (await lienzoGuardado(pg)).objetivos.oe1, g = oe1.agrupadores?.[0]
+      if (g?.titulo !== 'Ideas OE1' || g.miembros?.length !== 2) throw new Error('no se guardó en oe1: ' + JSON.stringify(g))
+      if (oe1.notas.some(n => !dentro(g, { x: n.x, y: n.y, w: 168, h: 60 }))) throw new Error('hay notas fuera del recuadro')
+      if (!(await pg.$('.obj-panel g.agrupador.frente'))) throw new Error('no se dibujó')
+      await pg.click('.obj-panel button[aria-label="Cerrar lienzo del objetivo"]'); await esperar(400)
+    })
+    if (pg.errores.length) s.fallas.push(...pg.errores.filter(e => !/crossref/i.test(e)))
+    return s
+  },
+
+  // Grupo de sincronización: un "celular" (Android simulado) y una "laptop" editan a la vez y
+  // todos (con la PC) terminan con la misma versión, enviando solo lo que cambió.
+  async grupo(b) {
+    const s = suite('Grupo de sincronización')
+    const crate = path.resolve(APP, '../receptor/sincro')
+    if (spawnSync('cargo', ['build', '--release', '--quiet'], { cwd: crate, stdio: 'inherit' }).status !== 0) { s.fallas.push('cargo build'); return s }
+    const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'canvas-grupo-'))
+    fs.writeFileSync(path.join(carpeta, 'proyectos.json'), JSON.stringify({ proyectos: [{ id: 'proyecto_001', tipo: 'tesis', titulo: 'Tesis común', objetivos_especificos: [], indicadores: [], canvas: { modo: 'radial', posiciones: {}, notas: [], fotos: [], listas: [], audios: [], conexiones: [], objetivos: {} } }] }, null, 2) + '\n')
+    const bin = path.join(crate, 'target', 'release', process.platform === 'win32' ? 'canvas-sincro.exe' : 'canvas-sincro')
+    const srv = spawn(bin, ['--carpeta', carpeta, '--puerto', '0'])
+    const info = JSON.parse(await new Promise(res => srv.stdout.once('data', d => res(String(d).split('\n')[0]))))
+    const codigo = `canvas-sync://127.0.0.1:${info.puerto}/#${info.clave}`
+    const cel = await pagina(b), lap = await pagina(b)
+    await cel.evaluateOnNewDocument(() => { window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android', nativePromise: async () => ({}) } })
+    const enPc = () => fs.readFileSync(path.join(carpeta, 'proyectos.json'), 'utf8')
+    const sincronizarEn = async pg => {
+      await pg.click('button[aria-label="Sincronizar con la PC"]'); await esperar(300)
+      await pg.waitForFunction(() => !document.querySelector('.sincro-btn.girando'), { timeout: 15000 }); await esperar(300)
+    }
+    const nota = async (pg, texto) => {
+      await pg.evaluate(() => (location.hash = '#/p/proyecto_001')); await esperar(800)
+      await pg.click('button[aria-label="Añadir nota"]')
+      await pg.type('dialog[open] textarea', texto)
+      await clicTexto(pg, 'Guardar'); await esperar(300)
+    }
+    try {
+      await s.paso('celular y laptop se unen al grupo con el mismo código', async () => {
+        for (const [pg, nombre] of [[cel, 'Celular de Max'], [lap, 'Laptop de Max']]) {
+          await pg.goto(URL_APP, { waitUntil: 'networkidle0' }); await esperar(600)
+          await clicTexto(pg, 'Configuración')
+          await pg.type('dialog[open] input[placeholder^="canvas-sync"]', codigo)
+          const campo = await pg.$('dialog[open] .sincro input[maxlength="60"]')
+          await campo.click({ clickCount: 3 }); await campo.type(nombre); await pg.keyboard.press('Tab')
+          await clicTexto(pg, 'Sincronizar', '//dialog[@open]//div[contains(@class,"fila")]')
+          await pg.waitForFunction(() => /Última:/.test(document.querySelector('.sincro .estado')?.textContent || ''), { timeout: 15000 })
+          await pg.keyboard.press('Escape'); await esperar(300)
+          if (!(await pg.evaluate(() => document.body.textContent.includes('Tesis común')))) throw new Error('no llegó el proyecto')
+        }
+      })
+      await s.paso('cada uno agrega una nota sin sincronizar y todo se junta', async () => {
+        await nota(cel, 'Idea desde el celular')
+        await nota(lap, 'Idea desde la laptop')
+        await sincronizarEn(cel); await sincronizarEn(lap); await sincronizarEn(cel)
+        for (const t of ['Idea desde el celular', 'Idea desde la laptop']) if (!enPc().includes(t)) throw new Error(`falta en la PC: ${t}`)
+        for (const [pg, n] of [[cel, 'celular'], [lap, 'laptop']]) {
+          const textos = await pg.evaluate(() => document.body.textContent)
+          if (!textos.includes('Idea desde el celular') || !textos.includes('Idea desde la laptop')) throw new Error(`al ${n} le falta una nota`)
+        }
+      })
+      await s.paso('solo viajó lo que cambió y el grupo muestra a los dos', async () => {
+        await clicTexto(cel, 'Configuración').catch(() => cel.click('button[aria-label="Configuración"]'))
+        await cel.waitForSelector('dialog[open] .grupo', { timeout: 5000 })
+        const txt = await cel.$eval('dialog[open] .sincro', e => e.textContent)
+        if (!txt.includes('Laptop de Max')) throw new Error('el grupo no muestra la laptop')
+        if (!/↓ \d+ · ↑ \d+ cambios/.test(txt)) throw new Error('no muestra el resumen de cambios: ' + txt)
+        const ultima = await cel.evaluate(() => new Promise(res => { const r = indexedDB.open('canvas-de-citas'); r.onsuccess = () => { const q = r.result.transaction('meta').objectStore('meta').get('sincroUltima'); q.onsuccess = () => res(q.result) } }))
+        if (!(ultima?.bytes < 4000)) throw new Error(`viajaron ${ultima?.bytes} bytes (se esperaba solo lo cambiado)`)
+      })
+    } finally { srv.kill() }
+    for (const pg of [cel, lap]) if (pg.errores.length) s.fallas.push(...pg.errores)
+    return s
+  },
+
+  // App Android: Chrome con window.Capacitor simulado (como lo inyecta el WebView), contra
+  // canvas-sincro real. El plugin nativo Vinculo (escáner de QR) también es simulado.
+  async android(b) {
+    const s = suite('App Android (simulada)')
+    const crate = path.resolve(APP, '../receptor/sincro')
+    if (spawnSync('cargo', ['build', '--release', '--quiet'], { cwd: crate, stdio: 'inherit' }).status !== 0) { s.fallas.push('cargo build'); return s }
+    const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'canvas-android-'))
+    const proyecto = titulo => JSON.stringify({ proyectos: [{ id: 'proyecto_001', tipo: 'tesis', titulo, objetivos_especificos: [], indicadores: [], canvas: { modo: 'radial', posiciones: {}, notas: [], fotos: [], listas: [], audios: [], conexiones: [], objetivos: {} } }] }, null, 2) + '\n'
+    fs.writeFileSync(path.join(carpeta, 'proyectos.json'), proyecto('Tesis en la PC'))
+    const bin = path.join(crate, 'target', 'release', process.platform === 'win32' ? 'canvas-sincro.exe' : 'canvas-sincro')
+    const srv = spawn(bin, ['--carpeta', carpeta, '--puerto', '0'])
+    const info = JSON.parse(await new Promise(res => srv.stdout.once('data', d => res(String(d).split('\n')[0]))))
+    const codigo = `canvas-sync://127.0.0.1:${info.puerto}/#${info.clave}`
+    const pg = await pagina(b)
+    await pg.evaluateOnNewDocument(qr => {
+      window.Capacitor = {
+        isNativePlatform: () => true,
+        getPlatform: () => 'android',
+        nativePromise: async (plugin, metodo, opciones) => {
+          if (plugin === 'Vinculo' && metodo === 'escanear') return { codigo: qr }
+          if (plugin === 'Voz' && metodo === 'transcribir') {
+            window.__voz = { bytes: atob(opciones.pcm).length, frecuencia: opciones.frecuencia, idioma: opciones.idioma }
+            return { texto: '  hola   desde Android ', idioma: 'es-US' }
+          }
+          throw new Error(`plugin no simulado: ${plugin}.${metodo}`)
+        }
+      }
+    }, codigo)
+    const enPc = () => fs.readFileSync(path.join(carpeta, 'proyectos.json'), 'utf8')
+    try {
+      await pg.goto(URL_APP, { waitUntil: 'networkidle0' }); await esperar(600)
+      await s.paso('modo Android: sin carpeta ni PixPin, con botón Sincronizar', async () => {
+        if (await pg.$('button[aria-label="Celular y PixPin"]')) throw new Error('se ve el botón de PixPin')
+        if (!(await pg.$('button[aria-label="Sincronizar con la PC"]'))) throw new Error('falta el botón Sincronizar')
+        if (await pg.evaluate(() => navigator.serviceWorker?.getRegistrations().then(r => r.length))) throw new Error('registró el service worker')
+        await pg.click('button[aria-label="Sincronizar con la PC"]') // sin código: abre Configuración
+        await pg.waitForSelector('dialog[open] .sincro', { timeout: 5000 })
+        if (await pg.evaluate(() => document.querySelector('dialog[open]').textContent.includes('Carpeta de almacenamiento'))) throw new Error('se ve la carpeta de almacenamiento')
+      })
+      await s.paso('nada queda bajo la barra de estado ni la de gestos', async () => {
+        // Como hace Capacitor en Android 15+ (la app ocupa toda la pantalla).
+        await pg.keyboard.press('Escape'); await esperar(300)
+        await pg.evaluate(() => { const r = document.documentElement.style; r.setProperty('--safe-area-inset-top', '32px'); r.setProperty('--safe-area-inset-bottom', '24px') })
+        await esperar(200)
+        const cab = await pg.$eval('header', h => h.getBoundingClientRect().top)
+        if (cab < 32) throw new Error(`la cabecera empieza en ${cab}px, bajo la barra de estado`)
+        const fondo = await pg.evaluate(() => innerHeight - document.getElementById('app').lastElementChild.getBoundingClientRect().bottom)
+        if (fondo < 24) throw new Error(`el contenido llega a ${fondo}px del borde inferior`)
+        await pg.click('button[aria-label="Sincronizar con la PC"]')
+        await pg.waitForSelector('dialog[open] .sincro', { timeout: 5000 })
+        const cerrar = await pg.$eval('dialog[open] button[aria-label="Cerrar"]', b => b.getBoundingClientRect().top)
+        if (cerrar < 32) throw new Error(`el botón Cerrar queda bajo la barra (${cerrar}px)`)
+      })
+      await s.paso('escanear el QR vincula y trae el proyecto de la PC', async () => {
+        await clicTexto(pg, 'Escanear QR')
+        await pg.waitForFunction(() => /Última:/.test(document.querySelector('.sincro .estado')?.textContent || ''), { timeout: 15000 })
+        await pg.keyboard.press('Escape'); await esperar(400)
+        if (!(await pg.evaluate(() => document.body.textContent.includes('Tesis en la PC')))) throw new Error('no llegó el proyecto')
+      })
+      await s.paso('una nota del celular llega a la PC con el botón de la cabecera', async () => {
+        await pg.evaluate(() => (location.hash = '#/p/proyecto_001')); await esperar(800)
+        await pg.click('button[aria-label="Añadir nota"]')
+        await pg.type('dialog[open] textarea', 'Nota desde Android')
+        await clicTexto(pg, 'Guardar'); await esperar(300)
+        await pg.click('button[aria-label="Sincronizar con la PC"]')
+        await pg.waitForFunction(() => !document.querySelector('.sincro-btn.girando'), { timeout: 15000 }); await esperar(300)
+        if (!enPc().includes('Nota desde Android')) throw new Error('no llegó a la PC')
+      })
+      await s.paso('nota de voz: se transcribe en el celular al terminar de grabar', async () => {
+        await pg.click('button[aria-label="Grabar nota de voz"]')
+        await pg.click('dialog[open] button[aria-label="Empezar a grabar"]')
+        await pg.waitForSelector('dialog[open] button[aria-label="Detener grabación"]', { timeout: 10000 }); await esperar(1500)
+        await pg.click('dialog[open] button[aria-label="Detener grabación"]')
+        await pg.waitForFunction(() => document.querySelector('dialog[open] textarea')?.value === 'hola desde Android', { timeout: 10000 })
+        const v = await pg.evaluate(() => window.__voz)
+        // ~1,5 s de audio a 16 kHz, 16 bits: unos 48 000 bytes.
+        if (v.frecuencia !== 16000 || v.bytes < 32000 || v.bytes > 128000) throw new Error('audio mal convertido: ' + JSON.stringify(v))
+        await clicTexto(pg, 'Guardar'); await esperar(300)
+      })
+      await s.paso('al abrir la app sincroniza sola (cambio hecho en la PC)', async () => {
+        fs.writeFileSync(path.join(carpeta, 'proyectos.json'), enPc().replace('Tesis en la PC', 'Tesis renombrada en la PC'))
+        await pg.reload({ waitUntil: 'networkidle0' })
+        await pg.waitForFunction(() => document.body.textContent.includes('Tesis renombrada en la PC'), { timeout: 15000 })
+        if (!enPc().includes('Nota desde Android')) throw new Error('se perdió la nota')
+      })
+    } finally { srv.kill() }
+    if (pg.errores.length) s.fallas.push(...pg.errores)
+    return s
+  },
+
+  // Sincronización: la app (como "celular") contra canvas-sincro sobre una carpeta temporal.
+  async sincro(b) {
+    const s = suite('Sincronización con la PC')
+    const crate = path.resolve(APP, '../receptor/sincro')
+    if (spawnSync('cargo', ['build', '--release', '--quiet'], { cwd: crate, stdio: 'inherit' }).status !== 0) { s.fallas.push('cargo build'); return s }
+    const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'canvas-e2e-'))
+    fs.writeFileSync(path.join(carpeta, 'proyectos.json'), JSON.stringify({ proyectos: [{ id: 'proyecto_001', tipo: 'tesis', titulo: 'Tesis en la PC', objetivos_especificos: [], indicadores: [], canvas: { modo: 'radial', posiciones: {}, notas: [], fotos: [], listas: [], audios: [], conexiones: [], objetivos: {} } }] }, null, 2) + '\n')
+    const bin = path.join(crate, 'target', 'release', process.platform === 'win32' ? 'canvas-sincro.exe' : 'canvas-sincro')
+    const srv = spawn(bin, ['--carpeta', carpeta, '--puerto', '0'])
+    const info = JSON.parse(await new Promise(res => srv.stdout.once('data', d => res(String(d).split('\n')[0]))))
+    const codigo = `canvas-sync://127.0.0.1:${info.puerto}/#${info.clave}`
+    const pg = await pagina(b)
+    try {
+      await pg.goto(URL_APP, { waitUntil: 'networkidle0' }); await esperar(600)
+      await s.paso('trae el proyecto de la PC', async () => {
+        await clicTexto(pg, 'Configuración') // en Proyectos (escritorio) el botón lleva texto
+        await pg.type('dialog[open] input[placeholder^="canvas-sync"]', codigo)
+        await clicTexto(pg, 'Sincronizar')
+        await pg.waitForFunction(() => /Última:/.test(document.querySelector('.sincro .estado')?.textContent || ''), { timeout: 15000 })
+        await pg.keyboard.press('Escape'); await esperar(400)
+        if (!(await pg.evaluate(() => document.body.textContent.includes('Tesis en la PC')))) throw new Error('no llegó el proyecto')
+      })
+      await s.paso('una nota creada aquí llega a la carpeta de la PC', async () => {
+        await pg.evaluate(() => (location.hash = '#/p/proyecto_001')); await esperar(800)
+        await pg.click('button[aria-label="Añadir nota"]')
+        await pg.type('dialog[open] textarea', 'Nota desde el celular')
+        await clicTexto(pg, 'Guardar'); await esperar(300)
+        await pg.click('button[aria-label="Configuración"]')
+        await clicTexto(pg, 'Sincronizar'); await esperar(2500)
+        const disco = fs.readFileSync(path.join(carpeta, 'proyectos.json'), 'utf8')
+        if (!disco.includes('Nota desde el celular')) throw new Error('no llegó a la PC')
+      })
+    } finally { srv.kill() }
+    if (pg.errores.length) s.fallas.push(...pg.errores)
     return s
   }
 }

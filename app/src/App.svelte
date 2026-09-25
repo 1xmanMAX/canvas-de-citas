@@ -8,6 +8,8 @@
   import { iniciarCelular } from './lib/celular.svelte.js'
   import { C, iniciarCarpeta, reconectar } from './lib/carpeta.svelte.js'
   import Visor from './components/Visor.svelte'
+  import { esAndroid } from './lib/plataforma.js'
+  import { iniciarSincroAutomatica } from './lib/sincro-app.svelte.js'
   import { abrirArchivo, ACEPTADOS } from './lib/visor.svelte.js'
 
   // Rutas por hash: #/  ·  #/p/<id>  ·  #/p/<id>/f/<fuente>  ·  #/p/<id>/o/<objetivo>[/f/<fuente>]
@@ -56,7 +58,10 @@
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') { e.preventDefault(); abrirArchivos() }
   }
 
-  cargar().then(iniciarCarpeta).then(iniciarCelular)
+  // En Android no hay carpeta de almacenamiento ni receptor local: se sincroniza con la PC.
+  // La sincronización con la PC corre en todo aparato vinculado (celular, laptop…).
+  if (esAndroid) cargar().then(iniciarSincroAutomatica)
+  else cargar().then(() => { iniciarSincroAutomatica(); return iniciarCarpeta() }).then(iniciarCelular)
 </script>
 
 <svelte:window

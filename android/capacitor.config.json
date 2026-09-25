@@ -1,0 +1,17 @@
+{
+  "appId": "pe.canvasdecitas.app",
+  "appName": "Canvas de Citas",
+  "webDir": "../app/dist",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  },
+  "android": {
+    "backgroundColor": "#F7F5EF"
+  },
+  "plugins": {
+    "SystemBars": {
+      "style": "LIGHT"
+    }
+  }
+}

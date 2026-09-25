@@ -1,1 +1,3 @@
 node_modules/
+# Lo genera scripts/preparar-nube.sh (npm install) en cada sesión de la nube
+package-lock.json

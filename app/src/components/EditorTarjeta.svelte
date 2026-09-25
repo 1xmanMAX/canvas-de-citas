@@ -6,6 +6,8 @@
   import Grabador from './Grabador.svelte'
   import Dibujo from './Dibujo.svelte'
   import { LETRAS, PAPELES, COLORES, fechaCorta, duracionTexto } from '../lib/tarjetas.js'
+  import { esAndroid } from '../lib/plataforma.js'
+  import { transcribirAudio } from '../lib/voz.js'
 
   /** `o` es una copia editable; `vinculos` los nombres de lo que está conectado a la tarjeta. */
   let { lista, o = $bindable(), nueva = false, vinculos = [], onguardar, oneliminar, onduplicar, onvinculo = null, onclose } = $props()
@@ -37,7 +39,27 @@
   }
 
   // --- Audio ---
-  const grabado = r => Object.assign(o, r)
+  // En Android la transcripción se hace al terminar de grabar (ver lib/voz.js).
+  let transcribiendo = $state(false)
+  let errorVoz = $state('')
+  function grabado(r) {
+    Object.assign(o, r)
+    if (esAndroid && !o.transcripcion?.trim()) transcribir()
+  }
+  async function transcribir() {
+    if (o.transcripcion?.trim() && !confirm('¿Reemplazar la transcripción actual?')) return
+    transcribiendo = true
+    errorVoz = ''
+    try {
+      const texto = await transcribirAudio(o.audio)
+      if (texto) o.transcripcion = texto
+      else errorVoz = 'No se entendió nada en el audio.'
+    } catch (e) {
+      errorVoz = e?.message || String(e)
+    } finally {
+      transcribiendo = false
+    }
+  }
   const puedeGuardar = $derived(lista !== 'audios' || !!o.audio)
 
   function guardar() {
@@ -101,7 +123,13 @@
       <audio controls src={o.audio} class="reproductor"></audio>
       <div class="suave meta">{duracionTexto(o.duracion)}{#if o.creado} · {fechaCorta(o.creado)}{/if}</div>
       <label class="campo"><span>Transcripción</span>
-        <textarea rows="6" bind:value={o.transcripcion} placeholder="Escribe o corrige lo que se dijo en el audio…"></textarea></label>
+        <textarea rows="6" bind:value={o.transcripcion} disabled={transcribiendo} placeholder={transcribiendo ? 'Transcribiendo…' : 'Escribe o corrige lo que se dijo en el audio…'}></textarea></label>
+      {#if esAndroid}
+        <div class="fila entre">
+          <span class="suave pista-voz" class:error={errorVoz} role={errorVoz ? 'alert' : undefined}>{transcribiendo ? 'Transcribiendo en el celular…' : errorVoz || 'Se transcribe en el celular, sin internet.'}</span>
+          <button class="btn" disabled={transcribiendo} onclick={transcribir}><Icono nombre="mic" />Transcribir</button>
+        </div>
+      {/if}
     {/if}
 
   {:else}
@@ -146,6 +174,8 @@
 
 <style>
   .texto-nota { resize: vertical; line-height: 1.45; }
+  .pista-voz { font-size: 12px; }
+  .pista-voz.error { color: var(--unreviewed); }
   .opciones { display: flex; flex-direction: column; gap: 10px; }
   .opcion { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .opcion .rotulo { width: 48px; }

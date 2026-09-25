@@ -1,0 +1,18 @@
+{
+  "name": "canvas-de-citas-android",
+  "private": true,
+  "description": "Empaqueta app/dist en un APK de Android con Capacitor",
+  "scripts": {
+    "sincronizar": "npm --prefix ../app run build && cap sync android",
+    "apk": "npm run sincronizar && cd android && ./gradlew assembleDebug",
+    "apk:windows": "npm run sincronizar && cd android && gradlew.bat assembleDebug",
+    "iconos": "node scripts/iconos.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.2"
+  }
+}

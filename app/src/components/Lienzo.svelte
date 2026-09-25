@@ -145,8 +145,11 @@
   })
 
   // --- Fondo: desplazar con un dedo / ratón, pellizcar con dos ---
+  // `punteros` cuenta todos los dedos sobre el lienzo, también el que empezó sobre una tarjeta:
+  // así dos dedos siempre hacen zoom, aunque uno esté encima de una tarjeta o nota.
   const punteros = new Map()
   let gesto = null
+  let arrastre = null // arrastre de una tarjeta en curso: { id, cancelar }
 
   function medio() {
     const [a, b] = [...punteros.values()]
@@ -157,9 +160,14 @@
   function abajo(e) {
     if (e.button === 2 || e.target.closest?.('.zoom, button, a, input, textarea')) return
     cont.setPointerCapture(e.pointerId)
+    anotar(e)
+  }
+
+  function anotar(e) {
     punteros.set(e.pointerId, { x: e.clientX, y: e.clientY })
     if (punteros.size === 1) gesto = { tipo: 'mover', x0: e.clientX, y0: e.clientY, tx, ty, movido: false }
     else if (punteros.size === 2) {
+      arrastre?.cancelar() // el primer dedo estaba sobre una tarjeta: ahora es un pellizco
       const m = medio()
       gesto = { tipo: 'pellizco', d: m.d, k, wx: (m.cx - tx) / k, wy: (m.cy - ty) / k }
     }
@@ -200,7 +208,11 @@
   function arrastrar(e, { inicio, mover: alMover, fin } = {}) {
     if (e.button === 2) return
     e.stopPropagation()
+    // Ya hay un dedo en el lienzo: este es el segundo de un pellizco, no un arrastre.
+    if (punteros.size) return anotar(e)
     const id = e.pointerId, x0 = e.clientX, y0 = e.clientY
+    punteros.set(id, { x: x0, y: y0 })
+    gesto = { tipo: 'nodo' }
     let movido = false, pendiente = null, cuadro = 0
     const aplicarMov = () => {
       cuadro = 0
@@ -216,18 +228,27 @@
       pendiente = { dx: (ev.clientX - x0) / k, dy: (ev.clientY - y0) / k }
       if (!cuadro) cuadro = requestAnimationFrame(aplicarMov)
     }
-    const up = ev => {
-      if (ev.pointerId !== id) return
+    const terminar = cancelado => {
       removeEventListener('pointermove', mv)
       removeEventListener('pointerup', up)
       removeEventListener('pointercancel', up)
       cancelAnimationFrame(cuadro)
       aplicarMov()
-      fin?.(movido, ev.type === 'pointercancel')
+      arrastre = null
+      fin?.(movido, cancelado)
+    }
+    const up = ev => {
+      if (ev.pointerId !== id) return
+      // Aquí también: si se suelta fuera del lienzo, este no recibe el pointerup.
+      punteros.delete(id)
+      if (gesto?.tipo === 'nodo') gesto = null
+      terminar(ev.type === 'pointercancel')
     }
     addEventListener('pointermove', mv)
     addEventListener('pointerup', up)
     addEventListener('pointercancel', up)
+    // Al llegar un segundo dedo: deja la tarjeta donde esté (sin abrirla) y sigue el pellizco.
+    arrastre = { id, cancelar: () => terminar(true) }
   }
 
   setContext('lienzo', { arrastrar, vista })
@@ -275,7 +296,7 @@
   .capa { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
   svg { position: absolute; overflow: visible; }
   .zoom {
-    position: absolute; bottom: calc(16px + env(safe-area-inset-bottom)); right: 16px; display: flex; align-items: center; gap: 2px;
+    position: absolute; bottom: 16px; right: 16px; display: flex; align-items: center; gap: 2px;
     background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 4px;
     box-shadow: 0 2px 8px rgba(33, 31, 26, .08); cursor: default;
   }

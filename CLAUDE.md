@@ -23,6 +23,8 @@ van en español.
 | `app/tests/` | `unit/` (node:test), `e2e/` (Chrome headless), `fixtures/` (documentos de prueba propios) |
 | `claude-skill/canvas-de-citas/` | Copia versionada de la skill de Claude Code (`~/.claude/skills/canvas-de-citas` en la PC de Max): CLI `scripts/canvas.mjs` que lee/edita la carpeta de datos |
 | `receptor/` | Receptor Windows en Rust (127.0.0.1:47480): pasa archivos con el celular / PixPin |
+| `receptor/sincro/` | Servidor de sincronización con el celular (Rust, **sin PixPin**: compila y se prueba en la nube) |
+| `android/` | App Android con Capacitor 8: empaqueta `app/dist` (ver `android/README.md`); en la app, `lib/plataforma.js` (`esAndroid`) |
 | `docs/superpowers/specs/` | Diseños aprobados o en revisión |
 | `spec.md`, `*.html` (raíz) | Especificación y mockups originales |
 
@@ -36,6 +38,8 @@ npm run build        # dist/ (incluye sw.js con precache; pdf.js/PDFium no se pr
 npm test             # pruebas unitarias (node --test, sin navegador)
 npm run test:e2e     # pruebas de navegador (necesita build y Chrome; ver abajo)
 node tests/e2e/rendimiento.mjs   # fluidez con un tablero grande (fps)
+npm run test:integracion         # cliente JS ↔ servidor Rust real (necesita cargo)
+cd ../android && npm ci && npm run apk   # APK de depuración (necesita JDK 21 + Android SDK)
 ```
 
 **Pruebas de navegador**: `tests/e2e/comun.mjs` busca Chrome en rutas conocidas o usa
@@ -70,8 +74,26 @@ Hecho (sep. 2026): lienzo con tarjetas y tablero de corcho, rendimiento con tabl
 visor PDF propio (PDFium) con búsqueda, recortes y vínculos, biblioteca con referencias del
 paper, skill con referencias y puntos clave.
 
-**Siguiente: app Android + sincronización por Wi-Fi** —
-diseño en `docs/superpowers/specs/2026-09-24-android-sincronizacion-design.md` y plan en
-`docs/superpowers/plans/2026-09-24-sincronizacion-nucleo.md` (Plan 1: núcleo de sincronización; Tarea 8 solo en la PC de Max). Empezar por la fusión a tres vías (`app/src/lib/sincro.js`, con
-pruebas unitarias), luego el servidor de sincronización en Rust sin PixPin y el proyecto
-Capacitor en `android/`.
+**App Android + sincronización por Wi-Fi** — diseño en
+`docs/superpowers/specs/2026-09-24-android-sincronizacion-design.md`.
+- Plan 1 (`docs/superpowers/plans/2026-09-24-sincronizacion-nucleo.md`): tareas 1–7 hechas
+  (fusión `lib/sincro*.js`, cifrado `lib/cifrado.js`, servidor `receptor/sincro`, pantalla
+  "Sincronizar con la PC").
+- Plan 2 (`docs/superpowers/plans/2026-09-25-android-app.md`): hecho — proyecto `android/`,
+  modo Android (botón Sincronizar, automática, búsqueda de la PC si cambió su IP, escáner de QR
+  con el plugin propio `Vinculo`, transcripción de notas de voz con el plugin `Voz`,
+  márgenes de las barras del sistema). Prueba: `npm run test:e2e -- android` (Capacitor simulado).
+
+- Plan 3 (`docs/superpowers/plans/2026-09-25-grupo-sincronizacion.md`): hecho — **grupo de
+  sincronización**: cada aparato tiene id y nombre, la PC guarda su base en `<carpeta>/.sincro/`
+  y solo viajan parches (`lib/parche.js` ≡ `receptor/sincro/src/parche.rs`); automática en todo
+  aparato vinculado. Prueba: `npm run test:e2e -- grupo`.
+
+**Agrupadores** (sep. 2026): recuadros punteados con nombre que reúnen elementos del lienzo
+(`canvas.agrupadores` y en cada sub-lienzo de objetivo; `lib/agrupadores.js`, `Agrupador.svelte`,
+`EditorAgrupador.svelte`). Guardan sus `miembros` y el recuadro se ajusta solo a ellos; mover el
+recuadro mueve todo; soltar algo encima lo agrega y arrastrarlo lejos lo saca. Prueba: `npm run test:e2e -- agrupador`.
+
+**Siguiente:** probar el APK en el celular de Max y hacer la **Tarea 8 del Plan 1** en su PC
+(receptor de Windows + "Vincular celular" con QR). Mientras tanto sirve `canvas-sincro.exe`
+(ver `android/README.md`).
