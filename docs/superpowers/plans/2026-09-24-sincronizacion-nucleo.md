@@ -56,7 +56,7 @@
 **Interfaces:**
 - Produces: `igual(a, b) → boolean`; `fusionar3(base, local, remoto) → { resultado: {proyectos, fuentes, citas}, conflictos: [{ruta, tipo}], borrados: {proyectos: string[], fuentes: string[], citas: string[]} }`. `base`/`local`/`remoto` son objetos `{proyectos, fuentes, citas}` (arreglos de objetos con `id`); `base` puede ser `null` (primera vez). `borrados` = ids que estaban en `remoto` y no quedan en `resultado` (la PC debe borrarlos).
 
-- [ ] **Step 1: Escribir las pruebas (fallan)**
+- [x] **Step 1: Escribir las pruebas (fallan)**
 
 ```js
 // app/tests/unit/sincro.test.js — fusión a tres vías (src/lib/sincro.js)
@@ -144,12 +144,12 @@ test('posiciones y sub-lienzos de objetivos se combinan por clave', () => {
 })
 ```
 
-- [ ] **Step 2: Correr y ver que fallan**
+- [x] **Step 2: Correr y ver que fallan**
 
 Run: `cd app && npm test`
 Expected: FAIL — `Cannot find module '../../src/lib/sincro.js'`
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 ```js
 // app/src/lib/sincro.js
@@ -216,12 +216,12 @@ export function fusionar3(base, local, remoto) {
 }
 ```
 
-- [ ] **Step 4: Correr y ver que pasan**
+- [x] **Step 4: Correr y ver que pasan**
 
 Run: `cd app && npm test`
 Expected: PASS (todas, incluidas las de `referencias.test.js`)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/src/lib/sincro.js app/tests/unit/sincro.test.js
@@ -240,7 +240,7 @@ git commit -m "Sincronización: fusión a tres vías con pruebas"
 - Produces: `claveNueva() → string` (base64 de 32 bytes); `importarClave(b64) → Promise<CryptoKey>`; `cifrarBytes(clave, bytes, iv?, ahora?) → Promise<Uint8Array>`; `descifrarBytes(clave, sobre, ahora?) → Promise<Uint8Array>`; `cifrarJson(clave, obj, iv?, ahora?) → Promise<string>`; `descifrarJson(clave, texto, ahora?) → Promise<any>`; `b64.a(Uint8Array) → string`, `b64.de(string) → Uint8Array`; `EDAD_MAX` (ms). Errores con mensajes: `'Clave incorrecta o mensaje alterado'`, `'Mensaje vencido (revisa la hora del celular y de la PC)'`, `'La clave debe tener 32 bytes'`.
 - Produces (archivo): `app/tests/vectores/cifrado.json` = `{ clave, iv, ahora, texto, sobre }` (base64 salvo `ahora` número y `texto` string).
 
-- [ ] **Step 1: Escribir las pruebas (fallan)**
+- [x] **Step 1: Escribir las pruebas (fallan)**
 
 ```js
 // app/tests/unit/cifrado.test.js
@@ -285,12 +285,12 @@ test('el vector compartido con Rust sigue siendo válido', async () => {
 })
 ```
 
-- [ ] **Step 2: Correr y ver que fallan**
+- [x] **Step 2: Correr y ver que fallan**
 
 Run: `cd app && npm test`
 Expected: FAIL — no existe `src/lib/cifrado.js`
 
-- [ ] **Step 3: Implementar el cifrado**
+- [x] **Step 3: Implementar el cifrado**
 
 ```js
 // app/src/lib/cifrado.js
@@ -339,7 +339,7 @@ export const cifrarJson = async (clave, obj, iv, ahora) => b64.a(await cifrarByt
 export const descifrarJson = async (clave, texto, ahora) => JSON.parse(new TextDecoder().decode(await descifrarBytes(clave, b64.de(texto), ahora)))
 ```
 
-- [ ] **Step 4: Generar el vector compartido**
+- [x] **Step 4: Generar el vector compartido**
 
 ```js
 // app/tests/vectores/crear-cifrado.mjs — vector fijo para comprobar que JS y Rust cifran igual.
@@ -357,12 +357,12 @@ console.log('Vector escrito en tests/vectores/cifrado.json')
 Run: `cd app && node tests/vectores/crear-cifrado.mjs`
 Expected: `Vector escrito en tests/vectores/cifrado.json`
 
-- [ ] **Step 5: Correr las pruebas**
+- [x] **Step 5: Correr las pruebas**
 
 Run: `cd app && npm test`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/src/lib/cifrado.js app/tests/unit/cifrado.test.js app/tests/vectores/
@@ -381,7 +381,7 @@ git commit -m "Sincronización: cifrado AES-GCM en JavaScript con vector compart
 - Consumes: `app/tests/vectores/cifrado.json` (Tarea 2).
 - Produces: `canvas_sincro::cifrado::{Clave, ErrorCifrado, ahora_ms, EDAD_MAX_MS}`; `Clave::desde_base64(&str) -> Result<Clave, ErrorCifrado>`, `Clave::nueva() -> (Clave, String)`, `cifrar(&self, &[u8]) -> Vec<u8>`, `cifrar_con(&self, &[u8], [u8; 12], u64) -> Vec<u8>`, `descifrar(&self, &[u8]) -> Result<Vec<u8>, ErrorCifrado>`, `descifrar_en(&self, &[u8], u64) -> Result<…>`, `cifrar_json(&self, &Value) -> String`, `descifrar_json(&self, &str) -> Result<Value, ErrorCifrado>`.
 
-- [ ] **Step 1: Crear el crate y la prueba (falla)**
+- [x] **Step 1: Crear el crate y la prueba (falla)**
 
 ```toml
 # receptor/sincro/Cargo.toml
@@ -466,7 +466,7 @@ fn rechaza_clave_ajena_alterado_y_vencido() {
 Run: `cd receptor/sincro && cargo test`
 Expected: FAIL — no existe el módulo `cifrado`.
 
-- [ ] **Step 2: Implementar**
+- [x] **Step 2: Implementar**
 
 ```rust
 // receptor/sincro/src/cifrado.rs
@@ -561,7 +561,7 @@ impl Clave {
 Run: `cd receptor/sincro && cargo test`
 Expected: PASS (3 pruebas)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add receptor/sincro
@@ -580,7 +580,7 @@ git commit -m "Sincronización: crate canvas-sincro con cifrado compatible con l
 **Interfaces:**
 - Produces: `canvas_sincro::carpeta::{Carpeta, COLECCIONES}`; `Carpeta::nueva(impl Into<PathBuf>)`, `etiqueta(&self) -> String` (sha256 hex de los tres JSON), `coleccion(&self, &str) -> io::Result<Value>`, `leer(&self) -> io::Result<Value>` (`{etiqueta, proyectos, fuentes, citas, docs:[{ruta, bytes}]}`), `escribir(&self, datos: &Value, eliminados: &Value) -> io::Result<()>`, `documentos(&self) -> Vec<Value>`, `ruta_segura(&self, &str) -> Option<PathBuf>`, `escribir_doc(&self, &Path, &[u8]) -> io::Result<()>`.
 
-- [ ] **Step 1: Pruebas (fallan)**
+- [x] **Step 1: Pruebas (fallan)**
 
 ```rust
 // receptor/sincro/tests/carpeta.rs
@@ -641,7 +641,7 @@ fn solo_acepta_rutas_de_documentos_dentro_de_la_carpeta() {
 Run: `cd receptor/sincro && cargo test --test carpeta`
 Expected: FAIL — no existe `carpeta`.
 
-- [ ] **Step 2: Implementar**
+- [x] **Step 2: Implementar**
 
 ```rust
 // receptor/sincro/src/carpeta.rs
@@ -789,7 +789,7 @@ Agregar a `receptor/sincro/src/lib.rs`: `pub mod carpeta;`
 Run: `cd receptor/sincro && cargo test`
 Expected: PASS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add receptor/sincro
@@ -818,7 +818,7 @@ git commit -m "Sincronización: lectura y escritura segura de la carpeta de dato
   - Cuerpo mayor que `tope` → **413**. CORS abierto (`*`): todo va cifrado.
 - Binario: `canvas-sincro --carpeta <ruta> [--puerto 47481] [--clave <base64>]`; con `--puerto 0` elige uno libre. Imprime en la primera línea `{"puerto":…,"codigo":"canvas-sync://…","clave":"…"}`.
 
-- [ ] **Step 1: Pruebas (fallan)**
+- [x] **Step 1: Pruebas (fallan)**
 
 ```rust
 // receptor/sincro/tests/servidor.rs
@@ -902,7 +902,7 @@ fn emparejar_solo_desde_la_misma_pc_y_tope_de_cuerpo() {
 Run: `cd receptor/sincro && cargo test --test servidor`
 Expected: FAIL — no existe `servidor`.
 
-- [ ] **Step 2: Implementar el servidor**
+- [x] **Step 2: Implementar el servidor**
 
 ```rust
 // receptor/sincro/src/servidor.rs
@@ -1117,7 +1117,7 @@ Agregar a `lib.rs`: `pub mod servidor;`
 Run: `cd receptor/sincro && cargo test && cargo build --release`
 Expected: PASS y binario en `target/release/canvas-sincro`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add receptor/sincro
@@ -1141,7 +1141,7 @@ git commit -m "Sincronización: servidor HTTP cifrado y binario canvas-sincro"
   - `sincronizar({ conexion, almacen, alProgreso? }) → Promise<{ conflictos, bajados, subidos, reintentos }>` con el almacén:
     `{ leerLocal(), escribirLocal(datos), leerBase(), guardarBase(datos), docsLocales() → [{ruta}], tieneDoc(ruta), leerDoc(ruta) → Uint8Array, guardarDoc(ruta, bytes) }` (todas pueden ser async).
 
-- [ ] **Step 1: Prueba unitaria del orquestador (falla)**
+- [x] **Step 1: Prueba unitaria del orquestador (falla)**
 
 ```js
 // app/tests/unit/sincro-cliente.test.js — orquestación con una PC y un almacén falsos
@@ -1214,7 +1214,7 @@ test('lo borrado en el celular se informa a la PC', async () => {
 Run: `cd app && npm test`
 Expected: FAIL — no existe `sincro-cliente.js`.
 
-- [ ] **Step 2: Implementar conexión y orquestador**
+- [x] **Step 2: Implementar conexión y orquestador**
 
 ```js
 // app/src/lib/sincro-http.js
@@ -1307,7 +1307,7 @@ export async function sincronizar({ conexion, almacen, alProgreso = () => {} }) 
 Run: `cd app && npm test`
 Expected: PASS
 
-- [ ] **Step 3: Prueba de integración contra el binario Rust**
+- [x] **Step 3: Prueba de integración contra el binario Rust**
 
 ```js
 // app/tests/integracion/sincro.test.js — cliente JS ↔ servidor Rust real (receptor/sincro).
@@ -1373,7 +1373,7 @@ Agregar en `app/package.json` → `"scripts"`: `"test:integracion": "node --test
 Run: `cd app && npm run test:integracion`
 Expected: PASS (2 pruebas)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add app/src/lib/sincro-http.js app/src/lib/sincro-cliente.js app/tests/unit/sincro-cliente.test.js app/tests/integracion app/package.json
@@ -1393,7 +1393,7 @@ git commit -m "Sincronización: conexión cifrada, orquestación y prueba de int
 - Consumes: `sincronizar`, `crearConexion`, `leerCodigo` (Tarea 6); del store: `S`, `importar(datos, 'reemplazar')`, `leerMeta`, `ponerMeta`, `leerDocumento(fid)`, `guardarDocumentoImportado(fid, nombre, blob)`, `idsConDocumento()`.
 - Produces: `almacenApp` (implementa el almacén de la Tarea 6); meta `baseSincro`, `sincroCodigo`, `sincroUltima` en IndexedDB.
 
-- [ ] **Step 1: Adaptador del almacén**
+- [x] **Step 1: Adaptador del almacén**
 
 ```js
 // app/src/lib/sincro-almacen.js
@@ -1430,7 +1430,7 @@ export const almacenApp = {
 }
 ```
 
-- [ ] **Step 2: Pantalla**
+- [x] **Step 2: Pantalla**
 
 ```svelte
 <!-- app/src/components/Sincronizar.svelte -->
@@ -1495,7 +1495,7 @@ En `app/src/components/Datos.svelte`: agregar `import Sincronizar from './Sincro
 Run: `cd app && npm run build`
 Expected: `✓ built`
 
-- [ ] **Step 3: Suite de navegador `sincro`**
+- [x] **Step 3: Suite de navegador `sincro`**
 
 Agregar a `SUITES` en `app/tests/e2e/todas.mjs` (y los imports `spawn` de `node:child_process`, `os` de `node:os`):
 
@@ -1541,7 +1541,7 @@ Agregar a `SUITES` en `app/tests/e2e/todas.mjs` (y los imports `spawn` de `node:
 Run: `cd app && npm run build && npm run test:e2e -- sincro`
 Expected: `2 pasos correctos, 0 fallas` (si no hay Chrome en el entorno, anótalo y confía en `npm test` + `npm run test:integracion`).
 
-- [ ] **Step 4: Todas las pruebas y commit**
+- [x] **Step 4: Todas las pruebas y commit**
 
 Run: `cd app && npm test && npm run test:integracion && npm run build`
 Expected: todo PASS

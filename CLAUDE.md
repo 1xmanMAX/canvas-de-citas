@@ -72,6 +72,8 @@ paper, skill con referencias y puntos clave.
 
 **Siguiente: app Android + sincronización por Wi-Fi** —
 diseño en `docs/superpowers/specs/2026-09-24-android-sincronizacion-design.md` y plan en
-`docs/superpowers/plans/2026-09-24-sincronizacion-nucleo.md` (Plan 1: núcleo de sincronización; Tarea 8 solo en la PC de Max). Empezar por la fusión a tres vías (`app/src/lib/sincro.js`, con
-pruebas unitarias), luego el servidor de sincronización en Rust sin PixPin y el proyecto
-Capacitor en `android/`.
+`docs/superpowers/plans/2026-09-24-sincronizacion-nucleo.md` (Plan 1: núcleo de sincronización). **Tareas 1–7 hechas** (sep. 2026): fusión `lib/sincro*.js`,
+cifrado `lib/cifrado.js`, servidor Rust `receptor/sincro` (`cargo test`), pantalla "Sincronizar con la PC"
+en Configuración; pruebas: `npm test`, `npm run test:integracion` (necesita cargo), `npm run test:e2e -- sincro`.
+Falta la **Tarea 8** (solo en la PC de Max: integrar en el receptor de Windows + "Vincular celular") y
+escribir el **Plan 2** (Capacitor en `android/`).
