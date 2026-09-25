@@ -368,6 +368,8 @@ const SUITES = {
         getPlatform: () => 'android',
         nativePromise: async (plugin, metodo, opciones) => {
           if (plugin === 'Vinculo' && metodo === 'escanear') return { codigo: qr }
+          if (plugin === 'Archivos' && metodo === 'compartir') { (window.__compartidos ||= []).push(opciones.archivos || [opciones]); return {} }
+          if (plugin === 'Archivos' && metodo === 'recibidos') { const a = window.__recibir || []; window.__recibir = []; return { archivos: a } }
           if (plugin === 'Voz' && metodo === 'transcribir') {
             window.__voz = { bytes: atob(opciones.pcm).length, frecuencia: opciones.frecuencia, idioma: opciones.idioma }
             return { texto: '  hola   desde Android ', idioma: 'es-US' }
@@ -426,6 +428,40 @@ const SUITES = {
         // ~1,5 s de audio a 16 kHz, 16 bits: unos 48 000 bytes.
         if (v.frecuencia !== 16000 || v.bytes < 32000 || v.bytes > 128000) throw new Error('audio mal convertido: ' + JSON.stringify(v))
         await clicTexto(pg, 'Guardar'); await esperar(300)
+      })
+      await s.paso('exportar los JSON y el .bib abre "Compartir" (el WebView no descarga)', async () => {
+        await pg.evaluate(() => (location.hash = '#/')); await esperar(500)
+        await pg.click('button[aria-label="Configuración"]').catch(() => clicTexto(pg, 'Configuración'))
+        await clicTexto(pg, 'Descargar los 3 JSON'); await esperar(500)
+        const c = await pg.evaluate(() => window.__compartidos?.at(-1))
+        if (c?.map(a => a.nombre).join() !== 'proyectos.json,fuentes.json,citas.json') throw new Error('compartió: ' + JSON.stringify(c?.map(a => a.nombre)))
+        const proyectos = JSON.parse(Buffer.from(c[0].datos, 'base64').toString('utf8'))
+        if (!proyectos.proyectos?.length || c[0].tipo !== 'application/json') throw new Error('contenido o tipo incorrecto')
+        await pg.keyboard.press('Escape'); await esperar(300)
+      })
+      await s.paso('en pantalla de celular también se puede exportar el .bib', async () => {
+        await pg.setViewport({ width: 390, height: 800, isMobile: true, hasTouch: true })
+        await pg.evaluate(() => (location.hash = '#/citas')); await esperar(800)
+        await pg.click('button.solo-movil[aria-label="Exportar .bib"]'); await esperar(400)
+        const c = await pg.evaluate(() => window.__compartidos?.at(-1))
+        if (c?.[0]?.nombre !== 'bibliografia.bib') throw new Error('no compartió el .bib')
+        await pg.setViewport({ width: 1500, height: 950 })
+      })
+      await s.paso('lo compartido desde otras apps llega al lienzo (texto e imagen)', async () => {
+        await pg.evaluate(() => (location.hash = '#/')); await esperar(500)
+        const antes = (await lienzoGuardado(pg)).fotos.length
+        await pg.evaluate(() => {
+          window.__recibir = [
+            { texto: 'Cita compartida desde el navegador' },
+            { nombre: 'figura.png', tipo: 'image/png', datos: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' }
+          ]
+          document.dispatchEvent(new Event('visibilitychange'))
+        })
+        await esperar(2500)
+        const cv = await lienzoGuardado(pg)
+        if (!cv.notas.some(n => n.texto === 'Cita compartida desde el navegador')) throw new Error('no llegó la nota; hash ' + (await pg.evaluate(() => location.hash)) + ' avisos ' + (await pg.evaluate(() => document.querySelector('.aviso')?.textContent)))
+        if (cv.fotos.length <= antes) throw new Error('no llegó la foto')
+        if (!/#\/p\//.test(await pg.evaluate(() => location.hash))) throw new Error('no abrió el lienzo del proyecto')
       })
       await s.paso('al abrir la app sincroniza sola (cambio hecho en la PC)', async () => {
         fs.writeFileSync(path.join(carpeta, 'proyectos.json'), enPc().replace('Tesis en la PC', 'Tesis renombrada en la PC'))

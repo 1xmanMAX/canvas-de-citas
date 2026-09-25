@@ -1,6 +1,7 @@
 // Exportar / importar los tres JSON con el mismo esquema que la skill citas-tesis
 // (references/formato-datos.md). La carpeta de almacenamiento vive en carpeta.svelte.js.
-import { S, COLECCIONES, importar, registrarIds, nuevoId } from './store.svelte.js'
+import { S, COLECCIONES, importar, registrarIds, nuevoId, avisar } from './store.svelte.js'
+import { guardarArchivo, guardarArchivos } from './archivos.js'
 import { aBibtex, extraerDoi, normalizar } from './citas.js'
 
 const CAMPOS = {
@@ -24,20 +25,14 @@ export function serializar(col) {
   return JSON.stringify({ [col]: items }, null, 2) + '\n'
 }
 
+/** Descarga (PC) o comparte (Android) un archivo de texto. */
 export function descargar(nombre, texto, tipo = 'application/json') {
-  const url = URL.createObjectURL(new Blob([texto], { type: tipo + ';charset=utf-8' }))
-  const a = Object.assign(document.createElement('a'), { href: url, download: nombre })
-  document.body.append(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  return guardarArchivo(nombre, new Blob([texto], { type: tipo + ';charset=utf-8' })).catch(e => avisar(e.message || String(e)))
 }
 
-export async function descargarTodo() {
-  for (const col of COLECCIONES) {
-    descargar(`${col}.json`, serializar(col))
-    await new Promise(r => setTimeout(r, 350)) // algunos navegadores bloquean descargas simultáneas
-  }
+export function descargarTodo() {
+  const archivos = COLECCIONES.map(col => ({ nombre: `${col}.json`, blob: new Blob([serializar(col)], { type: 'application/json;charset=utf-8' }) }))
+  return guardarArchivos(archivos).catch(e => avisar(e.message || String(e)))
 }
 
 export function descargarBib(fuentes, nombre = 'bibliografia.bib') {

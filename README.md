@@ -65,6 +65,18 @@ se sincroniza por el Wi-Fi de casa, **sin nube ni cuentas**:
   <img src="docs/capturas/sincronizar.png" alt="Sincronizar con la PC" width="520">
 </p>
 
+### PC y celular: las mismas funciones
+Lienzo, agrupadores, notas, listas, fotos, notas de voz, conexiones, visor de PDF, biblioteca,
+citas y exportar a `.bib` están igual en los dos. Lo que cambia es solo **cómo** se hace algo:
+
+| | En la PC | En el celular (Android) |
+|---|---|---|
+| Dónde se guardan los datos | Carpeta de almacenamiento | En el celular, sincronizados con la PC |
+| Guardar un archivo (JSON, `.bib`, PDF) | Se descarga | Hoja **Compartir**: Drive, Archivos, WhatsApp… |
+| Traer archivos de otro lado | Receptor (celular / PixPin), arrastrar o pegar | **Compartir → Canvas de Citas** desde cualquier app: PDF al visor, fotos y audios al lienzo, texto como nota, JSON a importar |
+| Transcribir notas de voz | En vivo mientras hablas (necesita internet) | Al terminar de grabar, en el celular y sin internet |
+| Vincular con la PC | Pegar el código | Escanear el QR o pegar el código |
+
 ---
 
 ## Empezar

@@ -4,7 +4,9 @@
   import Icono from './Icono.svelte'
   import { V, cerrarVisor, adjuntarAbierto, notaDesdeSeleccion, fotoDesdeRecorte, marcasDeFuente } from '../lib/visor.svelte.js'
   import { rangoDeCita, resaltar, ESTILO_RESALTADO } from '../lib/resaltar.js'
-  import { S } from '../lib/store.svelte.js'
+  import { S, avisar } from '../lib/store.svelte.js'
+  import { esAndroid } from '../lib/plataforma.js'
+  import { guardarArchivo } from '../lib/archivos.js'
   import { autorCorto, anio } from '../lib/citas.js'
 
   // Lector de PDF propio (PDFium en un hilo aparte): se descarga la primera vez que se abre un PDF.
@@ -120,8 +122,13 @@
           <Icono nombre="nota" tam={13} />Nota con la cita
         </button>
       {/if}
-      <a class="icono-btn" href={a.url} target="_blank" rel="noopener" title="Abrir en otra pestaña" aria-label="Abrir en otra pestaña"><Icono nombre="externo" tam={15} /></a>
-      <a class="icono-btn" href={a.url} download={a.nombre} title="Descargar" aria-label="Descargar"><Icono nombre="descargar" tam={15} /></a>
+      {#if esAndroid}
+        <!-- En el celular no hay pestañas ni descargas: se guarda o envía con "Compartir". -->
+        <button class="icono-btn" title="Guardar o compartir" aria-label="Guardar o compartir" onclick={() => guardarArchivo(a.nombre, a.blob).catch(e => avisar(e.message))}><Icono nombre="descargar" tam={15} /></button>
+      {:else}
+        <a class="icono-btn" href={a.url} target="_blank" rel="noopener" title="Abrir en otra pestaña" aria-label="Abrir en otra pestaña"><Icono nombre="externo" tam={15} /></a>
+        <a class="icono-btn" href={a.url} download={a.nombre} title="Descargar" aria-label="Descargar"><Icono nombre="descargar" tam={15} /></a>
+      {/if}
       <button class="icono-btn solo-escritorio" aria-label={V.grande ? 'Media pantalla' : 'Pantalla completa'} title={V.grande ? 'Media pantalla' : 'Pantalla completa'} onclick={() => (V.grande = !V.grande)}>
         <Icono nombre={V.grande ? 'reducir' : 'agrandar'} tam={16} />
       </button>
