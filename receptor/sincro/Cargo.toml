@@ -1,0 +1,20 @@
+[package]
+name = "canvas-sincro"
+version = "0.1.0"
+edition = "2021"
+description = "Sincronización por Wi-Fi de Canvas de Citas (sin PixPin: compila y se prueba en cualquier sistema)"
+publish = false
+
+# Proyecto propio: no pertenece al workspace del receptor (que depende de PixPin).
+[workspace]
+
+[dependencies]
+aes-gcm = "0.10.3"
+base64 = "0.22"
+getrandom = "0.2"
+serde_json = { version = "1.0", features = ["preserve_order"] }
+sha2 = "0.10"
+tiny_http = "0.12"
+
+[dev-dependencies]
+tempfile = "3"
