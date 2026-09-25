@@ -1,0 +1,7 @@
+{
+  "clave": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+  "iv": "AQIDBAUGBwgJCgsM",
+  "ahora": 1760000000000,
+  "texto": "{\"hola\":\"canvas\",\"ñ\":1}",
+  "sobre": "AQIDBAUGBwgJCgsMBepbTCS4MIY3gAsofHLIEmAggJDhDCPnjX06lbyMR7insy+vN8UdWM6ONzKLEfNS"
+}
