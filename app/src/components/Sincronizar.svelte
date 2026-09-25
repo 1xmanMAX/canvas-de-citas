@@ -35,7 +35,7 @@
 
 <section class="sincro" class:primera>
   <h3 class="serif">Sincronizar con la PC</h3>
-  <p class="suave">En la PC: Configuración → Vincular celular. {esAndroid ? 'Escanea su QR' : 'Copia aquí su código'} (o pega el código). Deben estar en el mismo Wi-Fi.</p>
+  <p class="suave">En la PC: Configuración → Vincular celular. {esAndroid ? 'Escanea su QR (o pega su código)' : 'Copia aquí su código'}. Deben estar en el mismo Wi-Fi.</p>
   {#if esAndroid}
     <div class="fila"><button class="btn" disabled={SA.trabajando} onclick={escanear}><Icono nombre="qr" />Escanear QR de la PC</button></div>
   {/if}
