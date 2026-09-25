@@ -2,10 +2,12 @@ import './app.css'
 import { mount } from 'svelte'
 import App from './App.svelte'
 import { S } from './lib/store.svelte.js'
+import { esAndroid } from './lib/plataforma.js'
 
 mount(App, { target: document.getElementById('app') })
 
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+// En Android los archivos ya vienen dentro del APK: sin service worker.
+if ('serviceWorker' in navigator && import.meta.env.PROD && !esAndroid) {
   addEventListener('load', async () => {
     const reg = await navigator.serviceWorker.register('./sw.js')
     const esperar = w => w.addEventListener('statechange', () => w.state === 'installed' && (S.actualizacion = w))

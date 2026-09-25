@@ -166,6 +166,67 @@ const SUITES = {
     return s
   },
 
+  // App Android: Chrome con window.Capacitor simulado (como lo inyecta el WebView), contra
+  // canvas-sincro real. El plugin nativo Vinculo (escáner de QR) también es simulado.
+  async android(b) {
+    const s = suite('App Android (simulada)')
+    const crate = path.resolve(APP, '../receptor/sincro')
+    if (spawnSync('cargo', ['build', '--release', '--quiet'], { cwd: crate, stdio: 'inherit' }).status !== 0) { s.fallas.push('cargo build'); return s }
+    const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'canvas-android-'))
+    const proyecto = titulo => JSON.stringify({ proyectos: [{ id: 'proyecto_001', tipo: 'tesis', titulo, objetivos_especificos: [], indicadores: [], canvas: { modo: 'radial', posiciones: {}, notas: [], fotos: [], listas: [], audios: [], conexiones: [], objetivos: {} } }] }, null, 2) + '\n'
+    fs.writeFileSync(path.join(carpeta, 'proyectos.json'), proyecto('Tesis en la PC'))
+    const bin = path.join(crate, 'target', 'release', process.platform === 'win32' ? 'canvas-sincro.exe' : 'canvas-sincro')
+    const srv = spawn(bin, ['--carpeta', carpeta, '--puerto', '0'])
+    const info = JSON.parse(await new Promise(res => srv.stdout.once('data', d => res(String(d).split('\n')[0]))))
+    const codigo = `canvas-sync://127.0.0.1:${info.puerto}/#${info.clave}`
+    const pg = await pagina(b)
+    await pg.evaluateOnNewDocument(qr => {
+      window.Capacitor = {
+        isNativePlatform: () => true,
+        getPlatform: () => 'android',
+        nativePromise: async (plugin, metodo) => {
+          if (plugin === 'Vinculo' && metodo === 'escanear') return { codigo: qr }
+          throw new Error(`plugin no simulado: ${plugin}.${metodo}`)
+        }
+      }
+    }, codigo)
+    const enPc = () => fs.readFileSync(path.join(carpeta, 'proyectos.json'), 'utf8')
+    try {
+      await pg.goto(URL_APP, { waitUntil: 'networkidle0' }); await esperar(600)
+      await s.paso('modo Android: sin carpeta ni PixPin, con botón Sincronizar', async () => {
+        if (await pg.$('button[aria-label="Celular y PixPin"]')) throw new Error('se ve el botón de PixPin')
+        if (!(await pg.$('button[aria-label="Sincronizar con la PC"]'))) throw new Error('falta el botón Sincronizar')
+        if (await pg.evaluate(() => navigator.serviceWorker?.getRegistrations().then(r => r.length))) throw new Error('registró el service worker')
+        await pg.click('button[aria-label="Sincronizar con la PC"]') // sin código: abre Configuración
+        await pg.waitForSelector('dialog[open] .sincro', { timeout: 5000 })
+        if (await pg.evaluate(() => document.querySelector('dialog[open]').textContent.includes('Carpeta de almacenamiento'))) throw new Error('se ve la carpeta de almacenamiento')
+      })
+      await s.paso('escanear el QR vincula y trae el proyecto de la PC', async () => {
+        await clicTexto(pg, 'Escanear QR')
+        await pg.waitForFunction(() => /Última:/.test(document.querySelector('.sincro .estado')?.textContent || ''), { timeout: 15000 })
+        await pg.keyboard.press('Escape'); await esperar(400)
+        if (!(await pg.evaluate(() => document.body.textContent.includes('Tesis en la PC')))) throw new Error('no llegó el proyecto')
+      })
+      await s.paso('una nota del celular llega a la PC con el botón de la cabecera', async () => {
+        await pg.evaluate(() => (location.hash = '#/p/proyecto_001')); await esperar(800)
+        await pg.click('button[aria-label="Añadir nota"]')
+        await pg.type('dialog[open] textarea', 'Nota desde Android')
+        await clicTexto(pg, 'Guardar'); await esperar(300)
+        await pg.click('button[aria-label="Sincronizar con la PC"]')
+        await pg.waitForFunction(() => !document.querySelector('.sincro-btn.girando'), { timeout: 15000 }); await esperar(300)
+        if (!enPc().includes('Nota desde Android')) throw new Error('no llegó a la PC')
+      })
+      await s.paso('al abrir la app sincroniza sola (cambio hecho en la PC)', async () => {
+        fs.writeFileSync(path.join(carpeta, 'proyectos.json'), enPc().replace('Tesis en la PC', 'Tesis renombrada en la PC'))
+        await pg.reload({ waitUntil: 'networkidle0' })
+        await pg.waitForFunction(() => document.body.textContent.includes('Tesis renombrada en la PC'), { timeout: 15000 })
+        if (!enPc().includes('Nota desde Android')) throw new Error('se perdió la nota')
+      })
+    } finally { srv.kill() }
+    if (pg.errores.length) s.fallas.push(...pg.errores)
+    return s
+  },
+
   // Sincronización: la app (como "celular") contra canvas-sincro sobre una carpeta temporal.
   async sincro(b) {
     const s = suite('Sincronización con la PC')

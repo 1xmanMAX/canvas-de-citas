@@ -8,6 +8,7 @@
   import { C, establecerCarpeta, reconectar, dejarDeUsarCarpeta, guardarAhora } from '../lib/carpeta.svelte.js'
   import { haceCuanto } from '../lib/citas.js'
   import Sincronizar from './Sincronizar.svelte'
+  import { esAndroid } from '../lib/plataforma.js'
 
   let { onclose, archivosIniciales = null } = $props()
   let previa = $state(null) // datos leídos pendientes de confirmar
@@ -65,6 +66,10 @@
       </div>
     </section>
   {:else}
+    {#if esAndroid}
+    <!-- En el celular no hay carpeta de almacenamiento: los datos llegan de la PC. -->
+    <Sincronizar primera />
+    {:else}
     <section class="primera">
       <div class="rotulo">Carpeta de almacenamiento</div>
       {#if C.estado === 'no-soportado'}
@@ -103,6 +108,7 @@
         </div>
       {/if}
     </section>
+    {/if}
 
     <section>
       <div class="rotulo">Exportar</div>
@@ -122,7 +128,7 @@
       <p class="suave nota">Puedes elegir uno, dos o los tres archivos. También puedes arrastrarlos sobre la ventana.</p>
     </section>
 
-    <Sincronizar />
+    {#if !esAndroid}<Sincronizar />{/if}
   {/if}
 </Modal>
 

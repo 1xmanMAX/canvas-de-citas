@@ -24,6 +24,8 @@
   import { comprimirFoto } from '../lib/imagen.js'
   import { abrirOrigen } from '../lib/visor.svelte.js'
   import { R } from '../lib/celular.svelte.js'
+  import BotonSincro from '../components/BotonSincro.svelte'
+  import { esAndroid } from '../lib/plataforma.js'
 
   let { p, fid = null, oid = null, abrirDatos, abrirCelular, abrirArchivos, atras } = $props()
 
@@ -357,7 +359,7 @@
   <a class="btn solo-escritorio" href="#/citas/{p.id}">Vista de citas</a>
   <a class="icono-btn solo-movil" href="#/citas/{p.id}" aria-label="Vista de citas"><Icono nombre="lista" tam={18} /></a>
   <button class="btn solo-escritorio" onclick={() => descargarBib(fuentes, 'bibliografia.bib')}>Exportar .bib</button>
-<button class="icono-btn celular-btn" aria-label="Celular y PixPin" title="Pasar archivos con el celular o PixPin" onclick={abrirCelular}><Icono nombre="celular" tam={18} />{#if R.recibidos.length}<span class="insignia">{R.recibidos.length}</span>{/if}</button>
+{#if esAndroid}<BotonSincro {abrirDatos} />{:else}<button class="icono-btn celular-btn" aria-label="Celular y PixPin" title="Pasar archivos con el celular o PixPin" onclick={abrirCelular}><Icono nombre="celular" tam={18} />{#if R.recibidos.length}<span class="insignia">{R.recibidos.length}</span>{/if}</button>{/if}
   <button class="icono-btn" aria-label="Abrir archivo" title="Abrir un PDF, HTML o Markdown para leerlo aquí (Ctrl+O)" onclick={abrirArchivos}><Icono nombre="carpeta" tam={18} /></button>
   <button class="icono-btn" aria-label="Configuración" title="Configuración" onclick={abrirDatos}><Icono nombre="ajustes" tam={18} /></button>
 </header>
