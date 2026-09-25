@@ -9,6 +9,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { leerCodigo, crearConexion } from '../../src/lib/sincro-http.js'
 import { sincronizar } from '../../src/lib/sincro-cliente.js'
+import { buscarPc } from '../../src/lib/sincro-red.js'
 
 const CRATE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../receptor/sincro')
 let proceso, carpeta, codigo
@@ -53,4 +54,12 @@ test('con otra clave la PC rechaza', async () => {
   const { url } = leerCodigo(codigo)
   const otra = await crearConexion({ url, clave: Buffer.alloc(32, 7).toString('base64') })
   await assert.rejects(otra.estado(), /vuelve a vincularlo/)
+})
+
+test('hola responde con la clave correcta y la búsqueda encuentra la PC', async () => {
+  const { url, clave } = leerCodigo(codigo)
+  assert.deepEqual(await (await crearConexion({ url, clave })).hola(), { app: 'canvas-sincro', v: 1 })
+  // Código con una IP vieja de 127.0.0.x: la búsqueda la encuentra en 127.0.0.1.
+  const viejo = codigo.replace('127.0.0.1', '127.0.0.9')
+  assert.equal(await buscarPc({ codigo: viejo, tiempo: 500 }), codigo)
 })

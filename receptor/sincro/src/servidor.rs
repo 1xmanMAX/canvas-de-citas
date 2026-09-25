@@ -110,6 +110,8 @@ impl Sincro {
             return Respuesta::vacia(401);
         }
         match (metodo, ruta) {
+            // Liviano: el celular lo usa para encontrar la PC si cambió su IP.
+            ("GET", "/sync/hola") => Respuesta::texto(200, self.clave.cifrar_json(&json!({"app": "canvas-sincro", "v": 1}))),
             ("GET", "/sync/estado") => match self.carpeta.leer() {
                 Ok(v) => Respuesta::texto(200, self.clave.cifrar_json(&v)),
                 Err(e) => Respuesta::texto(500, e.to_string()),

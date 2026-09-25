@@ -74,3 +74,12 @@ fn emparejar_solo_desde_la_misma_pc_y_tope_de_cuerpo() {
     assert!(v["codigo"].as_str().unwrap().ends_with(&s.clave_b64));
     assert_eq!(s.atender("PUT", "/sync/estado", None, &[0u8; 65], false).estado, 413);
 }
+
+#[test]
+fn hola_confirma_la_clave() {
+    let (_d, s) = sincro(1 << 20);
+    assert_eq!(s.atender("GET", "/sync/hola", None, b"", false).estado, 401);
+    let r = s.atender("GET", "/sync/hola", Some(&prueba(&s, "/sync/hola")), b"", false);
+    assert_eq!(r.estado, 200);
+    assert_eq!(leer(&s, &r), json!({"app": "canvas-sincro", "v": 1}));
+}
