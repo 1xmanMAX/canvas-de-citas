@@ -2,6 +2,7 @@
 
 > Sigue al Plan 1 (`2026-09-24-sincronizacion-nucleo.md`, tareas 1–7 hechas). Spec:
 > `docs/superpowers/specs/2026-09-24-android-sincronizacion-design.md`. Pasos con casillas (`- [ ]`).
+> **Estado (2026-09-25): tareas 1–6 hechas.** Falta probar el APK en un celular real.
 
 **Goal:** Un APK de Android con la misma app (mismo código que la PWA) que se sincroniza con la PC
 por Wi-Fi: botón "Sincronizar" siempre visible, sincronización automática, vinculación con QR y
@@ -67,9 +68,9 @@ dependencias nuevas).
 - En Android: no registrar el service worker; no `iniciarCarpeta`/`iniciarCelular`; ocultar la
   sección "Carpeta de almacenamiento" y el botón "Celular y PixPin"; en su lugar `BotonSincro`.
 
-- [ ] Suite e2e `android` (Chrome con `window.Capacitor` simulado antes de cargar): no aparece
+- [x] Suite e2e `android` (Chrome con `window.Capacitor` simulado antes de cargar): no aparece
   "Carpeta de almacenamiento" ni el botón de PixPin; aparece el botón "Sincronizar con la PC".
-- [ ] `npm run build`, suite `android` en verde, el resto de suites sin cambios. Commit.
+- [x] `npm run build`, suite `android` en verde, el resto de suites sin cambios. Commit.
 
 ### Task 2: Estado de sincronización compartido y botón de cabecera
 
@@ -81,9 +82,9 @@ Modify `app/src/components/Sincronizar.svelte`, `app/src/App.svelte`.
 (Android: al abrir, cada 5 min y al volver a primer plano; solo con código guardado; en silencio
 los errores de red no muestran aviso).
 
-- [ ] Mover la lógica de `Sincronizar.svelte` a `sincro-app.svelte.js` (misma UI).
-- [ ] `BotonSincro`: ícono que gira mientras sincroniza; si no hay código abre Configuración.
-- [ ] Suite `android`: con `canvas-sincro` real, pegar código, sincronizar desde la cabecera y
+- [x] Mover la lógica de `Sincronizar.svelte` a `sincro-app.svelte.js` (misma UI).
+- [x] `BotonSincro`: ícono que gira mientras sincroniza; si no hay código abre Configuración.
+- [x] Suite `android`: con `canvas-sincro` real, pegar código, sincronizar desde la cabecera y
   ver el proyecto de la PC; la suite `sincro` sigue verde. Commit.
 
 ### Task 3: `/sync/hola`, tiempos de espera y búsqueda de la PC
@@ -101,7 +102,7 @@ los errores de red no muestran aviso).
 - `sincronizarAhora`: si la conexión falla por red (no 401/409), busca la PC, guarda el código
   nuevo y reintenta una vez.
 
-- [ ] Pruebas: Rust (`hola` con y sin prueba), unitarias de `buscarPc` con `fetch` falso (la
+- [x] Pruebas: Rust (`hola` con y sin prueba), unitarias de `buscarPc` con `fetch` falso (la
   encuentra en otra IP; no acepta a quien responde con otra clave; `null` si no hay nadie),
   integración (`hola` contra el binario). Commit.
 
@@ -118,7 +119,7 @@ los errores de red no muestran aviso).
 - Íconos: `mipmap-*/ic_launcher*.png` y primer plano adaptativo desde los íconos de la PWA.
 - Scripts: `npm run apk` (build de la app + `cap sync` + `gradlew assembleDebug`).
 
-- [ ] `npm run apk` produce `android/android/app/build/outputs/apk/debug/app-debug.apk`. Commit.
+- [x] `npm run apk` produce `android/android/app/build/outputs/apk/debug/app-debug.apk`. Commit.
 
 ### Task 5: Plugin `Vinculo` (escanear el QR)
 
@@ -129,12 +130,12 @@ Modify `MainActivity.java`, `android/android/app/build.gradle`, `Sincronizar.sve
   `"cancelado"`.
 - En la app (Android): botón "Escanear QR" → `nativo('Vinculo', 'escanear')` → `leerCodigo`
   para validar → guardar y sincronizar.
-- [ ] Suite `android`: con el plugin simulado (`nativePromise` falso) el botón llena el código y
+- [x] Suite `android`: con el plugin simulado (`nativePromise` falso) el botón llena el código y
   sincroniza. `npm run apk` compila. Commit.
 
 ### Task 6: Documentación y estado
 
-- [ ] `android/README.md` (instalar el APK, vincular, límites v1), `CLAUDE.md` (estructura,
+- [x] `android/README.md` (instalar el APK, vincular, límites v1), `CLAUDE.md` (estructura,
   comandos, estado), casillas del plan. Commit y push.
 
 ## Fuera de alcance (v1)
