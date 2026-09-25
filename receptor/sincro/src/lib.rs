@@ -3,3 +3,4 @@
 //! (`app/src/lib/cifrado.js`), acceso a la carpeta de datos y servidor HTTP.
 pub mod cifrado;
 pub mod carpeta;
+pub mod servidor;
