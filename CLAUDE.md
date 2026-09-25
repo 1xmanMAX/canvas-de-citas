@@ -81,7 +81,8 @@ paper, skill con referencias y puntos clave.
   "Sincronizar con la PC").
 - Plan 2 (`docs/superpowers/plans/2026-09-25-android-app.md`): hecho — proyecto `android/`,
   modo Android (botón Sincronizar, automática, búsqueda de la PC si cambió su IP, escáner de QR
-  con el plugin propio `Vinculo`). Prueba: `npm run test:e2e -- android` (Capacitor simulado).
+  con el plugin propio `Vinculo`, transcripción de notas de voz con el plugin `Voz`,
+  márgenes de las barras del sistema). Prueba: `npm run test:e2e -- android` (Capacitor simulado).
 
 **Siguiente:** probar el APK en el celular de Max y hacer la **Tarea 8 del Plan 1** en su PC
 (receptor de Windows + "Vincular celular" con QR). Mientras tanto sirve `canvas-sincro.exe`

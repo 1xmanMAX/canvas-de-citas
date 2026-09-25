@@ -14,7 +14,9 @@ lleva dentro `app/dist`. En Android la app se sincroniza con la PC por Wi-Fi (Pl
   busca en la red (como mucho cada 30 min en automático).
 - No aparecen la carpeta de almacenamiento ni el receptor local; no hay service worker (todo
   va en el APK).
-- Notas de voz: se graban, pero sin transcripción en vivo (el WebView no la trae; v2).
+- Notas de voz: se graban y, al terminar, se transcriben **en el celular y sin internet** con el
+  reconocedor de Android (plugin propio `Voz`, Android 13+). La primera vez puede pedir descargar
+  el paquete de voz en español. Botón *Transcribir* en la nota para repetirlo.
 
 ## Construir el APK
 

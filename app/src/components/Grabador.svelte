@@ -4,6 +4,7 @@
   import Icono from './Icono.svelte'
   import { grabar, aDataURL, puedeGrabar, puedeTranscribir, MAX_SEG } from '../lib/audio.svelte.js'
   import { duracionTexto } from '../lib/tarjetas.js'
+  import { esAndroid } from '../lib/plataforma.js'
 
   let { onlisto } = $props()
   let estado = $state('listo') // 'listo' | 'grabando' | 'procesando'
@@ -69,7 +70,7 @@
     {#if estado === 'grabando'}
       <div class="vivo" aria-live="polite">
         {#if final || parcial}{final} <span class="suave">{parcial}</span>
-        {:else}<span class="suave">{puedeTranscribir ? 'Habla: la transcripción aparece aquí…' : 'Este navegador no transcribe; se guardará solo el audio.'}</span>{/if}
+        {:else}<span class="suave">{puedeTranscribir ? 'Habla: la transcripción aparece aquí…' : esAndroid ? 'Habla: se transcribe al terminar de grabar.' : 'Este navegador no transcribe; se guardará solo el audio.'}</span>{/if}
       </div>
     {/if}
     {#if error}<p class="error">{error}</p>{/if}

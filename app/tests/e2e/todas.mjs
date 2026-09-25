@@ -204,8 +204,12 @@ const SUITES = {
       window.Capacitor = {
         isNativePlatform: () => true,
         getPlatform: () => 'android',
-        nativePromise: async (plugin, metodo) => {
+        nativePromise: async (plugin, metodo, opciones) => {
           if (plugin === 'Vinculo' && metodo === 'escanear') return { codigo: qr }
+          if (plugin === 'Voz' && metodo === 'transcribir') {
+            window.__voz = { bytes: atob(opciones.pcm).length, frecuencia: opciones.frecuencia, idioma: opciones.idioma }
+            return { texto: '  hola   desde Android ', idioma: 'es-US' }
+          }
           throw new Error(`plugin no simulado: ${plugin}.${metodo}`)
         }
       }
@@ -249,6 +253,17 @@ const SUITES = {
         await pg.click('button[aria-label="Sincronizar con la PC"]')
         await pg.waitForFunction(() => !document.querySelector('.sincro-btn.girando'), { timeout: 15000 }); await esperar(300)
         if (!enPc().includes('Nota desde Android')) throw new Error('no llegó a la PC')
+      })
+      await s.paso('nota de voz: se transcribe en el celular al terminar de grabar', async () => {
+        await pg.click('button[aria-label="Grabar nota de voz"]')
+        await pg.click('dialog[open] button[aria-label="Empezar a grabar"]')
+        await pg.waitForSelector('dialog[open] button[aria-label="Detener grabación"]', { timeout: 10000 }); await esperar(1500)
+        await pg.click('dialog[open] button[aria-label="Detener grabación"]')
+        await pg.waitForFunction(() => document.querySelector('dialog[open] textarea')?.value === 'hola desde Android', { timeout: 10000 })
+        const v = await pg.evaluate(() => window.__voz)
+        // ~1,5 s de audio a 16 kHz, 16 bits: unos 48 000 bytes.
+        if (v.frecuencia !== 16000 || v.bytes < 32000 || v.bytes > 128000) throw new Error('audio mal convertido: ' + JSON.stringify(v))
+        await clicTexto(pg, 'Guardar'); await esperar(300)
       })
       await s.paso('al abrir la app sincroniza sola (cambio hecho en la PC)', async () => {
         fs.writeFileSync(path.join(carpeta, 'proyectos.json'), enPc().replace('Tesis en la PC', 'Tesis renombrada en la PC'))
