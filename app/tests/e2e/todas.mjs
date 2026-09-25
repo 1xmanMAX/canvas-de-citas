@@ -17,6 +17,26 @@ const SUITES = {
   async lienzo(b) {
     const s = suite('Lienzo y tarjetas'), pg = await pagina(b)
     await conEjemplo(pg)
+    await s.paso('pellizco con un dedo sobre una fuente: hace zoom y no la mueve ni la abre', async () => {
+      const cdp = await pg.createCDPSession()
+      const nodo = await pg.$('g.nodo')
+      const antes = await nodo.evaluate(g => g.getAttribute('transform'))
+      const r = await nodo.boundingBox()
+      const zoom = () => pg.$eval('.zoom .porc', b => parseInt(b.textContent))
+      const k0 = await zoom()
+      const a = { x: r.x + r.width / 2, y: r.y + r.height / 2 }, b = { x: a.x + 60, y: a.y + 40 }
+      const toque = (type, puntos) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: puntos.map((p, i) => ({ x: p.x, y: p.y, id: i })) })
+      await toque('touchStart', [a]); await esperar(30)
+      await toque('touchStart', [a, b]); await esperar(30)
+      for (let i = 1; i <= 8; i++) { await toque('touchMove', [{ x: a.x - 10 * i, y: a.y - 6 * i }, { x: b.x + 10 * i, y: b.y + 6 * i }]); await esperar(20) }
+      await toque('touchEnd', []); await esperar(400)
+      const k1 = await zoom()
+      if (!(k1 > k0 * 1.3)) throw new Error(`no hizo zoom (${k0}% → ${k1}%)`)
+      if (await nodo.evaluate(g => g.getAttribute('transform')) !== antes) throw new Error('movió la fuente')
+      if (await pg.$('dialog[open]')) throw new Error('abrió la fuente')
+      await cdp.detach()
+      await pg.click('.zoom .porc'); await esperar(400) // vuelve a encuadrar para los pasos siguientes
+    })
     await s.paso('nota manuscrita en ficha rayada', async () => {
       await pg.click('button[aria-label="Añadir nota"]')
       await pg.type('dialog[open] input[placeholder^="Extended"]', 'Extended Mind, p. 114')
