@@ -17,6 +17,7 @@
   import { LISTAS, cajas, nombreTarjeta, asegurarTablero } from '../lib/tarjetas.js'
   import { nuevaTarjeta, guardarTarjeta, eliminarTarjeta, duplicarTarjeta, alternarTarea, vinculosDe, ancla, rutaHilo } from '../lib/tablero.js'
   import { comprimirFoto } from '../lib/imagen.js'
+  import { abrirOrigen } from '../lib/visor.svelte.js'
 
   let { p, clave, abrirFuente, cerrar } = $props()
 
@@ -311,7 +312,7 @@
       <!-- Tarjetas libres: notas, listas, notas de voz y fotos -->
       {#each LISTAS as l (l)}
         {#each tarjVista[l] as t (t.id)}
-          <Tarjeta lista={l} o={t} origen={conectando?.desde === t.id}
+          <Tarjeta lista={l} o={t} origen={conectando?.desde === t.id} alVinculo={() => abrirOrigen(t.origen, p.id, t.id)}
             alTocar={() => tocar(t.id, () => (modal = { lista: l, o: copia(t) }))}
             alternar={i => { alternarTarea(t, i); guardar() }} {...arrastre(t)} />
         {/each}
@@ -395,7 +396,7 @@
   </Modal>
 {:else if modal?.lista}
   {#key modal.o.id}
-    <EditorTarjeta lista={modal.lista} bind:o={modal.o} nueva={modal.nueva} vinculos={modal.nueva ? [] : vinculosDe(o, modal.o.id, nombreDe)}
+    <EditorTarjeta lista={modal.lista} bind:o={modal.o} nueva={modal.nueva} vinculos={modal.nueva ? [] : vinculosDe(o, modal.o.id, nombreDe)} onvinculo={() => { const t = modal.o; modal = null; abrirOrigen(t.origen, p.id, t.id) }}
       onguardar={guardarModal} oneliminar={eliminarModal} onduplicar={duplicarModal} onclose={() => (modal = null)} />
   {/key}
 {:else if modal?.conexion}

@@ -14,6 +14,8 @@ class EstadoVisor {
   proyectoId = $state(null)
   grande = $state(false)
   recortando = $state(false) // herramienta de recorte activa en el lector de PDF
+  /** Punto del documento al que ir y señalar: { tipo, pagina, rects, cita, area, t }. */
+  destino = $state(null)
 }
 export const V = new EstadoVisor()
 
@@ -53,6 +55,7 @@ export function cerrarVisor() {
   V.archivo = null
   V.fuenteId = null
   V.recortando = false
+  V.destino = null
 }
 
 /** Adjunta el archivo abierto a una fuente (queda en su ficha y en la carpeta). */
@@ -91,16 +94,45 @@ function tarjetaCita(lista, datos, aviso) {
   avisar(aviso)
 }
 
-/** Nota con el texto seleccionado (y su página, si se conoce). */
-export function notaDesdeSeleccion(texto, pagina = null) {
+/**
+ * Origen de una cita para volver a ella: fuente, tipo de documento y ubicación. En PDF, los
+ * rectángulos (en puntos de la página); en HTML/Markdown, el texto citado.
+ */
+function origen(extra) {
+  if (!V.fuenteId) return null // un archivo suelto no se puede volver a abrir más tarde
+  return { fuente: V.fuenteId, tipo: V.archivo?.tipo, ...extra }
+}
+
+/** Nota con el texto seleccionado (y su página y ubicación, si se conocen). */
+export function notaDesdeSeleccion(texto, pagina = null, rects = null) {
   const cita = texto.replace(/\s+/g, ' ').trim().slice(0, 1200)
-  tarjetaCita('notas', { titulo: referencia(pagina), texto: `“${cita}”`, estilo: 'rayada', letra: 'serif' }, 'Nota creada en el lienzo')
+  const o = origen({ pagina, rects: rects?.slice(0, 80) || null, cita: cita.slice(0, 400) })
+  tarjetaCita('notas', { titulo: referencia(pagina), texto: `“${cita}”`, estilo: 'rayada', letra: 'serif', ...(o ? { origen: o } : {}) }, 'Nota creada en el lienzo')
 }
 
 /** Tarjeta de imagen con el área recortada de un PDF (gráfico, tabla, escaneo…). */
-export function fotoDesdeRecorte({ imagen, proporcion, texto, pagina }) {
+export function fotoDesdeRecorte({ imagen, proporcion, texto, pagina, rect }) {
+  const o = origen({ pagina, area: true, rects: rect ? [{ n: pagina - 1, ...rect }] : null })
   tarjetaCita('fotos', {
     titulo: referencia(pagina), imagen, proporcion, trazos: [],
-    texto: texto ? `“${texto.slice(0, 1500)}”` : ''
+    texto: texto ? `“${texto.slice(0, 1500)}”` : '', ...(o ? { origen: o } : {})
   }, 'Recorte citado en el lienzo')
+}
+
+/** Vínculo: abre el documento de la cita y la señala. */
+export async function abrirOrigen(o, proyectoId, tarjetaId = null) {
+  const f = o?.fuente && S.fuentePorId.get(o.fuente)
+  if (!f) return avisar('La fuente de esta cita ya no existe')
+  if (V.fuenteId !== f.id || !V.archivo) await abrirDocumentoFuente(f, proyectoId)
+  if (V.archivo) V.destino = { ...o, tarjeta: tarjetaId, t: Date.now() }
+}
+
+/** Citas (notas y recortes) de un proyecto que vienen de la fuente abierta: se marcan en el documento. */
+export function marcasDeFuente(proyectoId, fuenteId) {
+  const p = S.proyectoPorId.get(proyectoId)
+  if (!p || !fuenteId) return []
+  const lienzos = [p.canvas, ...Object.values(p.canvas.objetivos || {})]
+  return lienzos.flatMap(c => [...(c.notas || []), ...(c.fotos || [])])
+    .filter(t => t.origen?.fuente === fuenteId)
+    .map(t => ({ id: t.id, titulo: t.titulo, ...t.origen }))
 }

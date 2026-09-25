@@ -8,7 +8,7 @@
   import { LETRAS, PAPELES, COLORES, fechaCorta, duracionTexto } from '../lib/tarjetas.js'
 
   /** `o` es una copia editable; `vinculos` los nombres de lo que está conectado a la tarjeta. */
-  let { lista, o = $bindable(), nueva = false, vinculos = [], onguardar, oneliminar, onduplicar, onclose } = $props()
+  let { lista, o = $bindable(), nueva = false, vinculos = [], onguardar, oneliminar, onduplicar, onvinculo = null, onclose } = $props()
 
   const TITULOS = { notas: ['Nueva nota', 'Nota'], listas: ['Nueva lista de tareas', 'Lista de tareas'], audios: ['Nueva nota de voz', 'Nota de voz'], fotos: ['Nueva foto', 'Foto'] }
   const titulo = $derived(TITULOS[lista][nueva ? 0 : 1])
@@ -121,6 +121,11 @@
     {/if}
   {/if}
 
+  {#if o.origen && onvinculo}
+    <button class="btn vinculo-doc" onclick={onvinculo}>
+      <Icono nombre="externo" tam={14} />Vínculo: ir a la cita en el documento{o.origen.pagina ? ` (pág. ${o.origen.pagina})` : ''}
+    </button>
+  {/if}
   {#if vinculos.length}
     <div class="vinculos">
       <span class="rotulo">Vinculado con · {vinculos.length}</span>
@@ -162,5 +167,6 @@
   .foto-grande { width: 100%; max-height: 42dvh; object-fit: contain; border-radius: 10px; background: var(--paper-dim); }
   .mano { font-family: var(--mano); font-size: 20px; color: #C0392B; }
   .vinculos { border-top: 1px solid var(--line); padding-top: 12px; }
+  .vinculo-doc { align-self: flex-start; border-color: var(--accent); color: var(--accent); }
   .vinculos ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.6; }
 </style>

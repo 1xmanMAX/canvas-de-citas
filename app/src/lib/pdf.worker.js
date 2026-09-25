@@ -235,7 +235,7 @@ onmessage = async ({ data: m }) => {
     } else if (m.tipo === 'descartar') {
       for (const k of [...cola.keys()]) if (!m.conservar.includes(+k.split(':')[0])) cola.delete(k)
     } else if (m.tipo === 'recorte') {
-      if (m.doc === docActual && doc) postMessage({ tipo: 'recorte', doc: m.doc, n: m.n, ...(await recorte(m.n, m.rect)) })
+      if (m.doc === docActual && doc) postMessage({ tipo: 'recorte', doc: m.doc, n: m.n, rect: m.rect, ...(await recorte(m.n, m.rect)) })
     } else if (m.tipo === 'texto') {
       if (m.doc === docActual && doc) postMessage({ tipo: 'texto', n: m.n, doc: m.doc, segs: texto(m.n) })
     } else if (m.tipo === 'buscar') {

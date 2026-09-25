@@ -5,7 +5,7 @@
   import { medir, COLORES, TINTAS, fechaCorta, duracionTexto } from '../lib/tarjetas.js'
   import { sonando, reproducir } from '../lib/audio.svelte.js'
 
-  let { lista, o, origen = false, resaltado = false, atenuado = false, alTocar, alternar, inicio, mover, fin } = $props()
+  let { lista, o, origen = false, resaltado = false, atenuado = false, alTocar, alternar, alVinculo = null, inicio, mover, fin } = $props()
 
   const d = $derived(medir(lista, o))
   const giro = $derived(lista === 'notas' ? (o.estilo === 'rayada' ? 1 : o.estilo === 'tarjeta' ? 0 : -2) : lista === 'fotos' ? 1.5 : 0)
@@ -110,6 +110,15 @@
   {/if}
 
   {#if origen || resaltado}<rect x="-4" y="-4" width={d.w + 8} height={d.h + 8} rx="10" class="marca" />{/if}
+  {#if o.origen && alVinculo}
+    <!-- Vínculo: abre el documento en el punto exacto de donde salió esta cita -->
+    <g class="vinculo" transform="translate({d.w - 70} -10)" role="button" tabindex="0" aria-label="Ir a la cita en el documento"
+      onpointerdown={parar} onclick={alVinculo} onkeydown={e => e.key === 'Enter' && alVinculo()}>
+      <title>Ir a la cita en el documento</title>
+      <rect width="66" height="20" rx="10" />
+      <text x="33" y="14" text-anchor="middle">↗ Vínculo</text>
+    </g>
+  {/if}
 
 </Arrastrable>
 
@@ -119,6 +128,11 @@
   text { user-select: none; pointer-events: none; }
   .sombra { fill: rgba(33, 31, 26, .12); }
   .s-barra { fill: var(--ink); opacity: .45; pointer-events: none; }
+  .vinculo { cursor: pointer; }
+  .vinculo rect { fill: var(--accent); stroke: var(--paper); stroke-width: 1.5; }
+  .vinculo:hover rect, .vinculo:focus-visible rect { fill: #C0392B; }
+  .vinculo:focus { outline: none; }
+  .vinculo text { font: 600 10.5px var(--sans); fill: #fff; }
   .s-barra.clara { fill: #fff; opacity: .6; }
   .borde { stroke: var(--line); }
   .marca { fill: none; stroke: var(--accent); stroke-width: 2.5; }

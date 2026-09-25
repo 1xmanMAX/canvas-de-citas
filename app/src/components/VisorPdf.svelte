@@ -7,7 +7,7 @@
   import Icono from './Icono.svelte'
   import { V } from '../lib/visor.svelte.js'
 
-  let { blob, onseleccion, onrecorte } = $props()
+  let { blob, onseleccion, onrecorte, marcas = [], destino = null } = $props()
 
   const HUECO = 12, MARGEN = 12
   let cont = $state()
@@ -38,7 +38,8 @@
     if (m.tipo === 'abierto') {
       tamanos = m.paginas
       cargando = false
-      requestAnimationFrame(ajustarAncho)
+      // Primero se ajusta al ancho; recién después (listo) se puede ir a un vínculo.
+      requestAnimationFrame(() => { ajustarAncho(); requestAnimationFrame(() => requestAnimationFrame(() => (listo = true))) })
     } else if (m.tipo === 'pagina') {
       guardarEn(m.nivel === 'alta' ? altas : bajas, m.n, { bitmap: m.bitmap, escala: m.escala }, m.nivel === 'alta' ? LIM_ALTAS : LIM_BAJAS)
       version++
@@ -52,7 +53,7 @@
       if (resultados.length) irAResultado(0)
     } else if (m.tipo === 'recorte') {
       const r = new FileReader()
-      r.onload = () => onrecorte?.({ imagen: r.result, proporcion: Math.round((m.w / m.h) * 1000) / 1000, texto: m.texto, pagina: m.n + 1 })
+      r.onload = () => onrecorte?.({ imagen: r.result, proporcion: Math.round((m.w / m.h) * 1000) / 1000, texto: m.texto, pagina: m.n + 1, rect: m.rect })
       r.readAsDataURL(m.blob)
     } else if (m.tipo === 'error') {
       if (cargando) { error = m.mensaje; cargando = false }
@@ -218,6 +219,55 @@
     return m
   })
 
+  // --- Vínculos: marcas de las citas tomadas de este documento e ir a una de ellas ---
+  /** Rectángulos (en puntos, por página) de la selección actual; los de una misma línea se unen. */
+  function rectsDeSeleccion(s) {
+    const paginas = [...cont.querySelectorAll('.pag-pdf')].map(p => ({ n: +p.dataset.n, b: p.getBoundingClientRect() }))
+    const sueltos = []
+    for (let i = 0; i < s.rangeCount; i++) for (const r of s.getRangeAt(i).getClientRects()) {
+      if (r.width < 1 || r.height < 1) continue
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2
+      const p = paginas.find(({ b }) => cx >= b.left && cx <= b.right && cy >= b.top && cy <= b.bottom)
+      if (p) sueltos.push({ n: p.n, x: (r.left - p.b.left) / escala, y: (r.top - p.b.top) / escala, w: r.width / escala, h: r.height / escala })
+    }
+    const unidos = []
+    for (const r of sueltos.sort((a, b) => a.n - b.n || a.y - b.y || a.x - b.x)) {
+      const u = unidos.at(-1)
+      if (u && u.n === r.n && Math.abs(u.y - r.y) < r.h * 0.5 && r.x <= u.x + u.w + 6) {
+        const fin = Math.max(u.x + u.w, r.x + r.w)
+        u.y = Math.min(u.y, r.y); u.h = Math.max(u.h, r.h); u.w = fin - u.x
+      } else unidos.push({ ...r })
+    }
+    const r1 = v => Math.round(v * 10) / 10
+    return unidos.map(r => ({ n: r.n, x: r1(r.x), y: r1(r.y), w: r1(r.w), h: r1(r.h) }))
+  }
+
+  let destelloHasta = $state(0)
+  let listo = $state(false)
+  const marcasPorPagina = $derived.by(() => {
+    const m = {}, activa = destelloHasta > 0 && destino
+    const todas = destino && !marcas.some(x => x.id === destino.tarjeta) ? [...marcas, { ...destino, id: 'destino' }] : marcas
+    for (const mk of todas) for (const r of mk.rects || [])
+      (m[r.n] ||= []).push({ ...r, area: !!mk.area, titulo: mk.titulo || '', activa: !!activa && (mk.id === destino.tarjeta || mk.id === 'destino') })
+    return m
+  })
+
+  /** Lleva la vista a la cita (su primer rectángulo, o su página) y la hace parpadear. */
+  function irADestino(d) {
+    const r = d.rects?.[0]
+    if (r && tops[r.n] !== undefined) {
+      cont.scrollTop = tops[r.n] + r.y * escala - H / 3
+      cont.scrollLeft = Math.max(0, (ancho - tamanos[r.n].w * escala) / 2 + r.x * escala - W / 3)
+    } else if (d.pagina) irAPagina(+d.pagina)
+    scrollTop = cont.scrollTop
+    destelloHasta = Date.now() + 3000
+    setTimeout(() => { if (Date.now() >= destelloHasta) destelloHasta = 0 }, 3100)
+  }
+  $effect(() => {
+    const d = destino
+    if (d && listo) untrack(() => requestAnimationFrame(() => irADestino(d)))
+  })
+
   // --- Selección de texto → nota (con la página donde empieza la selección) ---
   $effect(() => {
     const cambio = () => {
@@ -225,7 +275,7 @@
       const dentro = s?.rangeCount && cont?.contains(s.anchorNode)
       const nodo = dentro && (s.anchorNode.nodeType === 1 ? s.anchorNode : s.anchorNode.parentElement)
       const pagina = nodo?.closest?.('.pag-pdf')?.dataset.n
-      onseleccion?.(dentro ? s.toString().replace(/\s+/g, ' ').trim() : '', pagina ? +pagina + 1 : null)
+      onseleccion?.(dentro ? s.toString().replace(/\s+/g, ' ').trim() : '', pagina ? +pagina + 1 : null, dentro ? rectsDeSeleccion(s) : null)
     }
     document.addEventListener('selectionchange', cambio)
     return () => document.removeEventListener('selectionchange', cambio)
@@ -303,6 +353,13 @@
         onpointerdown={e => recorteAbajo(e, n)} onpointermove={recorteMueve} onpointerup={recorteArriba} onpointercancel={() => (marco = null)}>
         <canvas use:lienzo={n}></canvas>
         {#if cajaMarco && marco.n === n}<div class="marco-recorte" style="left:{cajaMarco.x}px;top:{cajaMarco.y}px;width:{cajaMarco.w}px;height:{cajaMarco.h}px"></div>{/if}
+        {#if marcasPorPagina[n]?.length}
+          <svg class="capa-marcas" viewBox="0 0 {t.w} {t.h}" preserveAspectRatio="none" aria-hidden="true">
+            {#each marcasPorPagina[n] as r}
+              <rect x={r.x - 1} y={r.y - 1} width={r.w + 2} height={r.h + 2} rx="1.5" class:area={r.area} class:texto={!r.area} class:destello={r.activa}><title>{r.titulo}</title></rect>
+            {/each}
+          </svg>
+        {/if}
         {#if (textos[n] || resaltes[n]) && !enZoom}
           <svg class="capa-texto" viewBox="0 0 {t.w} {t.h}" preserveAspectRatio="none">
             {#each resaltes[n] || [] as r}<rect x={r.x} y={r.y} width={r.w} height={r.h} class="resalte" class:actual={r.actual} />{/each}
@@ -340,6 +397,14 @@
   .capa-texto text::selection { fill: transparent; background: rgba(46, 75, 94, .35); }
   .resalte { fill: rgba(242, 194, 48, .45); }
   .resalte.actual { fill: rgba(235, 104, 52, .55); }
+  /* Citas ya tomadas de este documento: texto resaltado, recortes en cuadro punteado. */
+  .capa-marcas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .capa-marcas .texto { fill: rgba(242, 194, 48, .38); }
+  .capa-marcas .area { fill: rgba(47, 79, 181, .06); stroke: #2F4FB5; stroke-width: 1.4; stroke-dasharray: 5 3; vector-effect: non-scaling-stroke; }
+  .capa-marcas .destello { animation: destello 0.7s ease-in-out 4; }
+  .capa-marcas .texto.destello { fill: rgba(235, 104, 52, .5); }
+  .capa-marcas .area.destello { stroke: #C0392B; stroke-width: 2.5; }
+  @keyframes destello { 50% { opacity: .25; } }
   .estado { color: #fff; margin: 24px; position: absolute; }
   .error { color: #ffd6cf; }
 </style>

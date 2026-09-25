@@ -143,3 +143,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 /* Botón del celular con la cuenta de archivos recibidos pendientes */
 .celular-btn { position: relative; }
 .celular-btn .insignia { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--unreviewed); color: #fff; font-size: 10px; font-weight: 600; line-height: 16px; text-align: center; }
+
+/* Citas resaltadas en el visor (Markdown/texto); en los HTML se inyectan las mismas reglas. */
+::highlight(cita) { background-color: rgba(242, 194, 48, .45); }
+::highlight(cita-activa) { background-color: rgba(235, 104, 52, .65); }

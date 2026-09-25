@@ -22,6 +22,7 @@
   import { NODO_W, alturaNodo, radial, porTema, limitesDe, rutaConexion } from '../lib/grafo.js'
   import { descargarBib } from '../lib/io.svelte.js'
   import { comprimirFoto } from '../lib/imagen.js'
+  import { abrirOrigen } from '../lib/visor.svelte.js'
   import { R } from '../lib/celular.svelte.js'
 
   let { p, fid = null, oid = null, abrirDatos, abrirCelular, abrirArchivos, atras } = $props()
@@ -461,7 +462,7 @@
     {#each LISTAS as l (l)}
       {#each tarjVista[l] as o (o.id)}
         {@const coin = !!q && coincideTarjeta(o, q)}
-        <Tarjeta lista={l} {o} origen={conectando?.desde === o.id} resaltado={coin} atenuado={!!q && !coin}
+        <Tarjeta lista={l} {o} origen={conectando?.desde === o.id} resaltado={coin} atenuado={!!q && !coin} alVinculo={() => abrirOrigen(o.origen, p.id, o.id)}
           alTocar={() => tocar(o.id, () => abrirTarjeta(l, o))} alternar={i => alternar(o, i)} {...arrastreLibre(o)} />
       {/each}
     {/each}
@@ -526,7 +527,7 @@
   <ProyectoForm proyecto={p} onclose={() => (modal = null)} />
 {:else if modal?.lista}
   {#key modal.o.id}
-    <EditorTarjeta lista={modal.lista} bind:o={modal.o} nueva={modal.nueva} vinculos={modal.nueva ? [] : vinculosDe(cv, modal.o.id, nombreDe)}
+    <EditorTarjeta lista={modal.lista} bind:o={modal.o} nueva={modal.nueva} vinculos={modal.nueva ? [] : vinculosDe(cv, modal.o.id, nombreDe)} onvinculo={() => { const t = modal.o; modal = null; abrirOrigen(t.origen, p.id, t.id) }}
       onguardar={guardarModal} oneliminar={eliminarModal} onduplicar={duplicarModal} onclose={() => (modal = null)} />
   {/key}
 {:else if modal?.conexion}
