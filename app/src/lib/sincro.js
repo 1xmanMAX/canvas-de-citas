@@ -39,9 +39,20 @@ function fusionarValor(b, l, r, ruta, conflictos) {
   return l
 }
 
+/** ¿`lista` cambió el orden relativo de los elementos que comparte con `base`? */
+function reordenada(lista, base) {
+  const enBase = new Set(base.map(x => x.id)), enLista = new Set(lista.map(x => x.id))
+  const a = lista.filter(x => enBase.has(x.id)).map(x => x.id), b = base.filter(x => enLista.has(x.id)).map(x => x.id)
+  return a.some((id, i) => id !== b[i])
+}
+
 function fusionarLista(b, l, r, ruta, conflictos) {
   const mb = new Map(b.map(x => [x.id, x])), ml = new Map(l.map(x => [x.id, x])), mr = new Map(r.map(x => [x.id, x]))
-  const orden = [...l.map(x => x.id), ...r.filter(x => !ml.has(x.id)).map(x => x.id)]
+  // Orden: el de la PC (remoto), salvo que aquí se haya reordenado respecto a la base; lo que
+  // solo tiene un lado va después. Así todos los aparatos llegan al mismo orden.
+  const primero = reordenada(l, b) ? l : r, segundo = primero === l ? r : l
+  const est = new Set(primero.map(x => x.id))
+  const orden = [...primero.map(x => x.id), ...segundo.filter(x => !est.has(x.id)).map(x => x.id)]
   const out = []
   for (const id of orden) {
     const v = fusionarValor(mb.get(id), ml.get(id), mr.get(id), `${ruta}[${id}]`, conflictos)

@@ -84,6 +84,11 @@ paper, skill con referencias y puntos clave.
   con el plugin propio `Vinculo`, transcripción de notas de voz con el plugin `Voz`,
   márgenes de las barras del sistema). Prueba: `npm run test:e2e -- android` (Capacitor simulado).
 
+- Plan 3 (`docs/superpowers/plans/2026-09-25-grupo-sincronizacion.md`): hecho — **grupo de
+  sincronización**: cada aparato tiene id y nombre, la PC guarda su base en `<carpeta>/.sincro/`
+  y solo viajan parches (`lib/parche.js` ≡ `receptor/sincro/src/parche.rs`); automática en todo
+  aparato vinculado. Prueba: `npm run test:e2e -- grupo`.
+
 **Siguiente:** probar el APK en el celular de Max y hacer la **Tarea 8 del Plan 1** en su PC
 (receptor de Windows + "Vincular celular" con QR). Mientras tanto sirve `canvas-sincro.exe`
 (ver `android/README.md`).

@@ -1,9 +1,12 @@
 <script>
-  // Android: botón de la cabecera para sincronizar con la PC (sin código aún → Configuración).
+  // Botón de la cabecera para sincronizar con la PC: siempre en Android (sin código aún abre
+  // Configuración); en otros aparatos, solo si ya están vinculados.
   import Icono from './Icono.svelte'
-  import { SA, sincronizarAhora } from '../lib/sincro-app.svelte.js'
+  import { SA, cargarSincro, sincronizarAhora } from '../lib/sincro-app.svelte.js'
+  import { esAndroid } from '../lib/plataforma.js'
 
   let { abrirDatos } = $props()
+  cargarSincro()
   const titulo = $derived(SA.trabajando ? SA.progreso || 'Sincronizando…' : SA.error ? `Sincronizar con la PC (último error: ${SA.error})` : 'Sincronizar con la PC')
 
   function pulsar() {
@@ -12,9 +15,11 @@
   }
 </script>
 
+{#if esAndroid || SA.codigo.trim()}
 <button class="icono-btn sincro-btn" class:girando={SA.trabajando} aria-label="Sincronizar con la PC" title={titulo} disabled={SA.trabajando} onclick={pulsar}>
   <Icono nombre="sincro" tam={18} />{#if SA.error}<span class="insignia">!</span>{/if}
 </button>
+{/if}
 
 <style>
   .sincro-btn { position: relative; }

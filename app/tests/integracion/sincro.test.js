@@ -63,3 +63,32 @@ test('hola responde con la clave correcta y la búsqueda encuentra la PC', async
   const viejo = codigo.replace('127.0.0.1', '127.0.0.9')
   assert.equal(await buscarPc({ codigo: viejo, tiempo: 500 }), codigo)
 })
+
+test('grupo (v2): celular y laptop convergen con la PC enviando solo lo que cambió', async () => {
+  const { url, clave } = leerCodigo(codigo)
+  const conexion = await crearConexion({ url, clave })
+  const nuevo = id => {
+    const m = { local: { proyectos: [], fuentes: [], citas: [] }, base: null, docs: {} }
+    m.almacen = {
+      leerLocal: () => structuredClone(m.local), escribirLocal: d => { m.local = { ...m.local, ...structuredClone(d) } },
+      leerBase: () => m.base, guardarBase: d => { m.base = structuredClone(d) },
+      docsLocales: () => Object.keys(m.docs).map(ruta => ({ ruta })), tieneDoc: r => r in m.docs,
+      leerDoc: r => m.docs[r], guardarDoc: (r, b) => { m.docs[r] = b }
+    }
+    m.sinc = () => sincronizar({ conexion, almacen: m.almacen, aparato: { id, nombre: id } })
+    return m
+  }
+  const cel = nuevo('cel_prueba'), lap = nuevo('lap_prueba')
+  await cel.sinc(); await lap.sinc()
+  cel.local.citas.push({ id: 'cita_cel', texto: 'del celular' })
+  lap.local.citas.push({ id: 'cita_lap', texto: 'de la laptop' })
+  const r = await cel.sinc()
+  assert.equal(r.enviados, 1)
+  assert.ok(r.bytes < 400, `viajaron ${r.bytes} bytes`)
+  await lap.sinc(); await cel.sinc()
+  const disco = JSON.parse(fs.readFileSync(path.join(carpeta, 'citas.json'), 'utf8')).citas.map(c => c.id).sort()
+  assert.deepEqual(disco, ['cita_cel', 'cita_lap'])
+  assert.deepEqual(cel.local, lap.local)
+  const grupo = JSON.parse(fs.readFileSync(path.join(carpeta, '.sincro', 'grupo.json'), 'utf8')).map(a => a.id).sort()
+  assert.deepEqual(grupo, ['cel_prueba', 'lap_prueba'])
+})

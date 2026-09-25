@@ -68,7 +68,8 @@ test('notas nuevas en ambos lados del mismo lienzo se conservan todas', () => {
   const l = datos([], [proyecto({ notas: [{ id: 'nota_a', texto: 'A', x: 0, y: 0 }] })])
   const r = datos([], [proyecto({ notas: [{ id: 'nota_b', texto: 'B', x: 9, y: 9 }] })])
   const res = fusionar3(base, l, r)
-  assert.deepEqual(res.resultado.proyectos[0].canvas.notas.map(n => n.id), ['nota_a', 'nota_b'])
+  // Orden estable en todo el grupo: primero lo de la PC, luego lo nuevo de este aparato.
+  assert.deepEqual(res.resultado.proyectos[0].canvas.notas.map(n => n.id), ['nota_b', 'nota_a'])
   assert.equal(res.conflictos.length, 0)
 })
 
@@ -80,4 +81,13 @@ test('posiciones y sub-lienzos de objetivos se combinan por clave', () => {
   assert.deepEqual(c.posiciones, { fuente_001: { x: 50, y: 0 }, fuente_002: { x: 7, y: 7 } })
   assert.deepEqual(Object.keys(c.objetivos).sort(), ['oe1', 'oe2'])
   assert.equal(c.objetivos.oe1.notas[0].id, 'nota_c')
+})
+
+test('el orden converge: se respeta el de la PC salvo que aquí se haya reordenado', () => {
+  const f = id => fuente(id)
+  const base = datos([f('a'), f('b'), f('c')])
+  // Aquí no se reordenó: manda el orden de la PC.
+  assert.deepEqual(fusionar3(base, datos([f('a'), f('b'), f('c'), f('x')]), datos([f('c'), f('a'), f('b')])).resultado.fuentes.map(x => x.id), ['c', 'a', 'b', 'x'])
+  // Aquí se reordenó a propósito: gana este orden.
+  assert.deepEqual(fusionar3(base, datos([f('b'), f('a'), f('c')]), datos([f('a'), f('b'), f('c'), f('y')])).resultado.fuentes.map(x => x.id), ['b', 'a', 'c', 'y'])
 })

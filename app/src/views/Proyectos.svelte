@@ -33,7 +33,7 @@
   <div class="espacio"></div>
   <a class="btn solo-escritorio" href="#/citas">Biblioteca</a>
   <a class="icono-btn solo-movil" href="#/citas" aria-label="Biblioteca"><Icono nombre="lista" tam={18} /></a>
-{#if esAndroid}<BotonSincro {abrirDatos} />{:else}<button class="icono-btn celular-btn" aria-label="Celular y PixPin" title="Pasar archivos con el celular o PixPin" onclick={abrirCelular}><Icono nombre="celular" tam={18} />{#if R.recibidos.length}<span class="insignia">{R.recibidos.length}</span>{/if}</button>{/if}
+<BotonSincro {abrirDatos} />{#if !esAndroid}<button class="icono-btn celular-btn" aria-label="Celular y PixPin" title="Pasar archivos con el celular o PixPin" onclick={abrirCelular}><Icono nombre="celular" tam={18} />{#if R.recibidos.length}<span class="insignia">{R.recibidos.length}</span>{/if}</button>{/if}
   <button class="btn solo-escritorio" onclick={abrirDatos}><Icono nombre="ajustes" />Configuración</button>
   <button class="icono-btn solo-movil" aria-label="Configuración" onclick={abrirDatos}><Icono nombre="ajustes" tam={18} /></button>
   <button class="btn primario" aria-label="Nuevo proyecto" onclick={() => (nuevo = true)}>+ <span class="solo-escritorio">Nuevo proyecto</span></button>

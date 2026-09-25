@@ -59,8 +59,9 @@
   }
 
   // En Android no hay carpeta de almacenamiento ni receptor local: se sincroniza con la PC.
+  // La sincronización con la PC corre en todo aparato vinculado (celular, laptop…).
   if (esAndroid) cargar().then(iniciarSincroAutomatica)
-  else cargar().then(iniciarCarpeta).then(iniciarCelular)
+  else cargar().then(() => { iniciarSincroAutomatica(); return iniciarCarpeta() }).then(iniciarCelular)
 </script>
 
 <svelte:window

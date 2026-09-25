@@ -48,6 +48,15 @@ No hay emulador (sin KVM): la app se prueba con `npm run test:e2e -- android` (C
 2. Ábrelo y permite "Instalar apps de fuentes desconocidas" para esa app.
 3. Abre **Canvas de Citas** → botón Sincronizar → escanea el QR o pega el código.
 
+## Grupo de sincronización (celular, laptop, …)
+
+Todos los aparatos se vinculan con el **mismo código** de la PC (Configuración → Sincronizar con
+la PC) y cada uno tiene un nombre. La PC guarda la versión común y, por cada aparato, cómo
+quedaron sus datos la última vez (en `<carpeta>/.sincro/`): así solo viaja lo que cambió. Si
+editaste en el celular y en la laptop a la vez, al sincronizar se junta todo y ambos quedan con la
+misma versión. En la laptop (app publicada en https) el navegador pedirá una vez permiso para
+"acceder a dispositivos de la red local": acéptalo.
+
 ## Del lado de la PC
 
 Lo definitivo es la **Tarea 8 del Plan 1** (el receptor de Windows arranca la sincronización y

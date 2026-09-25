@@ -186,6 +186,69 @@ const SUITES = {
     return s
   },
 
+  // Grupo de sincronización: un "celular" (Android simulado) y una "laptop" editan a la vez y
+  // todos (con la PC) terminan con la misma versión, enviando solo lo que cambió.
+  async grupo(b) {
+    const s = suite('Grupo de sincronización')
+    const crate = path.resolve(APP, '../receptor/sincro')
+    if (spawnSync('cargo', ['build', '--release', '--quiet'], { cwd: crate, stdio: 'inherit' }).status !== 0) { s.fallas.push('cargo build'); return s }
+    const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'canvas-grupo-'))
+    fs.writeFileSync(path.join(carpeta, 'proyectos.json'), JSON.stringify({ proyectos: [{ id: 'proyecto_001', tipo: 'tesis', titulo: 'Tesis común', objetivos_especificos: [], indicadores: [], canvas: { modo: 'radial', posiciones: {}, notas: [], fotos: [], listas: [], audios: [], conexiones: [], objetivos: {} } }] }, null, 2) + '\n')
+    const bin = path.join(crate, 'target', 'release', process.platform === 'win32' ? 'canvas-sincro.exe' : 'canvas-sincro')
+    const srv = spawn(bin, ['--carpeta', carpeta, '--puerto', '0'])
+    const info = JSON.parse(await new Promise(res => srv.stdout.once('data', d => res(String(d).split('\n')[0]))))
+    const codigo = `canvas-sync://127.0.0.1:${info.puerto}/#${info.clave}`
+    const cel = await pagina(b), lap = await pagina(b)
+    await cel.evaluateOnNewDocument(() => { window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android', nativePromise: async () => ({}) } })
+    const enPc = () => fs.readFileSync(path.join(carpeta, 'proyectos.json'), 'utf8')
+    const sincronizarEn = async pg => {
+      await pg.click('button[aria-label="Sincronizar con la PC"]'); await esperar(300)
+      await pg.waitForFunction(() => !document.querySelector('.sincro-btn.girando'), { timeout: 15000 }); await esperar(300)
+    }
+    const nota = async (pg, texto) => {
+      await pg.evaluate(() => (location.hash = '#/p/proyecto_001')); await esperar(800)
+      await pg.click('button[aria-label="Añadir nota"]')
+      await pg.type('dialog[open] textarea', texto)
+      await clicTexto(pg, 'Guardar'); await esperar(300)
+    }
+    try {
+      await s.paso('celular y laptop se unen al grupo con el mismo código', async () => {
+        for (const [pg, nombre] of [[cel, 'Celular de Max'], [lap, 'Laptop de Max']]) {
+          await pg.goto(URL_APP, { waitUntil: 'networkidle0' }); await esperar(600)
+          await clicTexto(pg, 'Configuración')
+          await pg.type('dialog[open] input[placeholder^="canvas-sync"]', codigo)
+          const campo = await pg.$('dialog[open] .sincro input[maxlength="60"]')
+          await campo.click({ clickCount: 3 }); await campo.type(nombre); await pg.keyboard.press('Tab')
+          await clicTexto(pg, 'Sincronizar', '//dialog[@open]//div[contains(@class,"fila")]')
+          await pg.waitForFunction(() => /Última:/.test(document.querySelector('.sincro .estado')?.textContent || ''), { timeout: 15000 })
+          await pg.keyboard.press('Escape'); await esperar(300)
+          if (!(await pg.evaluate(() => document.body.textContent.includes('Tesis común')))) throw new Error('no llegó el proyecto')
+        }
+      })
+      await s.paso('cada uno agrega una nota sin sincronizar y todo se junta', async () => {
+        await nota(cel, 'Idea desde el celular')
+        await nota(lap, 'Idea desde la laptop')
+        await sincronizarEn(cel); await sincronizarEn(lap); await sincronizarEn(cel)
+        for (const t of ['Idea desde el celular', 'Idea desde la laptop']) if (!enPc().includes(t)) throw new Error(`falta en la PC: ${t}`)
+        for (const [pg, n] of [[cel, 'celular'], [lap, 'laptop']]) {
+          const textos = await pg.evaluate(() => document.body.textContent)
+          if (!textos.includes('Idea desde el celular') || !textos.includes('Idea desde la laptop')) throw new Error(`al ${n} le falta una nota`)
+        }
+      })
+      await s.paso('solo viajó lo que cambió y el grupo muestra a los dos', async () => {
+        await clicTexto(cel, 'Configuración').catch(() => cel.click('button[aria-label="Configuración"]'))
+        await cel.waitForSelector('dialog[open] .grupo', { timeout: 5000 })
+        const txt = await cel.$eval('dialog[open] .sincro', e => e.textContent)
+        if (!txt.includes('Laptop de Max')) throw new Error('el grupo no muestra la laptop')
+        if (!/↓ \d+ · ↑ \d+ cambios/.test(txt)) throw new Error('no muestra el resumen de cambios: ' + txt)
+        const ultima = await cel.evaluate(() => new Promise(res => { const r = indexedDB.open('canvas-de-citas'); r.onsuccess = () => { const q = r.result.transaction('meta').objectStore('meta').get('sincroUltima'); q.onsuccess = () => res(q.result) } }))
+        if (!(ultima?.bytes < 4000)) throw new Error(`viajaron ${ultima?.bytes} bytes (se esperaba solo lo cambiado)`)
+      })
+    } finally { srv.kill() }
+    for (const pg of [cel, lap]) if (pg.errores.length) s.fallas.push(...pg.errores)
+    return s
+  },
+
   // App Android: Chrome con window.Capacitor simulado (como lo inyecta el WebView), contra
   // canvas-sincro real. El plugin nativo Vinculo (escáner de QR) también es simulado.
   async android(b) {
