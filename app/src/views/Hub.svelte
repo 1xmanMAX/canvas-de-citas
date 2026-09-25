@@ -119,7 +119,7 @@
     { x: -HUB_W / 2, y: -hubH / 2, w: HUB_W, h: hubH },
     ...items.map(it => { const q = posDe(it.id); return { x: q.x, y: q.y, w: NODO_W, h: it.h } }),
     ...[...tarj.values()].map(({ x, y, w, h }) => ({ x, y, w, h })),
-    ...(cv.agrupadores || []).map(({ x, y, w, h }) => ({ x, y, w, h }))
+    ...[...cajasGrupos.values()]
   ])
   const limites = $derived(limitesDe(ocupadas, 40))
 
@@ -130,9 +130,11 @@
     for (const [id, t] of tarj) out.push({ id, get nombre() { return nombreDe(id) }, tipo: TIPO[t.lista], caja: t, poner: (x, y) => { t.obj.x = x; t.obj.y = y } })
     return out
   }
-  const grupos = accionesAgrupadores({ lienzo: () => cv, elementos, antes: () => fijarLibre(), guardar: () => guardar() })
-  const agrupadoresVista = $derived((cv.agrupadores || []).filter(g => cruza(g)))
-  const cuantos = $derived(new Map((cv.agrupadores || []).map(g => [g.id, grupos.miembros(g).length])))
+  const grupos = accionesAgrupadores({ lienzo: () => cv, elementos, cajaPorId: id => (id === 'hub' ? null : cajaDe(id)), antes: () => fijarLibre(), guardar: () => guardarProyecto(p) })
+  /** Recuadro de cada agrupador, ajustado en vivo a lo que tiene dentro. */
+  const cajasGrupos = $derived(new Map((cv.agrupadores || []).map(g => [g.id, grupos.caja(g)])))
+  const agrupadoresVista = $derived((cv.agrupadores || []).filter(g => cruza(cajasGrupos.get(g.id))))
+  const cuantos = $derived(new Map((cv.agrupadores || []).map(g => [g.id, Array.isArray(g.miembros) ? g.miembros.length : grupos.miembros(g).length])))
 
   function editarAgrupador(g) {
     modal = { grupo: true, agrupador: g, dentro: g ? grupos.miembros(g).map(e => e.id) : [] }
@@ -160,7 +162,8 @@
   let lejos = $state(false) // zoom lejano: el Lienzo simplifica el dibujo
   let entradaFoto
 
-  const guardar = () => guardarProyecto(p)
+  // Al guardar, cada agrupador fija su recuadro ajustado a lo que tiene dentro.
+  const guardar = () => { grupos.fijar(); guardarProyecto(p) }
   const copia = o => $state.snapshot(o)
 
   /** Al arrastrar en Radial / Por tema, se congela lo que se ve y se pasa a Libre. */
@@ -178,18 +181,19 @@
   function arrastreFuente(id) {
     let x0, y0
     return {
-      inicio: () => { fijarLibre(); ({ x: x0, y: y0 } = posDe(id)) },
+      inicio: () => { fijarLibre(); grupos.fijar(); ({ x: x0, y: y0 } = posDe(id)) },
       mover: (dx, dy) => { cv.posiciones[id] = { x: Math.round(x0 + dx), y: Math.round(y0 + dy) } },
-      fin: guardar
+      // Al soltar: sale de su agrupador si se alejó, o entra en el que quedó debajo.
+      fin: () => { grupos.soltado(id); guardarProyecto(p) }
     }
   }
 
   function arrastreLibre(obj) {
     let x0, y0
     return {
-      inicio: () => { x0 = obj.x; y0 = obj.y },
+      inicio: () => { grupos.fijar(); x0 = obj.x; y0 = obj.y },
       mover: (dx, dy) => { obj.x = Math.round(x0 + dx); obj.y = Math.round(y0 + dy) },
-      fin: guardar
+      fin: () => { grupos.soltado(obj.id); guardarProyecto(p) }
     }
   }
 
@@ -438,15 +442,15 @@
     </div>
     <div class="separador"></div>
     <div class="suave ayuda">
-      Arrastra las tarjetas para acomodarlas (pasa a modo Libre). Desliza con dos dedos para mover el lienzo y pellizca para hacer zoom (con ratón: Ctrl + rueda). Toca una fuente para ver sus citas. Crea notas, listas de tareas, notas de voz y fotos desde la barra; también puedes pegar (Ctrl+V) o arrastrar texto, imágenes y audios al lienzo. El buscador también encuentra texto en notas, tareas y transcripciones. El botón del recuadro punteado crea un agrupador: reúne varios elementos bajo un nombre y, al arrastrar su nombre, se mueven juntos (suelta algo dentro para agregarlo). La chincheta cambia a tablero de corcho.
+      Arrastra las tarjetas para acomodarlas (pasa a modo Libre). Desliza con dos dedos para mover el lienzo y pellizca para hacer zoom (con ratón: Ctrl + rueda). Toca una fuente para ver sus citas. Crea notas, listas de tareas, notas de voz y fotos desde la barra; también puedes pegar (Ctrl+V) o arrastrar texto, imágenes y audios al lienzo. El buscador también encuentra texto en notas, tareas y transcripciones. El botón del recuadro punteado crea un agrupador: reúne varios elementos bajo un nombre se ajusta solo a lo que tiene dentro; al arrastrar su nombre se mueve todo junto (suelta algo encima para agregarlo o arrástralo lejos para sacarlo). La chincheta cambia a tablero de corcho.
     </div>
   </aside>
 
   <Lienzo bind:this={lienzo} bind:simple={lejos} bind:ventana pesado={pesado} {limites} {corcho} cursor={conectando ? 'conectando' : ''} alTocarFondo={() => { if (conectando) conectando = null }}>
     <!-- Agrupadores: debajo de todo -->
     {#each agrupadoresVista as g (g.id)}
-      <Agrupador {g} resaltado={!!q && g.titulo.toLowerCase().includes(q.toLowerCase())}
-        alTocar={() => editarAgrupador(g)} arrastre={grupos.arrastre(g)} redimension={grupos.redimension(g)} />
+      <Agrupador {g} caja={cajasGrupos.get(g.id)} resaltado={!!q && g.titulo.toLowerCase().includes(q.toLowerCase())}
+        alTocar={() => editarAgrupador(g)} arrastre={grupos.arrastre(g)} />
     {/each}
 
     <!-- Etiquetas de grupo (Por tema) -->
@@ -509,7 +513,7 @@
 
     <!-- Nombre y esquina de los agrupadores: encima, para que ninguna tarjeta los tape -->
     {#each agrupadoresVista as g (g.id)}
-      <Agrupador {g} capa="frente" n={cuantos.get(g.id)} {lejos} alTocar={() => editarAgrupador(g)} arrastre={grupos.arrastre(g)} redimension={grupos.redimension(g)} />
+      <Agrupador {g} caja={cajasGrupos.get(g.id)} capa="frente" n={cuantos.get(g.id)} {lejos} alTocar={() => editarAgrupador(g)} arrastre={grupos.arrastre(g)} />
     {/each}
 
     <!-- Tablero de corcho: el hilo rojo pasa sobre las tarjetas y queda clavado en las chinchetas -->

@@ -54,7 +54,7 @@ function agrupadores(c, p, o, sangria = '') {
   const inds = (o?.indicadores || []).map(x => ({ id: x.id, caja: { x: x.x, y: x.y, w: 210, h: 60 } }))
   const todos = [...fuentes, ...inds, ...libres]
   return c.agrupadores.map(g => {
-    const dentro = todos.filter(e => contiene(g, e.caja)).map(e => nombreNodo(e.id, p, o))
+    const dentro = (Array.isArray(g.miembros) ? g.miembros : todos.filter(e => contiene(g, e.caja)).map(e => e.id)).map(id => nombreNodo(id, p, o))
     return `${sangria}- Agrupador «${una(g.titulo)}» \`${g.id}\`: ${dentro.length ? dentro.join('; ') : '(vacío)'}`
   })
 }
@@ -148,9 +148,10 @@ que la app no lo restaure. Lo de abajo describe el formato por si hay que editar
   Las notas de voz (\`canvas.audios\`) y fotos (\`canvas.fotos\`) llevan el archivo incrustado: no las crees, solo
   puedes corregir su \`transcripcion\`, \`titulo\`, \`texto\` o \`anotacion\`.
 - **Agrupadores** (recuadros punteados con nombre): \`canvas.agrupadores\` (o en \`canvas.objetivos.<clave>\`)
-  con \`{ "id": "grupo_<algo único>", "titulo": "…", "color": "azul", "x": 0, "y": 0, "w": 600, "h": 400 }\`
-  (color: azul | verde | rojo | ocre | lila | gris). Pertenece a un agrupador lo que tiene su centro
-  dentro del recuadro: para meter algo, pon su x, y dentro (debajo de los primeros 46 px, donde va el nombre).
+  con \`{ "id": "grupo_<algo único>", "titulo": "…", "color": "azul", "miembros": ["fuente_001", "nota_…"], "x": 0, "y": 0, "w": 600, "h": 400 }\`
+  (color: azul | verde | rojo | ocre | lila | gris). \`miembros\` son los ids de lo que agrupa (cada
+  elemento en un solo agrupador); la app ajusta sola el recuadro (x, y, w, h) a lo que tiene dentro.
+  Coloca los miembros cerca entre sí (unos 220 px de separación) para que el recuadro quede compacto.
 - Escribe JSON válido y completo (la app ignora un archivo a medio escribir y reintenta).
 - No borres campos que no conozcas: la app guarda ahí posiciones del lienzo y otros datos.
 `

@@ -186,17 +186,26 @@ const SUITES = {
     return s
   },
 
-  // Agrupadores: recuadro punteado con nombre que reúne elementos y los lleva consigo.
+  // Agrupadores: recuadro punteado con nombre que se ajusta a su contenido y lo lleva consigo.
   async agrupador(b) {
     const s = suite('Agrupadores del lienzo'), pg = await pagina(b)
     await conEjemplo(pg)
     const dentro = (g, c) => { const x = c.x + c.w / 2, y = c.y + c.h / 2; return x >= g.x && x <= g.x + g.w && y >= g.y && y <= g.y + g.h }
-    let ids = []
-    const miembros = async () => {
+    const datos = async () => {
       const cv = await lienzoGuardado(pg), g = cv.agrupadores[0]
-      const cajas = [...cv.notas.map(n => ({ id: n.id, x: n.x, y: n.y, w: 168, h: 60 })), ...Object.entries(cv.posiciones).map(([id, q]) => ({ id, x: q.x, y: q.y, w: 190, h: 70 }))]
-      return { cv, g, cajas, dentro: cajas.filter(c => dentro(g, c)).map(c => c.id).sort() }
+      const pos = { ...Object.fromEntries(cv.notas.map(n => [n.id, { x: n.x, y: n.y }])), ...cv.posiciones }
+      return { cv, g, pos }
     }
+    /** Arrastra con el ratón desde el centro de `el` (ElementHandle) dx, dy píxeles. */
+    const arrastrar = async (el, dx, dy) => {
+      const r = await el.boundingBox(), x = r.x + Math.min(r.width / 2, 30), y = r.y + Math.min(r.height / 2, 14)
+      await pg.mouse.move(x, y); await pg.mouse.down()
+      for (let i = 1; i <= 10; i++) await pg.mouse.move(x + (dx * i) / 10, y + (dy * i) / 10)
+      await pg.mouse.up(); await esperar(400)
+    }
+    const nota = texto => pg.evaluateHandle(t => [...document.querySelectorAll('g[aria-label="Nota"]')].find(g => g.textContent.includes(t)), texto)
+    const zoom = async () => (await pg.$eval('.zoom .porc', b => parseInt(b.textContent))) / 100
+    let ids = []
     await s.paso('crear un agrupador con dos fuentes y una nota: quedan dentro', async () => {
       await pg.click('button[aria-label="Añadir nota"]')
       await pg.type('dialog[open] textarea', 'Idea para el marco'); await clicTexto(pg, 'Guardar'); await esperar(300)
@@ -206,40 +215,54 @@ const SUITES = {
       if (casillas.length < 3) throw new Error('faltan elementos en la lista')
       await casillas[0].click(); await casillas[1].click(); await casillas.at(-1).click()
       await clicTexto(pg, 'Crear agrupador'); await esperar(500)
-      if (!(await pg.$('g.agrupador'))) throw new Error('no se dibujó')
-      const m = await miembros()
-      if (m.g.titulo !== 'Marco teórico' || m.cv.modo !== 'libre') throw new Error('datos: ' + JSON.stringify(m.g))
-      if (m.dentro.length !== 3) throw new Error(`dentro: ${m.dentro}`)
-      ids = m.dentro
+      const { cv, g, pos } = await datos()
+      if (g?.titulo !== 'Marco teórico' || cv.modo !== 'libre') throw new Error('datos: ' + JSON.stringify(g))
+      if (g.miembros?.length !== 3) throw new Error('miembros: ' + JSON.stringify(g.miembros))
+      for (const id of g.miembros) if (!dentro(g, { ...pos[id], w: 150, h: 50 })) throw new Error(`${id} quedó fuera del recuadro`)
+      ids = [...g.miembros].sort()
       const t = await pg.$eval('g.agrupador.frente .titulo text', e => e.textContent)
       if (!t.includes('Marco teórico') || !t.includes('3')) throw new Error('título: ' + t)
       await pg.screenshot({ path: path.join(SALIDA, 'agrupador-nuevo.png') })
     })
-    await s.paso('arrastrar el nombre mueve el recuadro con lo que tiene dentro', async () => {
-      const antes = await miembros()
-      const r = await (await pg.$('g.agrupador.frente .titulo')).boundingBox()
-      await pg.mouse.move(r.x + 20, r.y + 10); await pg.mouse.down()
-      for (let i = 1; i <= 10; i++) await pg.mouse.move(r.x + 20 + i * 15, r.y + 10 + i * 8)
-      await pg.mouse.up(); await esperar(400)
-      const desp = await miembros()
-      const dx = desp.g.x - antes.g.x, dy = desp.g.y - antes.g.y
+    await s.paso('arrastrar el nombre mueve el recuadro con todo su contenido', async () => {
+      const a = await datos()
+      await arrastrar(await pg.$('g.agrupador.frente .titulo'), 150, 80)
+      const d = await datos(), dx = d.g.x - a.g.x, dy = d.g.y - a.g.y
       if (!dx || !dy) throw new Error('no se movió')
-      for (const id of ids) {
-        const a = antes.cajas.find(c => c.id === id), d = desp.cajas.find(c => c.id === id)
-        if (d.x - a.x !== dx || d.y - a.y !== dy) throw new Error(`${id} no se movió con el recuadro`)
-      }
-      const fuera = antes.cajas.filter(c => !ids.includes(c.id))
-      for (const a of fuera) { const d = desp.cajas.find(c => c.id === a.id); if (d.x !== a.x || d.y !== a.y) throw new Error(`${a.id} se movió sin estar dentro`) }
-      // Lo que estaba dentro sigue dentro (si el recuadro cayó sobre otra cosa, esa también queda dentro).
-      if (!ids.every(id => desp.dentro.includes(id))) throw new Error('algo se salió del recuadro')
+      for (const id of ids) if (d.pos[id].x - a.pos[id].x !== dx || d.pos[id].y - a.pos[id].y !== dy) throw new Error(`${id} no se movió con el recuadro`)
+      for (const id of Object.keys(a.pos).filter(id => !ids.includes(id))) if (d.pos[id].x !== a.pos[id].x) throw new Error(`${id} se movió sin estar dentro`)
+      if ([...d.g.miembros].sort().join() !== ids.join()) throw new Error('cambió quién está dentro')
+    })
+    await s.paso('mover algo de dentro reajusta el recuadro', async () => {
+      const a = await datos()
+      await arrastrar(await nota('Idea para el marco'), 90, 70)
+      const d = await datos()
+      if (!d.g.miembros.some(id => id.startsWith('nota'))) throw new Error('la nota salió del grupo')
+      if (!(d.g.w > a.g.w || d.g.h > a.g.h)) throw new Error(`el recuadro no creció: ${a.g.w}×${a.g.h} → ${d.g.w}×${d.g.h}`)
+      const vis = await pg.$eval('g.agrupador.fondo .marco', r => ({ w: +r.getAttribute('width'), h: +r.getAttribute('height') }))
+      if (vis.w !== d.g.w || vis.h !== d.g.h) throw new Error('lo dibujado no coincide con lo guardado')
+    })
+    await s.paso('arrastrarlo lejos lo saca y soltarlo encima lo vuelve a meter', async () => {
+      const a = await datos(), k = await zoom()
+      await arrastrar(await nota('Idea para el marco'), -(a.g.w + 250) * k, 0)
+      let d = await datos()
+      if (d.g.miembros.some(id => id.startsWith('nota'))) throw new Error('no salió del grupo')
+      if (d.g.miembros.length !== 2) throw new Error('miembros: ' + d.g.miembros)
+      const titulo = await (await pg.$('g.agrupador.frente .titulo')).boundingBox()
+      const n = await (await nota('Idea para el marco')).boundingBox()
+      await arrastrar(await nota('Idea para el marco'), titulo.x + 40 - n.x, titulo.y + 60 - n.y)
+      d = await datos()
+      if (d.g.miembros.length !== 3) throw new Error('no volvió a entrar: ' + d.g.miembros)
     })
     await s.paso('quitar un elemento desde el editor lo saca del recuadro', async () => {
-      const antes = (await miembros()).dentro
       await pg.click('g.agrupador.frente .titulo'); await pg.waitForSelector('dialog[open] .lista', { timeout: 5000 })
       await (await pg.$('dialog[open] .lista input[type=checkbox]:checked')).click()
       await clicTexto(pg, 'Guardar'); await esperar(400)
-      const m = await miembros()
-      if (m.dentro.length !== antes.length - 1) throw new Error(`dentro: ${antes} → ${m.dentro}`)
+      const { g, pos } = await datos()
+      if (g.miembros.length !== 2) throw new Error('miembros: ' + g.miembros)
+      const fuera = ids.find(id => !g.miembros.includes(id) && pos[id])
+      if (fuera && dentro(g, { ...pos[fuera], w: 150, h: 50 })) throw new Error('quedó dibujado dentro')
+      await pg.screenshot({ path: path.join(SALIDA, 'agrupador.png') })
     })
     await s.paso('también en el lienzo de un objetivo', async () => {
       await clicTexto(pg, 'OE1', '', 'span')
@@ -253,21 +276,10 @@ const SUITES = {
       for (const c of await pg.$$('dialog[open] .lista input[type=checkbox]')) await c.click()
       await clicTexto(pg, 'Crear agrupador'); await esperar(500)
       const oe1 = (await lienzoGuardado(pg)).objetivos.oe1, g = oe1.agrupadores?.[0]
-      if (g?.titulo !== 'Ideas OE1') throw new Error('no se guardó en oe1')
-      const fuera = oe1.notas.filter(n => !dentro(g, { x: n.x, y: n.y, w: 168, h: 60 }))
-      if (fuera.length) throw new Error('hay notas fuera del recuadro')
+      if (g?.titulo !== 'Ideas OE1' || g.miembros?.length !== 2) throw new Error('no se guardó en oe1: ' + JSON.stringify(g))
+      if (oe1.notas.some(n => !dentro(g, { x: n.x, y: n.y, w: 168, h: 60 }))) throw new Error('hay notas fuera del recuadro')
       if (!(await pg.$('.obj-panel g.agrupador.frente'))) throw new Error('no se dibujó')
       await pg.click('.obj-panel button[aria-label="Cerrar lienzo del objetivo"]'); await esperar(400)
-    })
-    await s.paso('la esquina cambia el tamaño', async () => {
-      const antes = (await miembros()).g
-      const r = await (await pg.$('g.agrupador.frente .esquina rect')).boundingBox()
-      await pg.mouse.move(r.x + r.width / 2, r.y + r.height / 2); await pg.mouse.down()
-      for (let i = 1; i <= 6; i++) await pg.mouse.move(r.x + r.width / 2 + i * 12, r.y + r.height / 2 + i * 10)
-      await pg.mouse.up(); await esperar(300)
-      const g = (await miembros()).g
-      if (!(g.w > antes.w && g.h > antes.h) || g.x !== antes.x) throw new Error(`tamaño ${antes.w}×${antes.h} → ${g.w}×${g.h}`)
-      await pg.screenshot({ path: path.join(SALIDA, 'agrupador.png') })
     })
     if (pg.errores.length) s.fallas.push(...pg.errores.filter(e => !/crossref/i.test(e)))
     return s

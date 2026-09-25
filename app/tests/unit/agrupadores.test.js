@@ -1,7 +1,7 @@
 // app/tests/unit/agrupadores.test.js — recuadros que agrupan elementos (src/lib/agrupadores.js)
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { contiene, miembrosDe, acomodar, agregarDentro, sacar, nuevoAgrupador, accionesAgrupadores, CAB, PAD } from '../../src/lib/agrupadores.js'
+import { contiene, miembrosDe, acomodar, agregarDentro, sacar, nuevoAgrupador, accionesAgrupadores, ajustar, CAB, PAD } from '../../src/lib/agrupadores.js'
 
 const dentroDe = (g, c) => c.x >= g.x && c.y >= g.y + CAB - 1 && c.x + c.w <= g.x + g.w && c.y + c.h <= g.y + g.h
 const solapan = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
@@ -87,17 +87,6 @@ test('acciones: crear, mover con sus miembros, editar y eliminar', () => {
   assert.ok(guardados.n >= 4)
 })
 
-test('acciones: un agrupador dentro de otro se mueve con él', () => {
-  const { c, acc } = lienzoFalso([{ id: 'a', x: 0, y: 0, w: 100, h: 60 }])
-  const grande = acc.crear('Grande', 'azul', [], () => ({ x: 0, y: 0 }))
-  grande.w = 800; grande.h = 600
-  const chico = acc.crear('Chico', 'ocre', [], () => ({ x: 100, y: 100 }))
-  const d = acc.arrastre(grande)
-  d.inicio(); d.mover(10, 10); d.fin()
-  assert.deepEqual([chico.x, chico.y], [110, 110])
-  assert.equal(c.agrupadores.length, 2)
-})
-
 test('editar sin tocar la selección no mueve lo que ya está dentro', () => {
   const { acc, caja } = lienzoFalso([{ id: 'a', x: 0, y: 0, w: 100, h: 60 }, { id: 'b', x: 300, y: 0, w: 100, h: 60 }])
   const g = acc.crear('G', 'azul', ['a', 'b'], () => ({ x: 0, y: 0 }))
@@ -106,4 +95,49 @@ test('editar sin tocar la selección no mueve lo que ya está dentro', () => {
   assert.deepEqual([caja('a'), caja('b')], antes.slice(0, 2))
   assert.equal(g.w, antes[2].w)
   assert.equal(g.h, antes[2].h)
+})
+
+test('el recuadro se ajusta a su contenido cuando se mueve algo de dentro', () => {
+  const { acc, els } = lienzoFalso([{ id: 'a', x: 0, y: 0, w: 100, h: 60 }, { id: 'b', x: 300, y: 0, w: 100, h: 60 }])
+  const g = acc.crear('G', 'azul', ['a', 'b'], () => ({ x: 0, y: 0 }))
+  const antes = acc.caja(g)
+  const b = els.find(e => e.id === 'b').caja
+  b.x += 150 // se mueve 'b' un poco a la derecha (sigue tocando el recuadro)
+  const despues = acc.caja(g)
+  assert.equal(despues.x + despues.w, b.x + b.w + PAD) // el borde derecho lo sigue
+  assert.ok(despues.w > antes.w)
+  assert.equal(despues.x, antes.x)
+  acc.soltado('b') // sigue tocando el recuadro de antes: se queda y el recuadro se fija
+  assert.deepEqual(g.miembros, ['a', 'b'])
+  assert.equal(g.w, despues.w)
+})
+
+test('ajustar deja margen y la cabecera para el nombre', () => {
+  assert.deepEqual(ajustar([{ x: 100, y: 100, w: 300, h: 200 }]), { x: 100 - PAD, y: 100 - CAB, w: 300 + 2 * PAD, h: 200 + CAB + PAD })
+})
+
+test('arrastrar algo lejos lo saca; soltarlo sobre otro recuadro lo mete ahí', () => {
+  const { acc, els } = lienzoFalso([
+    { id: 'a', x: 0, y: 0, w: 100, h: 60 }, { id: 'b', x: 200, y: 0, w: 100, h: 60 }, { id: 'c', x: 2000, y: 0, w: 100, h: 60 }
+  ])
+  const g1 = acc.crear('Uno', 'azul', ['a', 'b'], () => ({ x: 0, y: 0 }))
+  const g2 = acc.crear('Dos', 'verde', ['c'], () => ({ x: 2000, y: 0 }))
+  const b = els.find(e => e.id === 'b').caja
+  // Lejos de todo: sale de g1 y no entra en nada.
+  b.x = 1000; b.y = 1000
+  acc.soltado('b')
+  assert.deepEqual(g1.miembros, ['a'])
+  // Encima de g2: entra en g2.
+  const c2 = acc.caja(g2)
+  b.x = c2.x + 20; b.y = c2.y + CAB
+  acc.soltado('b')
+  assert.deepEqual(g2.miembros.sort(), ['b', 'c'])
+  assert.deepEqual(g1.miembros, ['a'])
+})
+
+test('un agrupador de la versión anterior (sin lista de miembros) adopta lo que tiene dentro', () => {
+  const { c, acc } = lienzoFalso([{ id: 'a', x: 20, y: 60, w: 100, h: 60 }, { id: 'lejos', x: 900, y: 900, w: 100, h: 60 }])
+  c.agrupadores.push({ id: 'g', titulo: 'Viejo', color: 'azul', x: 0, y: 0, w: 400, h: 300 })
+  acc.fijar()
+  assert.deepEqual(c.agrupadores[0].miembros, ['a'])
 })

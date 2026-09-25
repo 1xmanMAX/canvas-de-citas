@@ -91,7 +91,8 @@ paper, skill con referencias y puntos clave.
 
 **Agrupadores** (sep. 2026): recuadros punteados con nombre que reúnen elementos del lienzo
 (`canvas.agrupadores` y en cada sub-lienzo de objetivo; `lib/agrupadores.js`, `Agrupador.svelte`,
-`EditorAgrupador.svelte`). Pertenece lo que tiene su centro dentro. Prueba: `npm run test:e2e -- agrupador`.
+`EditorAgrupador.svelte`). Guardan sus `miembros` y el recuadro se ajusta solo a ellos; mover el
+recuadro mueve todo; soltar algo encima lo agrega y arrastrarlo lejos lo saca. Prueba: `npm run test:e2e -- agrupador`.
 
 **Siguiente:** probar el APK en el celular de Max y hacer la **Tarea 8 del Plan 1** en su PC
 (receptor de Windows + "Vincular celular" con QR). Mientras tanto sirve `canvas-sincro.exe`

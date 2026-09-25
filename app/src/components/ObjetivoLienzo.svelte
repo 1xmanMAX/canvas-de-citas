@@ -34,7 +34,8 @@
     cv.objetivos[clave] ||= vacio()
     return asegurarTablero(cv.objetivos[clave])
   }
-  const guardar = () => guardarProyecto(p)
+  // Al guardar, cada agrupador fija su recuadro ajustado a lo que tiene dentro.
+  const guardar = () => { if (cv.objetivos[clave]) grupos.fijar(); guardarProyecto(p) }
   const copia = x => $state.snapshot(x)
   const idLocal = prefijo => `${prefijo}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`
 
@@ -100,7 +101,7 @@
     ...indicadores.map(x => ({ x: x.x, y: x.y, w: IND_W, h: indAlto(x) })),
     ...fuentes.map(x => ({ x: x.x, y: x.y, w: NODO_W, h: altoFuente(x.f) })),
     ...[...tarj.values()].map(({ x, y, w, h }) => ({ x, y, w, h })),
-    ...(o.agrupadores || []).map(({ x, y, w, h }) => ({ x, y, w, h }))
+    ...[...cajasGrupos.values()]
   ])
   const limites = $derived(limitesDe(ocupadas, 40))
 
@@ -152,9 +153,18 @@
     for (const [id, t] of tarj) out.push({ id, get nombre() { return nombreDe(id) }, tipo: TIPO[t.lista], caja: t, poner: (a, b) => { t.obj.x = a; t.obj.y = b } })
     return out
   }
-  const grupos = accionesAgrupadores({ lienzo: asegurar, elementos, guardar: () => guardar() })
-  const agrupadoresVista = $derived((o.agrupadores || []).filter(g => cruza(g)))
-  const cuantos = $derived(new Map((o.agrupadores || []).map(g => [g.id, grupos.miembros(g).length])))
+  function cajaPorId(id) {
+    const i = indicadores.find(x => x.id === id)
+    if (i) return { x: i.x, y: i.y, w: IND_W, h: indAlto(i) }
+    const f = fuentes.find(x => x.id === id)
+    if (f) return { x: f.x, y: f.y, w: NODO_W, h: altoFuente(f.f) }
+    return tarj.get(id) || null
+  }
+  const grupos = accionesAgrupadores({ lienzo: asegurar, elementos, cajaPorId, guardar: () => guardarProyecto(p) })
+  /** Recuadro de cada agrupador, ajustado en vivo a lo que tiene dentro. */
+  const cajasGrupos = $derived(new Map((o.agrupadores || []).map(g => [g.id, grupos.caja(g)])))
+  const agrupadoresVista = $derived((o.agrupadores || []).filter(g => cruza(cajasGrupos.get(g.id))))
+  const cuantos = $derived(new Map((o.agrupadores || []).map(g => [g.id, Array.isArray(g.miembros) ? g.miembros.length : grupos.miembros(g).length])))
   const editarAgrupador = g => (modal = { grupo: true, agrupador: g, dentro: g ? grupos.miembros(g).map(e => e.id) : [] })
   function guardarAgrupador({ titulo, color, ids }) {
     const g = modal.agrupador
@@ -173,9 +183,10 @@
   function arrastre(obj) {
     let x0, y0
     return {
-      inicio: () => { x0 = obj.x; y0 = obj.y },
+      inicio: () => { grupos.fijar(); x0 = obj.x; y0 = obj.y },
       mover: (dx, dy) => { obj.x = Math.round(x0 + dx); obj.y = Math.round(y0 + dy) },
-      fin: guardar
+      // Al soltar: sale de su agrupador si se alejó, o entra en el que quedó debajo.
+      fin: () => { grupos.soltado(obj.id); guardarProyecto(p) }
     }
   }
 
@@ -303,7 +314,7 @@
     <Lienzo bind:this={lienzo} bind:simple={lejos} bind:ventana pesado={pesado} {limites} {corcho} cursor={conectando ? 'conectando' : ''} alTocarFondo={() => { if (conectando) conectando = null }}>
       <!-- Agrupadores: debajo de todo -->
       {#each agrupadoresVista as g (g.id)}
-        <Agrupador {g} alTocar={() => editarAgrupador(g)} arrastre={grupos.arrastre(g)} redimension={grupos.redimension(g)} />
+        <Agrupador {g} caja={cajasGrupos.get(g.id)} alTocar={() => editarAgrupador(g)} arrastre={grupos.arrastre(g)} />
       {/each}
 
       <!-- Aristas objetivo → indicadores y fuentes -->
@@ -357,7 +368,7 @@
 
       <!-- Nombre y esquina de los agrupadores, encima de las tarjetas -->
       {#each agrupadoresVista as g (g.id)}
-        <Agrupador {g} capa="frente" n={cuantos.get(g.id)} {lejos} alTocar={() => editarAgrupador(g)} arrastre={grupos.arrastre(g)} redimension={grupos.redimension(g)} />
+        <Agrupador {g} caja={cajasGrupos.get(g.id)} capa="frente" n={cuantos.get(g.id)} {lejos} alTocar={() => editarAgrupador(g)} arrastre={grupos.arrastre(g)} />
       {/each}
 
       {#if corcho}

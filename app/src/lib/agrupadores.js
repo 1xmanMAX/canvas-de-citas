@@ -1,7 +1,10 @@
 // Agrupadores del lienzo: recuadros punteados con nombre que reúnen varios elementos (fuentes,
 // notas, listas, audios, fotos, indicadores). Se guardan en `c.agrupadores` del lienzo
-// ({ id, titulo, color, x, y, w, h }). Pertenecer a un agrupador es estar dentro: un elemento
-// es miembro si su centro cae en el recuadro. Así, soltar algo dentro lo agrega y sacarlo lo quita.
+// ({ id, titulo, color, miembros: [ids], x, y, w, h }). El recuadro siempre se ajusta a sus
+// miembros: si uno se mueve, el recuadro se estira o encoge; si se mueve el recuadro, se mueven
+// todos. Soltar algo sobre un recuadro lo agrega; arrastrarlo lejos (sin tocar el recuadro) lo saca.
+// x, y, w, h guardan el último ajuste (para un agrupador vacío, su lugar). Los agrupadores sin
+// `miembros` (versiones anteriores) adoptan lo que tengan dentro.
 const idLocal = prefijo => `${prefijo}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`
 
 export const COLORES_GRUPO = {
@@ -69,40 +72,80 @@ export function nuevoAgrupador(titulo, color, cajas, x, y) {
   return { agrupador: { id: idLocal('grupo'), titulo: titulo.trim() || 'Grupo', color, x: Math.round(x), y: Math.round(y), w: r.w, h: r.h }, pos: r.pos }
 }
 
+/** Recuadro ajustado a unas cajas: margen alrededor y la cabecera arriba para el nombre. */
+export function ajustar(cajas) {
+  const x0 = Math.min(...cajas.map(c => c.x)), y0 = Math.min(...cajas.map(c => c.y))
+  const x1 = Math.max(...cajas.map(c => c.x + c.w)), y1 = Math.max(...cajas.map(c => c.y + c.h))
+  const x = x0 - PAD, y = y0 - CAB
+  return { x: Math.round(x), y: Math.round(y), w: Math.round(Math.max(MIN_W, x1 + PAD - x)), h: Math.round(Math.max(MIN_H, y1 + PAD - y)) }
+}
+
+const solapan = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
+
 /**
  * Acciones sobre los agrupadores de un lienzo. `lienzo()` devuelve el objeto que guarda
  * `agrupadores`; `elementos()` los elementos movibles `{ id, nombre, tipo, caja, poner(x, y) }`;
  * `antes()` se llama antes de mover cosas (p. ej. pasar a modo Libre); `guardar()` al terminar.
+ * `cajaPorId(id)` (opcional) da la caja de un elemento sin recorrerlos todos: el recuadro se
+ * recalcula en cada cuadro mientras se arrastra algo.
  */
-export function accionesAgrupadores({ lienzo, elementos, antes = () => {}, guardar = () => {} }) {
+export function accionesAgrupadores({ lienzo, elementos, cajaPorId = null, antes = () => {}, guardar = () => {} }) {
   // Se relee tras crearla: con Svelte, el valor de `||=` es el arreglo crudo, no el reactivo.
   const lista = () => { const c = lienzo(); c.agrupadores ||= []; return c.agrupadores }
   const porId = ids => { const s = new Set(ids); return elementos().filter(e => s.has(e.id)) }
   const cajaDe = e => ({ id: e.id, w: e.caja.w, h: e.caja.h, x: e.caja.x, y: e.caja.y })
   const colocar = (els, pos) => { for (const e of els) { const p = pos.get(e.id); if (p) e.poner(p.x, p.y) } }
-  /** Miembros de `g` (elementos y agrupadores más pequeños dentro de él). */
-  const miembros = g => miembrosDe(g, elementos())
-  const anidados = g => lista().filter(o => o !== g && o.w * o.h < g.w * g.h && contiene(g, o))
+
+  /** Miembros de `g` que siguen en el lienzo (los antiguos, sin lista, adoptan lo que tienen dentro). */
+  function miembros(g, els = elementos()) {
+    if (!Array.isArray(g.miembros)) return miembrosDe(g, els)
+    const s = new Set(g.miembros)
+    return els.filter(e => s.has(e.id))
+  }
+  /** Recuadro que se ve: ajustado a sus miembros, o el guardado si está vacío. */
+  function caja(g, els) {
+    const cajas = Array.isArray(g.miembros) && cajaPorId && !els
+      ? g.miembros.map(cajaPorId).filter(Boolean)
+      : miembros(g, els || elementos()).map(e => e.caja).filter(Boolean)
+    return cajas.length ? ajustar(cajas) : { x: g.x, y: g.y, w: g.w, h: g.h }
+  }
+  /** Guarda en cada agrupador su recuadro ajustado (y la lista de miembros si no la tenía). */
+  function fijar() {
+    const els = elementos()
+    for (const g of lista()) {
+      if (!Array.isArray(g.miembros)) g.miembros = miembrosDe(g, els).map(e => e.id)
+      else { const hay = new Set(els.map(e => e.id)); g.miembros = g.miembros.filter(id => hay.has(id)) }
+      Object.assign(g, caja(g, els))
+    }
+  }
+  const terminar = () => { fijar(); guardar() }
+  /** Quita `ids` de todos los agrupadores salvo `g` (un elemento está en un solo agrupador). */
+  const quitarDeOtros = (ids, g) => { for (const o of lista()) if (o !== g && Array.isArray(o.miembros)) o.miembros = o.miembros.filter(id => !ids.includes(id)) }
 
   return {
     miembros,
+    caja,
 
     /** Crea un agrupador con los elementos `ids` acomodados dentro. `ubicar(w, h)` → esquina. */
     crear(titulo, color, ids, ubicar) {
       antes()
+      fijar()
       const els = porId(ids)
       const { agrupador: g, pos } = nuevoAgrupador(titulo, color, els.map(cajaDe), 0, 0)
       const { x, y } = ubicar(g.w, g.h)
       g.x = Math.round(x); g.y = Math.round(y)
+      g.miembros = els.map(e => e.id)
       colocar(els, new Map([...pos].map(([id, p]) => [id, { x: p.x + g.x, y: p.y + g.y }])))
+      quitarDeOtros(g.miembros, g)
       lista().push(g)
-      guardar()
+      terminar()
       return g
     },
 
     /** Cambia nombre y color; mete los `ids` nuevos y saca los que ya no están. */
     editar(g, { titulo, color, ids }) {
       antes()
+      fijar()
       g.titulo = titulo.trim() || 'Grupo'
       g.color = color
       const quedan = new Set(ids)
@@ -111,23 +154,24 @@ export function accionesAgrupadores({ lienzo, elementos, antes = () => {}, guard
       const siguen = actuales.filter(e => quedan.has(e.id))
       const ya = new Set(actuales.map(e => e.id))
       const entran = porId(ids).filter(e => !ya.has(e.id))
-      colocar(salen, sacar(g, salen.map(cajaDe)))
+      const antesDe = { x: g.x, y: g.y, w: g.w, h: g.h }
+      colocar(salen, sacar(antesDe, salen.map(cajaDe)))
       if (entran.length) {
-        const r = agregarDentro(g, siguen.map(cajaDe), entran.map(cajaDe))
-        colocar(entran, r.pos)
-        g.w = Math.round(r.w); g.h = Math.round(r.h)
+        const marco = siguen.length ? ajustar(siguen.map(e => e.caja)) : antesDe
+        colocar(entran, agregarDentro(marco, siguen.map(cajaDe), entran.map(cajaDe)).pos)
       }
-      guardar()
+      g.miembros = [...siguen, ...entran].map(e => e.id)
+      quitarDeOtros(g.miembros, g)
+      terminar()
     },
 
-    /** Vuelve a acomodar en filas todo lo que tiene dentro y ajusta el recuadro. */
+    /** Vuelve a acomodar en filas todo lo que tiene dentro (el recuadro se ajusta solo). */
     acomodar(g) {
       antes()
+      fijar()
       const els = miembros(g).sort((a, b) => a.caja.y - b.caja.y || a.caja.x - b.caja.x)
-      const r = acomodar(els.map(cajaDe), g.x, g.y)
-      colocar(els, r.pos)
-      g.w = r.w; g.h = r.h
-      guardar()
+      colocar(els, acomodar(els.map(cajaDe), g.x, g.y).pos)
+      terminar()
     },
 
     /** Quita el recuadro (los elementos se quedan donde están). */
@@ -136,34 +180,48 @@ export function accionesAgrupadores({ lienzo, elementos, antes = () => {}, guard
       guardar()
     },
 
-    /** Arrastre del recuadro: se mueven con él sus miembros y los agrupadores que tiene dentro. */
+    /** Arrastre del recuadro: se mueven con él todos sus miembros. */
     arrastre(g) {
       let x0, y0, mov = []
       return {
         inicio: () => {
           antes()
+          fijar()
           x0 = g.x; y0 = g.y
-          mov = [
-            ...miembros(g).map(e => ({ x: e.caja.x, y: e.caja.y, poner: e.poner })),
-            ...anidados(g).map(o => ({ x: o.x, y: o.y, poner: (x, y) => { o.x = x; o.y = y } }))
-          ]
+          mov = miembros(g).map(e => ({ x: e.caja.x, y: e.caja.y, poner: e.poner }))
         },
         mover: (dx, dy) => {
           g.x = Math.round(x0 + dx); g.y = Math.round(y0 + dy)
           for (const m of mov) m.poner(Math.round(m.x + dx), Math.round(m.y + dy))
         },
-        fin: guardar
+        fin: terminar
       }
     },
 
-    /** Arrastre de la esquina: cambia el tamaño (no mueve nada). */
-    redimension(g) {
-      let w0, h0
-      return {
-        inicio: () => { w0 = g.w; h0 = g.h },
-        mover: (dx, dy) => { g.w = Math.round(Math.max(MIN_W, w0 + dx)); g.h = Math.round(Math.max(MIN_H, h0 + dy)) },
-        fin: guardar
+    /**
+     * Tras soltar el elemento `id` (arrastrado por el lienzo): si se alejó de su agrupador (ya no
+     * toca el recuadro de antes), sale; si cayó sobre otro recuadro, entra en él. Luego se ajustan
+     * todos los recuadros y se guarda.
+     */
+    soltado(id) {
+      const els = elementos()
+      const e = els.find(x => x.id === id)
+      if (!e) return terminar()
+      const suyo = lista().find(g => Array.isArray(g.miembros) && g.miembros.includes(id))
+      // g.x… aún guarda el recuadro de antes del arrastre (se fija al terminar).
+      if (suyo && !solapan(e.caja, { x: suyo.x, y: suyo.y, w: suyo.w, h: suyo.h })) suyo.miembros = suyo.miembros.filter(x => x !== id)
+      const sigue = suyo && suyo.miembros.includes(id)
+      if (!sigue) {
+        // El recuadro más pequeño que contiene su centro (el más específico).
+        const destino = lista().filter(g => contiene(caja(g, els), e.caja)).sort((a, b) => a.w * a.h - b.w * b.h)[0]
+        if (destino) {
+          if (!Array.isArray(destino.miembros)) destino.miembros = miembrosDe(destino, els).map(x => x.id)
+          if (!destino.miembros.includes(id)) destino.miembros.push(id)
+        }
       }
-    }
+      terminar()
+    },
+
+    fijar
   }
 }
