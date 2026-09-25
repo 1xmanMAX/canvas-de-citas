@@ -14,6 +14,12 @@ lleva dentro `app/dist`. En Android la app se sincroniza con la PC por Wi-Fi (Pl
   busca en la red (como mucho cada 30 min en automático).
 - No aparecen la carpeta de almacenamiento ni el receptor local; no hay service worker (todo
   va en el APK).
+- Mismas funciones que en la PC (lienzo, agrupadores, visor, biblioteca, citas, `.bib`…). Lo que
+  en la PC se **descarga** (3 JSON, `.bib`, el PDF del visor) aquí abre la hoja **Compartir** para
+  guardarlo en Archivos/Drive o enviarlo (plugin propio `Archivos`).
+- **Compartir → Canvas de Citas** desde cualquier app (lo que en la PC hace el receptor): PDF,
+  HTML o Markdown se abren en el visor; imágenes y audios van al lienzo del proyecto; un texto
+  se vuelve nota; los `.json` se importan.
 - Notas de voz: se graban y, al terminar, se transcriben **en el celular y sin internet** con el
   reconocedor de Android (plugin propio `Voz`, Android 13+). La primera vez puede pedir descargar
   el paquete de voz en español. Botón *Transcribir* en la nota para repetirlo.

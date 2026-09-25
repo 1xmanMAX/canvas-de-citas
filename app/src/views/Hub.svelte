@@ -29,6 +29,8 @@
   import { R } from '../lib/celular.svelte.js'
   import BotonSincro from '../components/BotonSincro.svelte'
   import { esAndroid } from '../lib/plataforma.js'
+  import { lienzoAbierto } from '../lib/archivos.js'
+  import { onMount } from 'svelte'
 
   let { p, fid = null, oid = null, abrirDatos, abrirCelular, abrirArchivos, atras } = $props()
 
@@ -281,6 +283,12 @@
     avisar(n === 1 ? 'Tarjeta agregada' : `${n} tarjetas agregadas`)
   }
 
+  // Lo compartido desde otras apps del celular llega aquí (App.svelte → lib/archivos.js).
+  onMount(() => {
+    lienzoAbierto.insertar = (archivos, texto) => { const c = lienzo.centro(); return insertar(archivos, texto, c.x, c.y) }
+    return () => { lienzoAbierto.insertar = null }
+  })
+
   function pegar(e) {
     if (modal || fuenteAbierta || oid || document.querySelector('dialog[open]')) return
     if (e.target.closest?.('input, textarea, [contenteditable]')) return
@@ -431,6 +439,8 @@
       </div>
     {/if}
     <button class="btn chico" onclick={() => (modal = 'ficha')}>Editar ficha</button>
+    <!-- En el celular la cabecera no tiene espacio: exportar va aquí. -->
+    <button class="btn chico solo-movil" onclick={() => descargarBib(fuentes, 'bibliografia.bib')}><Icono nombre="descargar" tam={13} />Exportar .bib del proyecto</button>
     <div class="separador"></div>
     <div>
       <div class="rotulo sub2">Leyenda</div>

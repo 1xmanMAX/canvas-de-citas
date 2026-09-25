@@ -81,7 +81,8 @@ paper, skill con referencias y puntos clave.
   "Sincronizar con la PC").
 - Plan 2 (`docs/superpowers/plans/2026-09-25-android-app.md`): hecho — proyecto `android/`,
   modo Android (botón Sincronizar, automática, búsqueda de la PC si cambió su IP, escáner de QR
-  con el plugin propio `Vinculo`, transcripción de notas de voz con el plugin `Voz`,
+  con el plugin propio `Vinculo`, transcripción de notas de voz con el plugin `Voz`, guardar y
+  recibir archivos con el plugin `Archivos` (`lib/archivos.js`: descargas en PC ≡ Compartir en Android),
   márgenes de las barras del sistema). Prueba: `npm run test:e2e -- android` (Capacitor simulado).
 
 - Plan 3 (`docs/superpowers/plans/2026-09-25-grupo-sincronizacion.md`): hecho — **grupo de

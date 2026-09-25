@@ -98,7 +98,18 @@ export function avisar(texto) {
 }
 
 export function copiar(texto) {
-  navigator.clipboard?.writeText(texto).then(() => avisar('Copiado'), () => avisar('No se pudo copiar'))
+  // Respaldo para WebViews (Android) sin portapapeles asíncrono o sin permiso.
+  const clasico = () => {
+    const t = Object.assign(document.createElement('textarea'), { value: texto })
+    t.style.cssText = 'position:fixed;opacity:0;top:0;left:0'
+    document.body.append(t)
+    t.select()
+    const ok = document.execCommand('copy')
+    t.remove()
+    avisar(ok ? 'Copiado' : 'No se pudo copiar')
+  }
+  if (!navigator.clipboard?.writeText) return clasico()
+  navigator.clipboard.writeText(texto).then(() => avisar('Copiado'), clasico)
 }
 
 function fallo(e) {

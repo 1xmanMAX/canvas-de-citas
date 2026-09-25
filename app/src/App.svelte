@@ -10,6 +10,8 @@
   import Visor from './components/Visor.svelte'
   import { esAndroid } from './lib/plataforma.js'
   import { iniciarSincroAutomatica } from './lib/sincro-app.svelte.js'
+  import { recibidosAndroid, lienzoAbierto } from './lib/archivos.js'
+  import { avisar } from './lib/store.svelte.js'
   import { abrirArchivo, ACEPTADOS } from './lib/visor.svelte.js'
 
   // Rutas por hash: #/  ·  #/p/<id>  ·  #/p/<id>/f/<fuente>  ·  #/p/<id>/o/<objetivo>[/f/<fuente>]
@@ -59,8 +61,38 @@
   }
 
   // En Android no hay carpeta de almacenamiento ni receptor local: se sincroniza con la PC.
+  // Android: lo que otra app comparte con "Canvas de Citas" (en la PC lo hace el receptor).
+  // JSON → importar · PDF/HTML/Markdown → visor · imágenes, audios y texto → lienzo del proyecto.
+  async function revisarRecibidos() {
+    let lista
+    try { lista = await recibidosAndroid() } catch { return }
+    if (!lista.length) return
+    const json = [], libres = [], textos = []
+    for (const x of lista) {
+      if (x.error) avisar(x.error)
+      else if (x.texto) textos.push(x.texto)
+      else if (/\.json$/i.test(x.name) || x.type === 'application/json') json.push(x)
+      else if (ACEPTADOS.test(x.name) && !/^(image|audio)\//.test(x.type)) abrirArchivo(x, proyectoActual())
+      else libres.push(x)
+    }
+    if (json.length) datos = { archivos: json }
+    if (!libres.length && !textos.length) return
+    if (ruta.vista !== 'hub') {
+      const p = [...S.proyectos].sort((a, b) => String(b.actualizado || '').localeCompare(String(a.actualizado || '')))[0]
+      if (!p) return avisar('Crea un proyecto para agregar lo recibido a su lienzo')
+      location.hash = `#/p/${p.id}`
+    }
+    for (let i = 0; i < 40 && !lienzoAbierto.insertar; i++) await new Promise(r => setTimeout(r, 100))
+    if (!lienzoAbierto.insertar) return
+    if (libres.length) await lienzoAbierto.insertar(libres, '')
+    for (const t of textos) await lienzoAbierto.insertar([], t)
+  }
+
   // La sincronización con la PC corre en todo aparato vinculado (celular, laptop…).
-  if (esAndroid) cargar().then(iniciarSincroAutomatica)
+  if (esAndroid) {
+    cargar().then(() => { iniciarSincroAutomatica(); revisarRecibidos() })
+    document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && revisarRecibidos())
+  }
   else cargar().then(() => { iniciarSincroAutomatica(); return iniciarCarpeta() }).then(iniciarCelular)
 </script>
 

@@ -133,6 +133,7 @@
   </div>
   <div class="espacio solo-escritorio"></div>
   <button class="btn solo-escritorio" onclick={() => descargarBib(visibles)}>Exportar .bib</button>
+  <button class="icono-btn solo-movil" aria-label="Exportar .bib" title="Exportar .bib" onclick={() => descargarBib(visibles)}><Icono nombre="descargar" tam={18} /></button>
   <button class="btn primario" aria-label="Agregar fuente" onclick={() => (modal = proyecto ? 'agregar' : 'nueva')}><span class="solo-escritorio">+ Agregar fuente</span><span class="solo-movil">+</span></button>
 <BotonSincro {abrirDatos} />{#if !esAndroid}<button class="icono-btn celular-btn" aria-label="Celular y PixPin" title="Pasar archivos con el celular o PixPin" onclick={abrirCelular}><Icono nombre="celular" tam={18} />{#if R.recibidos.length}<span class="insignia">{R.recibidos.length}</span>{/if}</button>{/if}
   <button class="icono-btn" aria-label="Configuración" title="Configuración" onclick={abrirDatos}><Icono nombre="ajustes" tam={18} /></button>
