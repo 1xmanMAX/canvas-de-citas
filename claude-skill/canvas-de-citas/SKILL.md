@@ -56,8 +56,11 @@ La lista completa de comandos, opciones y formatos está en `references/comandos
   es texto limpio en Markdown con marcas `## Página N`, mucho más rápido y fiable que leer el PDF.
   Cita con la paginación impresa de la revista (suele aparecer al inicio de cada página) y, si el
   texto avisa de capas duplicadas o páginas sin texto, verifica en el PDF.
-- Los papers de Max ya están convertidos en `F:\THE FORGE\THESIS\PAPERS\texto\`; si agrega nuevos,
-  `convertir "F:\THE FORGE\THESIS\PAPERS"` convierte solo lo nuevo.
+- **Los documentos viven solo en la app** (`fuentes/<id>/documento.*` de su carpeta): Max no
+  quiere copias duplicadas. Nunca copies ni exportes PDFs/HTML a otras carpetas. El texto de
+  lectura se guarda junto al documento (`fuentes/<id>/texto.md`); `convertir` sin argumentos lo
+  prepara para todas las fuentes (solo lo que falte o cambió). Para adjuntar un paper nuevo usa
+  `documento <fuente> <ruta>` y dile a Max que puede borrar el archivo original si quiere.
 - Si falta `node_modules` en la carpeta de la skill, ejecuta `npm i` ahí una vez.
 
 ## Analizar un paper para la tesis
