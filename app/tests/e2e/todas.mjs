@@ -186,6 +186,93 @@ const SUITES = {
     return s
   },
 
+  // Agrupadores: recuadro punteado con nombre que reúne elementos y los lleva consigo.
+  async agrupador(b) {
+    const s = suite('Agrupadores del lienzo'), pg = await pagina(b)
+    await conEjemplo(pg)
+    const dentro = (g, c) => { const x = c.x + c.w / 2, y = c.y + c.h / 2; return x >= g.x && x <= g.x + g.w && y >= g.y && y <= g.y + g.h }
+    let ids = []
+    const miembros = async () => {
+      const cv = await lienzoGuardado(pg), g = cv.agrupadores[0]
+      const cajas = [...cv.notas.map(n => ({ id: n.id, x: n.x, y: n.y, w: 168, h: 60 })), ...Object.entries(cv.posiciones).map(([id, q]) => ({ id, x: q.x, y: q.y, w: 190, h: 70 }))]
+      return { cv, g, cajas, dentro: cajas.filter(c => dentro(g, c)).map(c => c.id).sort() }
+    }
+    await s.paso('crear un agrupador con dos fuentes y una nota: quedan dentro', async () => {
+      await pg.click('button[aria-label="Añadir nota"]')
+      await pg.type('dialog[open] textarea', 'Idea para el marco'); await clicTexto(pg, 'Guardar'); await esperar(300)
+      await pg.click('button[aria-label="Agrupar elementos"]')
+      await pg.type('dialog[open] input[placeholder^="Marco"]', 'Marco teórico')
+      const casillas = await pg.$$('dialog[open] .lista input[type=checkbox]')
+      if (casillas.length < 3) throw new Error('faltan elementos en la lista')
+      await casillas[0].click(); await casillas[1].click(); await casillas.at(-1).click()
+      await clicTexto(pg, 'Crear agrupador'); await esperar(500)
+      if (!(await pg.$('g.agrupador'))) throw new Error('no se dibujó')
+      const m = await miembros()
+      if (m.g.titulo !== 'Marco teórico' || m.cv.modo !== 'libre') throw new Error('datos: ' + JSON.stringify(m.g))
+      if (m.dentro.length !== 3) throw new Error(`dentro: ${m.dentro}`)
+      ids = m.dentro
+      const t = await pg.$eval('g.agrupador.frente .titulo text', e => e.textContent)
+      if (!t.includes('Marco teórico') || !t.includes('3')) throw new Error('título: ' + t)
+      await pg.screenshot({ path: path.join(SALIDA, 'agrupador-nuevo.png') })
+    })
+    await s.paso('arrastrar el nombre mueve el recuadro con lo que tiene dentro', async () => {
+      const antes = await miembros()
+      const r = await (await pg.$('g.agrupador.frente .titulo')).boundingBox()
+      await pg.mouse.move(r.x + 20, r.y + 10); await pg.mouse.down()
+      for (let i = 1; i <= 10; i++) await pg.mouse.move(r.x + 20 + i * 15, r.y + 10 + i * 8)
+      await pg.mouse.up(); await esperar(400)
+      const desp = await miembros()
+      const dx = desp.g.x - antes.g.x, dy = desp.g.y - antes.g.y
+      if (!dx || !dy) throw new Error('no se movió')
+      for (const id of ids) {
+        const a = antes.cajas.find(c => c.id === id), d = desp.cajas.find(c => c.id === id)
+        if (d.x - a.x !== dx || d.y - a.y !== dy) throw new Error(`${id} no se movió con el recuadro`)
+      }
+      const fuera = antes.cajas.filter(c => !ids.includes(c.id))
+      for (const a of fuera) { const d = desp.cajas.find(c => c.id === a.id); if (d.x !== a.x || d.y !== a.y) throw new Error(`${a.id} se movió sin estar dentro`) }
+      // Lo que estaba dentro sigue dentro (si el recuadro cayó sobre otra cosa, esa también queda dentro).
+      if (!ids.every(id => desp.dentro.includes(id))) throw new Error('algo se salió del recuadro')
+    })
+    await s.paso('quitar un elemento desde el editor lo saca del recuadro', async () => {
+      const antes = (await miembros()).dentro
+      await pg.click('g.agrupador.frente .titulo'); await pg.waitForSelector('dialog[open] .lista', { timeout: 5000 })
+      await (await pg.$('dialog[open] .lista input[type=checkbox]:checked')).click()
+      await clicTexto(pg, 'Guardar'); await esperar(400)
+      const m = await miembros()
+      if (m.dentro.length !== antes.length - 1) throw new Error(`dentro: ${antes} → ${m.dentro}`)
+    })
+    await s.paso('también en el lienzo de un objetivo', async () => {
+      await clicTexto(pg, 'OE1', '', 'span')
+      await pg.waitForSelector('.obj-panel', { timeout: 5000 })
+      for (const t of ['Primera del OE1', 'Segunda del OE1']) {
+        await pg.click('.obj-panel button[aria-label="Añadir nota"]')
+        await pg.type('dialog[open] textarea', t); await clicTexto(pg, 'Guardar'); await esperar(300)
+      }
+      await pg.click('.obj-panel button[aria-label="Agrupar elementos"]')
+      await pg.type('dialog[open] input[placeholder^="Marco"]', 'Ideas OE1')
+      for (const c of await pg.$$('dialog[open] .lista input[type=checkbox]')) await c.click()
+      await clicTexto(pg, 'Crear agrupador'); await esperar(500)
+      const oe1 = (await lienzoGuardado(pg)).objetivos.oe1, g = oe1.agrupadores?.[0]
+      if (g?.titulo !== 'Ideas OE1') throw new Error('no se guardó en oe1')
+      const fuera = oe1.notas.filter(n => !dentro(g, { x: n.x, y: n.y, w: 168, h: 60 }))
+      if (fuera.length) throw new Error('hay notas fuera del recuadro')
+      if (!(await pg.$('.obj-panel g.agrupador.frente'))) throw new Error('no se dibujó')
+      await pg.click('.obj-panel button[aria-label="Cerrar lienzo del objetivo"]'); await esperar(400)
+    })
+    await s.paso('la esquina cambia el tamaño', async () => {
+      const antes = (await miembros()).g
+      const r = await (await pg.$('g.agrupador.frente .esquina rect')).boundingBox()
+      await pg.mouse.move(r.x + r.width / 2, r.y + r.height / 2); await pg.mouse.down()
+      for (let i = 1; i <= 6; i++) await pg.mouse.move(r.x + r.width / 2 + i * 12, r.y + r.height / 2 + i * 10)
+      await pg.mouse.up(); await esperar(300)
+      const g = (await miembros()).g
+      if (!(g.w > antes.w && g.h > antes.h) || g.x !== antes.x) throw new Error(`tamaño ${antes.w}×${antes.h} → ${g.w}×${g.h}`)
+      await pg.screenshot({ path: path.join(SALIDA, 'agrupador.png') })
+    })
+    if (pg.errores.length) s.fallas.push(...pg.errores.filter(e => !/crossref/i.test(e)))
+    return s
+  },
+
   // Grupo de sincronización: un "celular" (Android simulado) y una "laptop" editan a la vez y
   // todos (con la PC) terminan con la misma versión, enviando solo lo que cambió.
   async grupo(b) {

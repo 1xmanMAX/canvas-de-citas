@@ -4,7 +4,9 @@
 import { S } from './store.svelte.js'
 import { listaObjetivos } from './objetivos.js'
 import { TIPOS_FUENTE, ESTADOS_USO, ESTADOS_VERIF, autorCorto, anio, paginaTexto } from './citas.js'
-import { LISTAS, nombreTarjeta, duracionTexto } from './tarjetas.js'
+import { LISTAS, nombreTarjeta, duracionTexto, cajas } from './tarjetas.js'
+import { contiene } from './agrupadores.js'
+import { NODO_W, alturaNodo } from './grafo.js'
 
 const una = t => String(t ?? '').replace(/\s+/g, ' ').trim()
 const ref = f => (f ? `${autorCorto(f)} (${anio(f)}) \`${f.id}\`` : '(fuente borrada)')
@@ -42,6 +44,21 @@ function conexiones(l, p, o) {
   return l.map(c => `  - ${nombreNodo(c.desde, p, o)} → ${nombreNodo(c.hasta, p, o)}${c.etiqueta ? ` — ${una(c.etiqueta)}` : ''}`)
 }
 
+/** Agrupadores del lienzo `c` con lo que tiene dentro cada uno (por posición). */
+function agrupadores(c, p, o, sangria = '') {
+  if (!c?.agrupadores?.length) return []
+  const libres = [...cajas(c).entries()].map(([id, k]) => ({ id, caja: k }))
+  const fuentes = o
+    ? (c.fuentes || []).map(x => ({ id: x.id, caja: { x: x.x, y: x.y, w: NODO_W, h: alturaNodo(false, false) } }))
+    : Object.entries(c.posiciones || {}).map(([id, q]) => ({ id, caja: { x: q.x, y: q.y, w: NODO_W, h: alturaNodo(false, false) } }))
+  const inds = (o?.indicadores || []).map(x => ({ id: x.id, caja: { x: x.x, y: x.y, w: 210, h: 60 } }))
+  const todos = [...fuentes, ...inds, ...libres]
+  return c.agrupadores.map(g => {
+    const dentro = todos.filter(e => contiene(g, e.caja)).map(e => nombreNodo(e.id, p, o))
+    return `${sangria}- Agrupador «${una(g.titulo)}» \`${g.id}\`: ${dentro.length ? dentro.join('; ') : '(vacío)'}`
+  })
+}
+
 function proyecto(p) {
   const L = [`## ${una(p.titulo) || 'Sin título'} \`${p.id}\``, '']
   if (p.area) L.push(`Área: ${una(p.area)}`, '')
@@ -56,6 +73,7 @@ function proyecto(p) {
       if (o.fuentes.length) L.push(`  - Fuentes: ${o.fuentes.map(x => ref(S.fuentePorId.get(x.id))).join('; ')}`)
       L.push(...tarjetas(o, '  '))
       if (o.conexiones.length) L.push('  - Conexiones:', ...conexiones(o.conexiones, p, o).map(x => '  ' + x))
+      L.push(...agrupadores(o, p, o, '  '))
     }
     L.push('')
   }
@@ -78,6 +96,8 @@ function proyecto(p) {
   const libres = tarjetas(p.canvas)
   if (libres.length) L.push('### Notas, tareas, audios y fotos del lienzo', '', ...libres, '')
   if (p.canvas.conexiones.length) L.push('### Conexiones', '', ...conexiones(p.canvas.conexiones, p).map(x => x.slice(2)), '')
+  const grupos = agrupadores(p.canvas, p)
+  if (grupos.length) L.push('### Agrupadores (recuadros que reúnen elementos del lienzo)', '', ...grupos, '')
   return L
 }
 
@@ -127,6 +147,10 @@ que la app no lo restaure. Lo de abajo describe el formato por si hay que editar
   \`{ "id": "lista_<algo único>", "titulo": "…", "items": [{ "t": "tarea", "hecho": false }], "creado": "<ISO>", "x": 0, "y": 0 }\`.
   Las notas de voz (\`canvas.audios\`) y fotos (\`canvas.fotos\`) llevan el archivo incrustado: no las crees, solo
   puedes corregir su \`transcripcion\`, \`titulo\`, \`texto\` o \`anotacion\`.
+- **Agrupadores** (recuadros punteados con nombre): \`canvas.agrupadores\` (o en \`canvas.objetivos.<clave>\`)
+  con \`{ "id": "grupo_<algo único>", "titulo": "…", "color": "azul", "x": 0, "y": 0, "w": 600, "h": 400 }\`
+  (color: azul | verde | rojo | ocre | lila | gris). Pertenece a un agrupador lo que tiene su centro
+  dentro del recuadro: para meter algo, pon su x, y dentro (debajo de los primeros 46 px, donde va el nombre).
 - Escribe JSON válido y completo (la app ignora un archivo a medio escribir y reintenta).
 - No borres campos que no conozcas: la app guarda ahí posiciones del lienzo y otros datos.
 `

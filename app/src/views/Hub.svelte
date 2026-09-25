@@ -12,8 +12,11 @@
   import Tarjeta from '../components/Tarjeta.svelte'
   import Chinchetas from '../components/Chinchetas.svelte'
   import EditorTarjeta from '../components/EditorTarjeta.svelte'
-  import { LISTAS, cajas, coincideTarjeta, nombreTarjeta } from '../lib/tarjetas.js'
-  import { nuevaTarjeta, guardarTarjeta, eliminarTarjeta, duplicarTarjeta, alternarTarea, vinculosDe, ancla, rutaHilo } from '../lib/tablero.js'
+  import Agrupador from '../components/Agrupador.svelte'
+  import EditorAgrupador from '../components/EditorAgrupador.svelte'
+  import { accionesAgrupadores } from '../lib/agrupadores.js'
+  import { LISTAS, TIPO, cajas, coincideTarjeta, nombreTarjeta } from '../lib/tarjetas.js'
+  import { lugarLibre, nuevaTarjeta, guardarTarjeta, eliminarTarjeta, duplicarTarjeta, alternarTarea, vinculosDe, ancla, rutaHilo } from '../lib/tablero.js'
   import { analizar, aDataURL } from '../lib/audio.svelte.js'
   import { listaObjetivos, objetivosPorIndicador } from '../lib/objetivos.js'
   import { S, guardarProyecto, avisar } from '../lib/store.svelte.js'
@@ -115,9 +118,38 @@
   const ocupadas = $derived([
     { x: -HUB_W / 2, y: -hubH / 2, w: HUB_W, h: hubH },
     ...items.map(it => { const q = posDe(it.id); return { x: q.x, y: q.y, w: NODO_W, h: it.h } }),
-    ...[...tarj.values()].map(({ x, y, w, h }) => ({ x, y, w, h }))
+    ...[...tarj.values()].map(({ x, y, w, h }) => ({ x, y, w, h })),
+    ...(cv.agrupadores || []).map(({ x, y, w, h }) => ({ x, y, w, h }))
   ])
   const limites = $derived(limitesDe(ocupadas, 40))
+
+  // --- Agrupadores: recuadros punteados que reúnen elementos (lib/agrupadores.js) ---
+  /** Todo lo que se puede meter en un agrupador, con su caja actual y cómo moverlo. */
+  function elementos() {
+    const out = items.map(it => ({ id: it.id, get nombre() { return nombreDe(it.id) }, tipo: 'fuente', caja: cajaDe(it.id), poner: (x, y) => (cv.posiciones[it.id] = { x, y }) }))
+    for (const [id, t] of tarj) out.push({ id, get nombre() { return nombreDe(id) }, tipo: TIPO[t.lista], caja: t, poner: (x, y) => { t.obj.x = x; t.obj.y = y } })
+    return out
+  }
+  const grupos = accionesAgrupadores({ lienzo: () => cv, elementos, antes: () => fijarLibre(), guardar: () => guardar() })
+  const agrupadoresVista = $derived((cv.agrupadores || []).filter(g => cruza(g)))
+  const cuantos = $derived(new Map((cv.agrupadores || []).map(g => [g.id, grupos.miembros(g).length])))
+
+  function editarAgrupador(g) {
+    modal = { grupo: true, agrupador: g, dentro: g ? grupos.miembros(g).map(e => e.id) : [] }
+  }
+  function guardarAgrupador({ titulo, color, ids }) {
+    const g = modal.agrupador
+    if (g) grupos.editar(g, { titulo, color, ids })
+    else {
+      // Cerca de lo elegido (o del centro de la vista), en un hueco que no tape lo demás.
+      const els = elementos().filter(e => ids.includes(e.id))
+      const c = els.length ? { x: els.reduce((s, e) => s + e.caja.x + e.caja.w / 2, 0) / els.length, y: els.reduce((s, e) => s + e.caja.y + e.caja.h / 2, 0) / els.length } : lienzo.centro()
+      const libres = ocupadas.filter(o => !els.some(e => e.caja.x === o.x && e.caja.y === o.y && e.caja.w === o.w))
+      grupos.crear(titulo, color, ids, (w, h) => lugarLibre(libres, w, h, c.x, c.y, 40))
+      avisar('Agrupador creado')
+    }
+    modal = null
+  }
 
   // --- Interacción ---
   let lienzo
@@ -406,11 +438,17 @@
     </div>
     <div class="separador"></div>
     <div class="suave ayuda">
-      Arrastra las tarjetas para acomodarlas (pasa a modo Libre). Desliza con dos dedos para mover el lienzo y pellizca para hacer zoom (con ratón: Ctrl + rueda). Toca una fuente para ver sus citas. Crea notas, listas de tareas, notas de voz y fotos desde la barra; también puedes pegar (Ctrl+V) o arrastrar texto, imágenes y audios al lienzo. El buscador también encuentra texto en notas, tareas y transcripciones. La chincheta cambia a tablero de corcho.
+      Arrastra las tarjetas para acomodarlas (pasa a modo Libre). Desliza con dos dedos para mover el lienzo y pellizca para hacer zoom (con ratón: Ctrl + rueda). Toca una fuente para ver sus citas. Crea notas, listas de tareas, notas de voz y fotos desde la barra; también puedes pegar (Ctrl+V) o arrastrar texto, imágenes y audios al lienzo. El buscador también encuentra texto en notas, tareas y transcripciones. El botón del recuadro punteado crea un agrupador: reúne varios elementos bajo un nombre y, al arrastrar su nombre, se mueven juntos (suelta algo dentro para agregarlo). La chincheta cambia a tablero de corcho.
     </div>
   </aside>
 
   <Lienzo bind:this={lienzo} bind:simple={lejos} bind:ventana pesado={pesado} {limites} {corcho} cursor={conectando ? 'conectando' : ''} alTocarFondo={() => { if (conectando) conectando = null }}>
+    <!-- Agrupadores: debajo de todo -->
+    {#each agrupadoresVista as g (g.id)}
+      <Agrupador {g} resaltado={!!q && g.titulo.toLowerCase().includes(q.toLowerCase())}
+        alTocar={() => editarAgrupador(g)} arrastre={grupos.arrastre(g)} redimension={grupos.redimension(g)} />
+    {/each}
+
     <!-- Etiquetas de grupo (Por tema) -->
     {#each base.grupos as g}
       <text class="grupo" x={g.x} y={g.y - 4}>{g.nombre.toUpperCase()}</text>
@@ -469,6 +507,11 @@
       {/each}
     {/each}
 
+    <!-- Nombre y esquina de los agrupadores: encima, para que ninguna tarjeta los tape -->
+    {#each agrupadoresVista as g (g.id)}
+      <Agrupador {g} capa="frente" n={cuantos.get(g.id)} {lejos} alTocar={() => editarAgrupador(g)} arrastre={grupos.arrastre(g)} redimension={grupos.redimension(g)} />
+    {/each}
+
     <!-- Tablero de corcho: el hilo rojo pasa sobre las tarjetas y queda clavado en las chinchetas -->
     {#if corcho}
       {@render conexionesSvg()}
@@ -485,6 +528,7 @@
     <input bind:this={entradaFoto} type="file" accept="image/*" hidden onchange={nuevaFoto} />
     <button class="icono-btn" aria-label="Conectar elementos" title="Conectar elementos" aria-pressed={!!conectando}
       onclick={() => (conectando = conectando ? null : { desde: null })}><Icono nombre="enlace" /></button>
+    <button class="icono-btn" aria-label="Agrupar elementos" title="Agrupador: un recuadro con nombre que reúne varios elementos" onclick={() => editarAgrupador(null)}><Icono nombre="agrupar" /></button>
     <button class="icono-btn" aria-label="Tablero de corcho" title="Tablero de corcho" aria-pressed={corcho} onclick={alternarCorcho}><Icono nombre="chincheta" /></button>
     <div class="div"></div>
     <div class="segmentado">
@@ -532,6 +576,12 @@
     <EditorTarjeta lista={modal.lista} bind:o={modal.o} nueva={modal.nueva} vinculos={modal.nueva ? [] : vinculosDe(cv, modal.o.id, nombreDe)} onvinculo={() => { const t = modal.o; modal = null; abrirOrigen(t.origen, p.id, t.id) }}
       onguardar={guardarModal} oneliminar={eliminarModal} onduplicar={duplicarModal} onclose={() => (modal = null)} />
   {/key}
+{:else if modal?.grupo}
+  <EditorAgrupador nuevo={!modal.agrupador} titulo={modal.agrupador?.titulo || ''} color={modal.agrupador?.color || 'azul'}
+    elementos={elementos().map(({ id, nombre, tipo }) => ({ id, nombre, tipo }))} dentro={modal.dentro}
+    onguardar={guardarAgrupador} onclose={() => (modal = null)}
+    oneliminar={() => { grupos.eliminar(modal.agrupador); modal = null }}
+    onacomodar={() => { grupos.acomodar(modal.agrupador); modal = null }} />
 {:else if modal?.conexion}
   <Modal titulo={modal.nueva ? 'Nueva conexión' : 'Conexión'} onclose={() => (modal = null)} ancho={420}>
     <!-- svelte-ignore a11y_autofocus -->
