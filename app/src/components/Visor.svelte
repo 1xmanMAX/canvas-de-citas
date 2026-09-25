@@ -186,6 +186,6 @@
   .lectura :global(h1), .lectura :global(h2), .lectura :global(h3) { font-family: var(--serif); line-height: 1.3; }
   .lectura :global(code) { font-family: var(--mono); background: var(--paper-dim); padding: 0 4px; border-radius: 4px; }
   @media (max-width: 820px) {
-    .visor { top: 0; width: 100vw; min-width: 0; border-left: none; z-index: 40; }
+    .visor { top: 0; width: 100vw; min-width: 0; border-left: none; z-index: 40; padding: var(--sa-arriba) var(--sa-der) var(--sa-abajo) var(--sa-izq); }
   }
 </style>

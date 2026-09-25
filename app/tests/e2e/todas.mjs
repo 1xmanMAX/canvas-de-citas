@@ -201,6 +201,20 @@ const SUITES = {
         await pg.waitForSelector('dialog[open] .sincro', { timeout: 5000 })
         if (await pg.evaluate(() => document.querySelector('dialog[open]').textContent.includes('Carpeta de almacenamiento'))) throw new Error('se ve la carpeta de almacenamiento')
       })
+      await s.paso('nada queda bajo la barra de estado ni la de gestos', async () => {
+        // Como hace Capacitor en Android 15+ (la app ocupa toda la pantalla).
+        await pg.keyboard.press('Escape'); await esperar(300)
+        await pg.evaluate(() => { const r = document.documentElement.style; r.setProperty('--safe-area-inset-top', '32px'); r.setProperty('--safe-area-inset-bottom', '24px') })
+        await esperar(200)
+        const cab = await pg.$eval('header', h => h.getBoundingClientRect().top)
+        if (cab < 32) throw new Error(`la cabecera empieza en ${cab}px, bajo la barra de estado`)
+        const fondo = await pg.evaluate(() => innerHeight - document.getElementById('app').lastElementChild.getBoundingClientRect().bottom)
+        if (fondo < 24) throw new Error(`el contenido llega a ${fondo}px del borde inferior`)
+        await pg.click('button[aria-label="Sincronizar con la PC"]')
+        await pg.waitForSelector('dialog[open] .sincro', { timeout: 5000 })
+        const cerrar = await pg.$eval('dialog[open] button[aria-label="Cerrar"]', b => b.getBoundingClientRect().top)
+        if (cerrar < 32) throw new Error(`el botón Cerrar queda bajo la barra (${cerrar}px)`)
+      })
       await s.paso('escanear el QR vincula y trae el proyecto de la PC', async () => {
         await clicTexto(pg, 'Escanear QR')
         await pg.waitForFunction(() => /Última:/.test(document.querySelector('.sincro .estado')?.textContent || ''), { timeout: 15000 })

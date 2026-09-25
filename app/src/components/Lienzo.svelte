@@ -275,7 +275,7 @@
   .capa { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
   svg { position: absolute; overflow: visible; }
   .zoom {
-    position: absolute; bottom: calc(16px + env(safe-area-inset-bottom)); right: 16px; display: flex; align-items: center; gap: 2px;
+    position: absolute; bottom: 16px; right: 16px; display: flex; align-items: center; gap: 2px;
     background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 4px;
     box-shadow: 0 2px 8px rgba(33, 31, 26, .08); cursor: default;
   }
