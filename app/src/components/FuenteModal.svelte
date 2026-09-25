@@ -10,6 +10,11 @@
 
   let { fuente, proyectoId, onclose } = $props()
 
+  // Puntos clave y referencias que registra la skill de Claude Code (canvas-de-citas).
+  const TIPOS_PUNTO = { hallazgo: 'Hallazgo', dato: 'Dato', metodo: 'Método', definicion: 'Definición', marco: 'Marco teórico', vacio: 'Vacío', limitacion: 'Limitación', cita: 'Cita textual' }
+  const citaA = $derived((fuente.referencias_citadas || []).map(id => S.fuentePorId.get(id)).filter(Boolean))
+  const citadaEn = $derived((fuente.citada_en || []).map(id => S.fuentePorId.get(id)).filter(Boolean))
+
   const citas = $derived(
     (S.citasPorFuente.get(fuente.id) || [])
       .filter(c => c.proyecto_id === proyectoId)
@@ -141,6 +146,26 @@
     {#if fuente.notas_correccion}<div class="notas"><span class="rotulo">Notas de corrección</span> {fuente.notas_correccion}</div>{/if}
   {/if}
 
+  {#if fuente.puntos?.length}
+    <div class="separador"></div>
+    <div class="rotulo">Puntos clave para la tesis ({fuente.puntos.length})</div>
+    <ul class="puntos">
+      {#each fuente.puntos as p (p.id)}
+        <li>
+          <span class="chip-punto {p.tipo}">{TIPOS_PUNTO[p.tipo] || p.tipo}</span>
+          {p.texto}
+          <span class="suave">{p.pagina ? ` · p. ${p.pagina}` : ''}{p.objetivos?.length ? ` · ${p.objetivos.join(', ').toUpperCase()}` : ''}</span>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+  {#if citaA.length || citadaEn.length}
+    <div class="relaciones">
+      {#if citaA.length}<div><span class="rotulo">Cita a</span> {citaA.map(f => `${autorCorto(f)} (${anio(f)})`).join(' · ')}</div>{/if}
+      {#if citadaEn.length}<div><span class="rotulo">Citada en</span> {citadaEn.map(f => `${autorCorto(f)} (${anio(f)})`).join(' · ')}</div>{/if}
+    </div>
+  {/if}
+
   <div class="separador"></div>
   <div class="rotulo">Citas extraídas de esta fuente ({reales.length})</div>
 
@@ -191,6 +216,15 @@
 </Modal>
 
 <style>
+  .puntos { margin: 6px 0 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; line-height: 1.5; }
+  .chip-punto { display: inline-block; font-size: 10.5px; font-weight: 600; border-radius: 999px; padding: 1px 8px; margin-right: 4px; background: var(--paper-dim); color: var(--ink-soft); }
+  .chip-punto.hallazgo { background: #DCEBD5; color: #2E6B3E; }
+  .chip-punto.dato, .chip-punto.cita { background: #D6E6F2; color: #2A5575; }
+  .chip-punto.metodo { background: #E5DAF0; color: #5B3F80; }
+  .chip-punto.vacio { background: #F7D6D9; color: #8A2F3A; }
+  .chip-punto.limitacion { background: #F8DCB8; color: #8A5217; }
+  .chip-punto.definicion, .chip-punto.marco { background: #FBEFC0; color: #6B5516; }
+  .relaciones { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; font-size: 13px; }
   .cab { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   .titulo { gap: 8px; }
   h2 { margin: 0; font-size: 21px; line-height: 1.3; }

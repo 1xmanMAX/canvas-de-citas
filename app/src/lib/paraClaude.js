@@ -88,6 +88,8 @@ function biblioteca() {
     const datos = [TIPOS_FUENTE[f.tipo_fuente] || f.tipo_fuente, ESTADOS_VERIF[f.estado_verificacion] || f.estado_verificacion, f.tema, f.documento_original ? `documento: ${f.documento_original}` : ''].filter(Boolean)
     L.push(`- ${ref(f)} — ${una(f.titulo)}${datos.length ? ` _(${datos.join(' · ')})_` : ''}`)
     if (f.entrada_bibliografia) L.push(`  - ${una(f.entrada_bibliografia)}`)
+    for (const p of f.puntos || []) L.push(`  - Punto (${p.tipo}${p.pagina ? `, p. ${p.pagina}` : ''}${p.objetivos?.length ? `, ${p.objetivos.join('/').toUpperCase()}` : ''}): ${una(p.texto)}`)
+    if (f.referencias_citadas?.length) L.push(`  - Cita a: ${f.referencias_citadas.join(', ')}`)
   }
   if (!orden.length) L.push('_Todavía no hay fuentes._')
   return [...L, '']

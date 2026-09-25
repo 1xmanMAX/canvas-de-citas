@@ -60,6 +60,28 @@ La lista completa de comandos, opciones y formatos está en `references/comandos
   `convertir "F:\THE FORGE\THESIS\PAPERS"` convierte solo lo nuevo.
 - Si falta `node_modules` en la carpeta de la skill, ejecuta `npm i` ahí una vez.
 
+## Analizar un paper para la tesis
+
+Cuando Max pida analizar, fichar o "sacar lo importante" de un paper:
+
+1. `leer <fuente>` (por partes con `--paginas` si es largo). Relee los objetivos con `ver`.
+2. **Puntos clave**: registra con `punto <fuente> --texto "…" --pagina N --tipo … --objetivo oeX`
+   solo lo que sirve para la tesis de Max (retrabajos, gestión de cambios, RFIs, agentes de IA,
+   aceptación tecnológica, casos viales/Perú). Tipos: `hallazgo`, `dato` (cifras con su contexto),
+   `metodo`, `definicion`, `marco`, `vacio` (brecha de investigación), `limitacion`, `cita`
+   (textual, entre comillas y con página exacta). Redacta en español, con tus palabras salvo en
+   `cita`; una idea por punto; el número de página impreso de la revista si aparece. Asigna el
+   objetivo al que aporta (puede ser más de uno: `--objetivo oe2,oe3`). Cada punto queda en la
+   ficha de la fuente y como tarjeta de color en el lienzo del objetivo, conectada al paper.
+   Mejor 5–12 puntos precisos que 30 genéricos.
+3. **Referencias**: `referencias <fuente>` lista la bibliografía del paper (con DOI si lo trae y
+   si ya está en la biblioteca). Propón a Max las que valen la pena para la tesis (no todas).
+   Verifica cada una con **citas-tesis** y agrégala con
+   `referencia-nueva <paper> --json '{…}'`: queda vinculada al proyecto como "sin revisar" y
+   conectada al paper con un hilo "cita a" (si ya existía, solo se conecta).
+4. Para redactar un capítulo u objetivo: `puntos --objetivo oe1` (o `--tipo vacio`,
+   `--buscar retrabajo`) devuelve todos los puntos agrupados con su cita (Autor, año, p. N).
+
 ## Tarjetas, imágenes y gráficos
 
 - **Dónde:** si el pedido menciona un objetivo ("para el OE2", "vincúlalo al OE2"), crea las

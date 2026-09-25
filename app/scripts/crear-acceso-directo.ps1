@@ -1,11 +1,14 @@
 # Crea accesos directos "Canvas de Citas" en el Escritorio y en el menú Inicio.
-# Abren la app publicada en su propia ventana (modo app de Chrome o Edge): sin servidor local,
+# Abren la app publicada en su propia ventana (modo app de Comet, Chrome o Edge; se prefiere
+# Comet, que Max usa como navegador): sin servidor local,
 # y funciona sin conexión gracias al service worker.
 # Uso:  powershell -ExecutionPolicy Bypass -File scripts\crear-acceso-directo.ps1
 
 $url = 'https://1xmanmax.github.io/canvas-de-citas/'
 
 $navegadores = @(
+  "$env:LOCALAPPDATA\Perplexity\Comet\Application\comet.exe",
+  "$env:ProgramFiles\Perplexity\Comet\Application\comet.exe",
   "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
   "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
   "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe",
@@ -13,7 +16,7 @@ $navegadores = @(
   "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe"
 )
 $navegador = $navegadores | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $navegador) { Write-Error 'No se encontró Chrome ni Edge.'; exit 1 }
+if (-not $navegador) { Write-Error 'No se encontró Comet, Chrome ni Edge.'; exit 1 }
 
 # El ícono se copia a una carpeta fija para que el acceso directo no dependa del repo.
 $carpeta = Join-Path $env:LOCALAPPDATA 'CanvasDeCitas'

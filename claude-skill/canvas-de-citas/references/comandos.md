@@ -64,6 +64,14 @@ El número tras `## Página` es la página del PDF; la paginación de la revista
 inicio del texto de cada página (p. ej. "457"). Si el `.md` avisa de "capas de texto duplicadas",
 verifica la página en el PDF antes de citar. Requiere `npm i` en la carpeta de la skill (PDFium).
 
+## Analizar papers
+| Comando | Qué hace |
+|---|---|
+| `referencias <fuente>` | Bibliografía que cita el paper, numerada, con DOI y si ya está en la biblioteca |
+| `referencia-nueva <paper> --json '{…}' [--nota "…"]` | Crea (o reutiliza) la fuente citada, la vincula a los proyectos del paper y dibuja el hilo "cita a" |
+| `punto <fuente> --texto "…" [--pagina N] [--tipo hallazgo\|dato\|metodo\|definicion\|marco\|vacio\|limitacion\|cita] [--objetivo oe1,oe2] [--sin-tarjeta]` | Guarda un punto clave en la fuente y lo pone como tarjeta conectada en el lienzo (del objetivo, si se indica) |
+| `puntos [--objetivo oe1] [--tipo vacio] [--fuente X] [--buscar texto]` | Todos los puntos agrupados, con la cita (Autor, año, p. N) lista para redactar |
+
 ## Editar y borrar
 | Comando | Qué hace |
 |---|---|

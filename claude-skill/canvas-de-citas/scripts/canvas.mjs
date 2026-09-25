@@ -474,18 +474,25 @@ C.convertir = async () => {
 }
 
 /** Texto de una fuente (o archivo) en Markdown; con --paginas 3-5 solo esas páginas del PDF. */
+/** Markdown del documento adjunto de una fuente (con caché en fuentes/<id>/texto.md). */
+async function mdDeFuente(f) {
+  if (!f.documento_original) fallar(`${f.id} no tiene documento adjunto`)
+  const doc = ruta(...f.documento_original.split('/'))
+  if (!fs.existsSync(doc)) fallar(`El documento de ${f.id} aún no está en la carpeta (${f.documento_original})`)
+  const cache = ruta('fuentes', f.id, 'texto.md') // se regenera si el documento cambió
+  if (fs.existsSync(cache) && fs.statSync(cache).mtimeMs >= fs.statSync(doc).mtimeMs) return fs.readFileSync(cache, 'utf8')
+  const md = await aMarkdown(doc, f)
+  fs.writeFileSync(cache, md, 'utf8')
+  return md
+}
+
 C.leer = async () => {
   const id = pos.join(' ') || fallar('Uso: leer <fuente_id o archivo> [--paginas 3-5]')
   let md
   if (fs.existsSync(id)) md = await aMarkdown(id)
   else {
     const d = cargar(), f = d.fuentes.find(x => x.id === id) || fallar(`No existe la fuente ${id}`)
-    if (!f.documento_original) fallar(`${id} no tiene documento adjunto`)
-    const doc = ruta(...f.documento_original.split('/'))
-    if (!fs.existsSync(doc)) fallar(`El documento de ${id} aún no está en la carpeta (${f.documento_original})`)
-    const cache = ruta('fuentes', f.id, 'texto.md') // se regenera si el documento cambió
-    if (fs.existsSync(cache) && fs.statSync(cache).mtimeMs >= fs.statSync(doc).mtimeMs) md = fs.readFileSync(cache, 'utf8')
-    else { md = await aMarkdown(doc, f); fs.writeFileSync(cache, md, 'utf8') }
+    md = await mdDeFuente(f)
   }
   if (op.paginas) {
     const [a, b = a] = String(op.paginas).split('-').map(Number)
@@ -493,6 +500,131 @@ C.leer = async () => {
     md = trozos.join('\n') || `(sin páginas ${op.paginas}: el documento no es un PDF o no tiene esas páginas)`
   }
   ok(md)
+}
+
+// --- Referencias que cita un paper ---
+const TITULOS_REFS = /^(?:#+\s*)?(?:\d+\.?\s*)?(references|referencias|bibliograf[íi]a|literature cited|works cited|reference list|lista de referencias)\s*:?\s*$/im
+
+/** Separa la bibliografía de un paper en entradas (heurística: numeradas o "Apellido, I."). */
+function separarReferencias(md) {
+  const lineas = md.split('\n')
+  let ini = -1
+  for (let i = lineas.length - 1; i >= 0; i--) if (TITULOS_REFS.test(lineas[i].trim())) { ini = i; break }
+  // Si el título quedó pegado al comienzo de un párrafo ("References Abdul-Rahman, H. …").
+  let texto
+  if (ini >= 0) texto = lineas.slice(ini + 1).join('\n')
+  else {
+    const m = [...md.matchAll(/\b(References|REFERENCES|Referencias|REFERENCIAS|Bibliografía|BIBLIOGRAFÍA)\b\s+(?=[A-ZÁÉÍÓÚ\[\d])/g)].at(-1)
+    if (!m) return []
+    texto = md.slice(m.index + m[0].length)
+  }
+  texto = texto.replace(/^## Página \d+\s*$/gm, ' ').replace(/\s+/g, ' ').trim()
+  // DOI y números cortados por un salto de línea: "(ASCE)0733- 9364" → "(ASCE)0733-9364"
+  texto = texto.replace(/([\w)(/.:])-\s(\d)/g, '$1-$2')
+  const numeradas = texto.split(/\s(?=\[\d{1,3}\]\s)/)
+  const autor = "[A-ZÁÉÍÓÚÑ][\\p{L}'’-]+"
+  const inicio = new RegExp(`(?<=[.)\\]]|\\d{4}[a-z]?\\)?\\.?|https?:\\/\\/\\S+)\\s+(?=(?:${autor}(?:\\s[A-Z][\\p{L}'’-]+)?,\\s(?:[A-Z]\\.\\s?)+|[A-ZÁÉÍÓÚ][A-Z&.\\s]{2,}\\.\\s\\(|${autor},\\s[A-Z]\\p{L}+))`, 'u')
+  const partes = numeradas.length > 4 ? numeradas : texto.split(inicio)
+  return partes.map(t => t.trim()).filter(t => t.length > 25 && /(19|20)\d{2}|s\.\s?f\./.test(t))
+}
+
+C.referencias = async () => {
+  const d = cargar(), f = d.fuentes.find(x => x.id === pos[0]) || fallar('Uso: referencias <fuente_id>')
+  const refs = separarReferencias(await mdDeFuente(f))
+  if (!refs.length) return ok(`No encontré la sección de referencias en ${f.id}. Revísala con: leer ${f.id} (suele estar en las últimas páginas).`)
+  const ya = new Set(f.referencias_citadas || [])
+  ok(`# Referencias citadas en ${refF(f)} \`${f.id}\` — ${refs.length} entradas`)
+  ok('(Verifica cada una con citas-tesis antes de agregarla con referencia-nueva.)\n')
+  refs.forEach((r, i) => {
+    // Quita el punto final y los ")" sobrantes (sin romper DOI con paréntesis como "…118:1(34)").
+    let doi = (/10\.\d{4,9}\/[^\s,;]+/.exec(r) || [])[0]?.replace(/\.+$/, '')
+    while (doi && doi.endsWith(')') && (doi.match(/\(/g) || []).length < (doi.match(/\)/g) || []).length) doi = doi.slice(0, -1)
+    const existe = doi && d.fuentes.find(x => (x.doi_o_url || '').toLowerCase().includes(doi.toLowerCase()))
+    ok(`${i + 1}. ${r}${doi ? `\n   DOI: ${doi}` : ''}${existe ? `\n   ↳ ya está en la biblioteca: ${existe.id}${ya.has(existe.id) ? ' (conectada)' : ''}` : ''}`)
+  })
+}
+
+/** Proyectos donde está vinculada una fuente. */
+const proyectosDe = (d, fid) => [...new Set(d.citas.filter(c => c.fuente_id === fid).map(c => c.proyecto_id))].map(id => d.proyectos.find(p => p.id === id)).filter(Boolean)
+
+C['referencia-nueva'] = () => {
+  const d = cargar(), paper = d.fuentes.find(x => x.id === pos[0]) || fallar('Uso: referencia-nueva <fuente_del_paper> --json \'{…datos de la fuente citada…}\'')
+  const ref = crearFuente(d, leerJsonOp('json') || fallar('Falta --json con los datos de la referencia'))
+  if (ref.id === paper.id) fallar('La referencia es el mismo paper')
+  ref.citada_en = [...new Set([...(ref.citada_en || []), paper.id])]
+  paper.referencias_citadas = [...new Set([...(paper.referencias_citadas || []), ref.id])]
+  if (op.nota) ref.notas_correccion = [ref.notas_correccion, op.nota].filter(Boolean).join(' · ')
+  // Se vincula a los proyectos del paper y se dibuja el hilo "cita a" en su lienzo.
+  const proyectos = op.proyecto ? [buscarProyecto(d, op.proyecto)] : proyectosDe(d, paper.id)
+  for (const p of proyectos) {
+    vincular(d, ref.id, p.id, null)
+    if (!p.canvas.conexiones.some(k => k.desde === paper.id && k.hasta === ref.id)) p.canvas.conexiones.push({ id: idLocal('con'), desde: paper.id, hasta: ref.id, etiqueta: 'cita a' })
+  }
+  guardar(d)
+  ok(`${refF(ref)} \`${ref.id}\` conectada como referencia de ${refF(paper)}${proyectos.length ? ` en ${proyectos.map(p => p.id).join(', ')}` : ''}`)
+  aviso()
+}
+
+// --- Puntos clave de un paper (para desarrollar la tesis) ---
+const TIPOS_PUNTO = {
+  hallazgo: ['Hallazgo', 'verde'], dato: ['Dato', 'celeste'], metodo: ['Método', 'lila'], definicion: ['Definición', 'amarillo'],
+  marco: ['Marco teórico', 'amarillo'], vacio: ['Vacío de investigación', 'rosa'], limitacion: ['Limitación', 'naranja'], cita: ['Cita textual', 'celeste']
+}
+const tipoPunto = t => { const k = normal(t || 'hallazgo').replace(/[^a-z]/g, ''); return TIPOS_PUNTO[k] ? k : fallar(`--tipo "${t}" no válido. Usa: ${Object.keys(TIPOS_PUNTO).join(', ')}`) }
+
+C.punto = () => {
+  const d = cargar(), f = d.fuentes.find(x => x.id === pos[0]) || fallar('Uso: punto <fuente_id> --texto "…" [--pagina N] [--tipo hallazgo] [--objetivo oe1] [--sin-tarjeta]')
+  const texto = op.texto || fallar('Falta --texto')
+  const tipo = tipoPunto(op.tipo)
+  const pagina = op.pagina !== undefined && op.pagina !== true ? String(op.pagina) : null
+  const objetivos = op.objetivo ? String(op.objetivo).split(',').map(s => s.trim().toLowerCase()) : []
+  const punto = { id: idLocal('punto'), tipo, texto, pagina, objetivos, creado: ahoraISO() }
+  f.puntos = [...(f.puntos || []), punto]
+  // Tarjeta en el lienzo (o en el sub-lienzo del objetivo), conectada con el paper.
+  if (!op['sin-tarjeta']) {
+    const p = op.proyecto ? buscarProyecto(d, op.proyecto) : proyectosDe(d, f.id)[0]
+    if (p) {
+      const clave = objetivos[0] || null
+      if (clave) vincular(d, f.id, p.id, clave)
+      const c = subLienzo(p, clave)
+      const [nombreTipo, color] = TIPOS_PUNTO[tipo]
+      const n = { id: idLocal('nota'), titulo: `${nombreTipo} · ${refF(f)}${pagina ? `, pág. ${pagina}` : ''}`, texto: tipo === 'cita' ? `“${texto}”` : texto, estilo: 'tarjeta', letra: 'sans', color, creado: ahoraISO(), punto: punto.id, x: 0, y: 0 }
+      const cerca = (!clave && p.canvas.posiciones[f.id]) || (clave && c.fuentes.find(x => x.id === f.id)) || null
+      const oc = clave ? ocupadasObjetivo(c) : ocupadasProyecto(d, p)
+      const { w, h } = tamano('notas', n)
+      Object.assign(n, lugarLibre(oc, w, h, cerca ? cerca.x + 330 : 0, cerca ? cerca.y + 40 : 0))
+      c.notas.push(n)
+      c.conexiones.push({ id: idLocal('con'), desde: f.id, hasta: n.id, etiqueta: nombreTipo.toLowerCase() })
+      punto.tarjeta = n.id
+    }
+  }
+  guardar(d)
+  ok(`Punto ${punto.id} (${TIPOS_PUNTO[tipo][0]}) en ${refF(f)}${pagina ? `, pág. ${pagina}` : ''}${objetivos.length ? ` → ${objetivos.join(', ').toUpperCase()}` : ''}${punto.tarjeta ? ` · tarjeta ${punto.tarjeta}` : ''}`)
+  aviso()
+}
+
+/** Todos los puntos clave, agrupados, con su cita (Autor, año, p. N): materia prima para redactar. */
+C.puntos = () => {
+  const d = cargar()
+  const filtroTipo = op.tipo ? tipoPunto(op.tipo) : null, obj = op.objetivo ? String(op.objetivo).toLowerCase() : null
+  const q = op.buscar ? normal(op.buscar) : null
+  const todos = d.fuentes.filter(f => !op.fuente || f.id === op.fuente).flatMap(f => (f.puntos || []).map(p => ({ ...p, f })))
+    .filter(p => (!filtroTipo || p.tipo === filtroTipo) && (!obj || p.objetivos?.includes(obj)) && (!q || normal(p.texto).includes(q)))
+  if (!todos.length) return ok('No hay puntos con ese filtro. Agrega con: punto <fuente> --texto "…" --pagina N --tipo hallazgo')
+  const grupos = new Map()
+  for (const p of todos) {
+    const k = obj || op.fuente ? TIPOS_PUNTO[p.tipo][0] : (p.objetivos?.length ? p.objetivos.map(x => x.toUpperCase()).join(', ') : 'Sin objetivo')
+    ;(grupos.get(k) ?? grupos.set(k, []).get(k)).push(p)
+  }
+  ok(`# Puntos clave (${todos.length})`)
+  for (const [k, l] of grupos) {
+    ok(`\n## ${k}`)
+    for (const p of l) {
+      const ap = (p.f.autores || []).map(a => String(a).split(',')[0].trim())
+      const autor = ap.length > 2 ? `${ap[0]} et al.` : ap.join(' & ') || autorCorto(p.f)
+      ok(`- [${TIPOS_PUNTO[p.tipo][0]}] ${p.texto} (${autor}, ${p.f.anio ?? 's. f.'}${p.pagina ? `, p. ${p.pagina}` : ''}) \`${p.f.id}\` \`${p.id}\``)
+    }
+  }
 }
 
 // --- Ejecutar ---
