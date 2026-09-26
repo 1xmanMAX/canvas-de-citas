@@ -23,6 +23,15 @@ use wry::{PermissionResponse, WebContext, WebViewBuilder};
 const URL: &str = "https://1xmanmax.github.io/canvas-de-citas/";
 const PUERTO: u16 = 47481;
 
+/// Opciones para pruebas: --url <otra página>, --base <carpeta de datos>, --puerto <n>.
+fn arg(nombre: &str) -> Option<String> {
+    let a: Vec<String> = std::env::args().collect();
+    a.iter().position(|x| x == nombre).and_then(|i| a.get(i + 1).cloned())
+}
+fn puerto() -> u16 {
+    arg("--puerto").and_then(|p| p.parse().ok()).unwrap_or(PUERTO)
+}
+
 struct Rutas {
     base: PathBuf,
     registro: PathBuf,
@@ -34,8 +43,8 @@ struct Rutas {
 }
 
 fn rutas() -> Rutas {
-    let base = std::env::var_os("LOCALAPPDATA").map(PathBuf::from).unwrap_or_else(std::env::temp_dir).join("CanvasDeCitas");
-    let documentos = std::env::var_os("USERPROFILE").map(|u| PathBuf::from(u).join("Documents")).unwrap_or_else(|| base.clone());
+    let base = arg("--base").map(PathBuf::from).unwrap_or_else(|| std::env::var_os("LOCALAPPDATA").map(PathBuf::from).unwrap_or_else(std::env::temp_dir).join("CanvasDeCitas"));
+    let documentos = if arg("--base").is_some() { base.clone() } else { std::env::var_os("USERPROFILE").map(|u| PathBuf::from(u).join("Documents")).unwrap_or_else(|| base.clone()) };
     Rutas {
         registro: base.join("proyectos-abiertos.json"),
         estado: base.join("sincro"),
@@ -50,7 +59,7 @@ fn rutas() -> Rutas {
 
 /// ¿Ya corre nuestro servidor (con este token) en el puerto de siempre?
 fn servidor_corriendo(token: &str) -> bool {
-    let Ok(mut s) = TcpStream::connect_timeout(&([127, 0, 0, 1], PUERTO).into(), Duration::from_millis(400)) else { return false };
+    let Ok(mut s) = TcpStream::connect_timeout(&([127, 0, 0, 1], puerto()).into(), Duration::from_millis(400)) else { return false };
     let _ = s.set_read_timeout(Some(Duration::from_secs(2)));
     let pedido = format!("GET /local/hola HTTP/1.1\r\nHost: 127.0.0.1\r\nX-Canvas-Local: {token}\r\nConnection: close\r\n\r\n");
     if s.write_all(pedido.as_bytes()).is_err() {
@@ -64,7 +73,7 @@ fn servidor_corriendo(token: &str) -> bool {
 fn arrancar_servidor(r: &Rutas) -> std::io::Result<()> {
     let cfg = Config {
         modo: Modo::Carpetas { registro: r.registro.clone(), estado: r.estado.clone(), nuevos: r.nuevos.clone(), token: r.token.clone() },
-        puerto: PUERTO,
+        puerto: puerto(),
         clave: None,
         clave_archivo: Some(r.clave.clone()),
     };
@@ -104,7 +113,7 @@ fn main() {
     if !servidor_corriendo(&token) {
         if let Err(e) = arrancar_servidor(&r) {
             // Otro programa ocupa el puerto: la app abre igual (sin carpetas por el puente).
-            aviso(&format!("No se pudo arrancar la sincronización en el puerto {PUERTO}: {e}"));
+            aviso(&format!("No se pudo arrancar la sincronización en el puerto {}: {e}", puerto()));
         }
     }
 
@@ -124,14 +133,21 @@ fn main() {
     ventana.set_maximized(true);
 
     let mut contexto = WebContext::new(Some(r.webview.clone()));
-    let inicio = format!("window.canvasWindows = Object.freeze({{ puerto: {PUERTO}, token: {:?} }});", token);
+    let inicio = format!("window.canvasWindows = Object.freeze({{ puerto: {}, token: {:?} }});", puerto(), token);
     let webview = WebViewBuilder::new_with_web_context(&mut contexto)
-        .with_url(URL)
+        .with_url(arg("--url").unwrap_or_else(|| URL.into()))
         .with_initialization_script(inicio)
         // Micrófono (notas de voz), portapapeles, notificaciones…: la app es de confianza.
         .with_permission_handler(|_| PermissionResponse::Allow)
-        .with_devtools(false)
-        .build(&ventana);
+        .with_devtools(false);
+    // La página (de internet) habla con el puente de esta misma PC: que Chromium no lo bloquee como
+    // "acceso a la red local". Se mantienen las opciones que wry pone por defecto.
+    #[cfg(windows)]
+    let webview = {
+        use wry::WebViewBuilderExtWindows;
+        webview.with_additional_browser_args("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,LocalNetworkAccessChecks,PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults")
+    };
+    let webview = webview.build(&ventana);
     let _webview = match webview {
         Ok(w) => w,
         Err(e) => return aviso(&format!("No se pudo abrir WebView2 (¿falta el runtime de Edge WebView2?): {e}")),

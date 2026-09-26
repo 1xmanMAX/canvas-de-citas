@@ -3,16 +3,21 @@ CANVAS DE CITAS PARA WINDOWS
 
 Instalar: doble clic en  Instalar.cmd
 
-  1. Elige tu carpeta de datos (la misma de la app: Configuración → Carpeta de almacenamiento).
-  2. Acepta el permiso de administrador si Windows lo pide (es solo para el firewall).
-  3. Al terminar tienes:
-     - "Canvas de Citas" en el Escritorio y en el menú Inicio (abre la app en su propia ventana).
-     - La sincronización con el celular y la laptop, que arranca sola con Windows.
-     - El código de vinculación en el Escritorio y copiado al portapapeles.
+  1. Se instala "Canvas de Citas" (su propia ventana; siempre abre la última versión publicada).
+  2. La primera vez, tu carpeta de datos actual queda como la carpeta de tu proyecto.
+  3. Acepta el permiso de administrador si Windows lo pide (es solo para el firewall).
+  4. Al terminar tienes:
+     - "Canvas de Citas" en el Escritorio y en el menú Inicio.
+     - La sincronización por Wi-Fi (sin internet) con el celular y la laptop, que arranca sola
+       con Windows.
 
-Vincular el celular o la laptop: en la app, Configuración → Sincronizar con la PC → pega el código.
-Deben estar en el mismo Wi-Fi que esta PC.
+Cada proyecto vive en su propia carpeta: "Nuevo proyecto" crea la suya y "Abrir proyecto" carga
+una (por ejemplo, después de reinstalar). La app no vuelve a pedir permisos.
 
-Desinstalar: doble clic en  Desinstalar.cmd  (tus datos no se borran).
+Vincular el celular: en la app, Configuración -> Vincular celular -> escanea el código QR desde el
+celular (Configuración -> Sincronizar con la PC). Deben estar en el mismo Wi-Fi; no hace falta
+internet. En cada proyecto puedes elegir si se sincroniza con el celular.
+
+Desinstalar: doble clic en  Desinstalar.cmd  (tus carpetas de proyectos no se borran).
 
 Más información: https://github.com/1xmanMAX/canvas-de-citas

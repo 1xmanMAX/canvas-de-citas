@@ -148,3 +148,11 @@ fn apk_viejo_sincroniza_con_el_servidor_multicarpeta() {
     let v2 = s.clave.descifrar_json(std::str::from_utf8(&r2.cuerpo).unwrap()).unwrap();
     assert!(v2["docs"].as_array().unwrap().iter().any(|d| d["ruta"] == "fotos/foto_x.jpg"));
 }
+
+#[test]
+fn registro_escrito_por_powershell_con_bom() {
+    let (t, c) = escenario();
+    let texto = fs::read(t.path().join("proyectos-abiertos.json")).unwrap();
+    fs::write(t.path().join("proyectos-abiertos.json"), [b"\xef\xbb\xbf".as_slice(), &texto].concat()).unwrap();
+    assert_eq!(c.entradas().len(), 2);
+}

@@ -77,7 +77,8 @@ impl Carpetas {
     }
 
     fn entradas_sin_candado(&self) -> Vec<Entrada> {
-        let v: Value = fs::read(&self.registro).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_else(|| json!([]));
+        // (Tolera el BOM que agrega PowerShell 5 al escribir UTF-8.)
+        let v: Value = fs::read(&self.registro).ok().and_then(|b| serde_json::from_slice(b.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&b)).ok()).unwrap_or_else(|| json!([]));
         lista(&v).into_iter().map(|v| Entrada { v }).collect()
     }
 

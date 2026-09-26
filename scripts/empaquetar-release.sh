@@ -11,10 +11,18 @@ RAIZ=$(cd "$(dirname "$0")/.." && pwd)
 OUT="$RAIZ/dist-release/$V"
 rm -rf "$OUT" && mkdir -p "$OUT/CanvasDeCitas-Windows"
 
-# Windows: servidor de sincronización + instalador (PowerShell 5 necesita BOM y CRLF).
-(cd "$RAIZ/receptor/sincro" && CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc cargo build --release --target x86_64-pc-windows-gnu)
+# Windows: la app (Canvas de Citas.exe: ventana WebView2 + sincronización por Wi-Fi) + instalador
+# (PowerShell 5 necesita BOM y CRLF). En Windows se compila con MSVC; en Linux, con mingw.
+if [ "${OS:-}" = "Windows_NT" ]; then
+  (cd "$RAIZ/escritorio" && cargo build --release)
+  EXE="$RAIZ/escritorio/target/release/canvas-de-citas.exe"
+else
+  (cd "$RAIZ/escritorio" && CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc cargo build --release --target x86_64-pc-windows-gnu)
+  EXE="$RAIZ/escritorio/target/x86_64-pc-windows-gnu/release/canvas-de-citas.exe"
+fi
 W="$OUT/CanvasDeCitas-Windows"
-cp "$RAIZ/receptor/sincro/target/x86_64-pc-windows-gnu/release/canvas-sincro.exe" "$RAIZ/app/public/icon.ico" "$W/"
+cp "$EXE" "$W/Canvas de Citas.exe"
+cp "$RAIZ/app/public/icon.ico" "$W/"
 for f in "$RAIZ"/instalador-windows/*; do
   n=$(basename "$f")
   case "$n" in
