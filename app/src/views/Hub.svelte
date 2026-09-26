@@ -424,7 +424,7 @@
   </nav>
   <div class="espacio"></div>
   <label for="buscar-fuente" class="sr-only">Buscar fuentes</label>
-  <input id="buscar-fuente" class="buscar" type="search" placeholder="Buscar fuente..." bind:value={q} />
+  <input id="buscar-fuente" class="buscar" type="search" placeholder="Buscar (usa #tema o @persona)…" bind:value={q} />
   <a class="btn solo-escritorio" href="#/citas/{p.id}">Vista de citas</a>
   <a class="icono-btn solo-movil" href="#/citas/{p.id}" aria-label="Vista de citas"><Icono nombre="lista" tam={18} /></a>
   <button class="btn solo-escritorio" onclick={() => descargarBib(fuentes, 'bibliografia.bib')}>Exportar .bib</button>

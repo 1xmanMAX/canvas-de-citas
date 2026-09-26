@@ -55,6 +55,13 @@ const SUITES = {
       if (notas.some(([, con, at]) => con && at)) throw new Error('atenuó una nota con #vial')
       await pg.$eval('#buscar-fuente', i => { i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })) }); await esperar(200)
     })
+    await s.paso('el buscador del lienzo encuentra una @persona puesta solo como chip', async () => {
+      await pg.type('#buscar-fuente', '@ana'); await esperar(300)
+      const notas = await pg.$$eval('g.tarjeta.notas', gs => Array.from(gs, g => [g.textContent.includes('nota con chip'), g.classList.contains('atenuada')]))
+      if (!notas.some(([es]) => es)) throw new Error('no se ve la nota con chip')
+      if (notas.some(([es, at]) => es && at)) throw new Error('atenuó la nota con @Ana en su campo de etiquetas')
+      await pg.$eval('#buscar-fuente', i => { i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })) }); await esperar(200)
+    })
     await s.paso('Ctrl+F abre el buscador general y encuentra por @persona', async () => {
       await pg.keyboard.down('Control'); await pg.keyboard.press('f'); await pg.keyboard.up('Control')
       await pg.waitForSelector('dialog[open] .buscador input', { timeout: 3000 })

@@ -2,7 +2,7 @@
 // y búsqueda. Las comparten el lienzo del proyecto y los sub-lienzos de cada objetivo.
 import { S } from './store.svelte.js'
 import { F, envolver, limpiarCache, ancho } from './texto.js'
-import { etiquetasDe, colorEtiqueta, textosTarjeta } from './etiquetas.js'
+import { etiquetasDe, colorEtiqueta, textosTarjeta, coincideConsulta, parsearConsulta } from './etiquetas.js'
 import { cajaFoto } from './medidas-foto.js'
 export { ANCHO_FOTO } from './medidas-foto.js'
 
@@ -136,7 +136,8 @@ const normal = t => String(t ?? '').toLowerCase().normalize('NFD').replace(/[̀-
 export function textoDe(o) {
   return [o.titulo, o.texto, o.anotacion, o.transcripcion, ...(o.items || []).map(i => i.t)].filter(Boolean).join(' ')
 }
-export const coincideTarjeta = (o, q) => normal(textoDe(o)).includes(normal(q).trim())
+/** Búsqueda en el lienzo: palabras, #tema y @persona (escritos en el texto o puestos como chips). */
+export const coincideTarjeta = (o, q) => coincideConsulta({ texto: textoDe(o), ...etiquetasDe(textosTarjeta(o), o.etiquetas) }, parsearConsulta(q))
 
 export function nombreTarjeta(lista, o) {
   const corto = t => { t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length > 48 ? t.slice(0, 47) + '…' : t }
