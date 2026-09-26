@@ -1,6 +1,7 @@
 // receptor/sincro/src/servidor.rs
 //! Servidor HTTP de sincronización (red local). Todo lo que viaja va cifrado con la clave de
 //! vinculación; cada petición demuestra conocerla con la cabecera X-Canvas-Prueba.
+use crate::almacen::Almacen;
 use crate::carpeta::Carpeta;
 use crate::cifrado::{ahora_ms, Clave};
 use crate::parche;
@@ -16,7 +17,8 @@ pub const TOPE_CUERPO: usize = 200 * 1024 * 1024;
 static ESCRITURA: Mutex<()> = Mutex::new(());
 
 pub struct Sincro {
-    pub carpeta: Carpeta,
+    /// Una carpeta (`Carpeta`) o las de los proyectos abiertos (`Carpetas`).
+    pub carpeta: Box<dyn Almacen>,
     pub clave: Clave,
     pub clave_b64: String,
     pub puerto: u16,
@@ -115,7 +117,7 @@ impl Sincro {
             ("GET", "/sync/hola") => Respuesta::texto(200, self.clave.cifrar_json(&json!({"app": "canvas-sincro", "v": 1}))),
             ("POST", "/sync/v2/leer") => self.leer_v2(cuerpo),
             ("POST", "/sync/v2/escribir") => self.escribir_v2(cuerpo),
-            ("GET", "/sync/estado") => match self.carpeta.leer() {
+            ("GET", "/sync/estado") => match self.carpeta.leer(false) {
                 Ok(v) => Respuesta::texto(200, self.clave.cifrar_json(&v)),
                 Err(e) => Respuesta::texto(500, e.to_string()),
             },
@@ -132,18 +134,23 @@ impl Sincro {
                 }
             }
             ("GET", "/sync/doc") => {
-                let Some(p) = parametro(url, "ruta").and_then(|r| self.carpeta.ruta_segura(&r)) else { return Respuesta::vacia(400) };
-                match std::fs::read(p) {
-                    Ok(b) => Respuesta::binario(self.clave.cifrar(&b)),
-                    Err(_) => Respuesta::vacia(404),
+                let Some(r) = parametro(url, "ruta") else { return Respuesta::vacia(400) };
+                match self.carpeta.leer_doc(&r) {
+                    Err(_) => Respuesta::vacia(400),
+                    Ok(Some(b)) => Respuesta::binario(self.clave.cifrar(&b)),
+                    Ok(None) => Respuesta::vacia(404),
                 }
             }
             ("PUT", "/sync/doc") => {
-                let Some(p) = parametro(url, "ruta").and_then(|r| self.carpeta.ruta_segura(&r)) else { return Respuesta::vacia(400) };
+                let Some(r) = parametro(url, "ruta") else { return Respuesta::vacia(400) };
+                if crate::almacen::ruta_doc_valida(&r).is_none() {
+                    return Respuesta::vacia(400);
+                }
                 let Ok(b) = self.clave.descifrar(cuerpo) else { return Respuesta::vacia(401) };
-                match self.carpeta.escribir_doc(&p, &b) {
-                    Ok(()) => Respuesta::texto(200, self.clave.cifrar_json(&json!({"ok": true}))),
-                    Err(e) => Respuesta::texto(500, e.to_string()),
+                match self.carpeta.escribir_doc(&r, &b) {
+                    Err(_) => Respuesta::vacia(400),
+                    Ok(Ok(())) => Respuesta::texto(200, self.clave.cifrar_json(&json!({"ok": true}))),
+                    Ok(Err(e)) => Respuesta::texto(500, e.to_string()),
                 }
             }
             _ => Respuesta::vacia(404),
@@ -176,7 +183,9 @@ impl Sincro {
         if !Carpeta::id_valido(id) {
             return Respuesta::vacia(400);
         }
-        let actual = match self.carpeta.leer() {
+        // Clientes nuevos piden también los originales de fotos; un APK viejo no los ve (y no se rompe).
+        let con_fotos = pedido["capacidades"].as_array().is_some_and(|c| c.iter().any(|x| x == "fotos"));
+        let actual = match self.carpeta.leer(con_fotos) {
             Ok(v) => v,
             Err(e) => return Respuesta::texto(500, e.to_string()),
         };
@@ -217,7 +226,7 @@ impl Sincro {
         if v["etiqueta"].as_str() != Some(self.carpeta.etiqueta().as_str()) {
             return Respuesta::texto(409, self.clave.cifrar_json(&json!({"error": "cambio"})));
         }
-        let actual = match self.carpeta.leer() {
+        let actual = match self.carpeta.leer(false) {
             Ok(a) => solo_datos(&a),
             Err(e) => return Respuesta::texto(500, e.to_string()),
         };

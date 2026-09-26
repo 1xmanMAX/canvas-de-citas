@@ -6,3 +6,5 @@ pub mod carpeta;
 pub mod servidor;
 pub mod parche;
 pub mod reparto;
+pub mod almacen;
+pub mod carpetas;

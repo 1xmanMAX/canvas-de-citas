@@ -22,7 +22,7 @@ impl Carpeta {
         self.raiz.join(format!("{col}.json"))
     }
 
-    fn bytes(&self, col: &str) -> Vec<u8> {
+    pub fn bytes(&self, col: &str) -> Vec<u8> {
         fs::read(self.archivo(col)).unwrap_or_default()
     }
 
@@ -68,7 +68,7 @@ impl Carpeta {
         fs::rename(&tmp, destino)
     }
 
-    fn json_bonito(v: &Value) -> io::Result<Vec<u8>> {
+    pub fn json_bonito(v: &Value) -> io::Result<Vec<u8>> {
         let mut txt = serde_json::to_string_pretty(v)?;
         txt.push('\n');
         Ok(txt.into_bytes())
@@ -132,6 +132,10 @@ impl Carpeta {
         (*raiz == "fuentes" && id_ok && ext_ok).then(|| self.raiz.join("fuentes").join(id).join(nombre))
     }
 
+    pub fn escribir_atomico_pub(&self, destino: &Path, bytes: &[u8]) -> io::Result<()> {
+        self.escribir_atomico(destino, bytes)
+    }
+
     pub fn escribir_doc(&self, destino: &Path, bytes: &[u8]) -> io::Result<()> {
         self.escribir_atomico(destino, bytes)
     }
@@ -191,5 +195,67 @@ impl Carpeta {
             a["sincronizado"] = json!(ahora_ms);
         }
         self.escribir_atomico(&self.dir_sincro().join("grupo.json"), &Self::json_bonito(&g)?)
+    }
+}
+
+impl Carpeta {
+    /// Originales de fotos (`fotos/<id>.<ext>`), como `documentos()`.
+    pub fn fotos(&self) -> Vec<Value> {
+        let mut l = vec![];
+        let Ok(archivos) = fs::read_dir(self.raiz.join("fotos")) else { return l };
+        for a in archivos.flatten() {
+            let nombre = a.file_name().to_string_lossy().to_string();
+            let ruta = format!("fotos/{nombre}");
+            if crate::almacen::ruta_doc_valida(&ruta).is_none() {
+                continue;
+            }
+            let Ok(meta) = a.metadata() else { continue };
+            l.push(json!({"ruta": ruta, "bytes": meta.len()}));
+        }
+        l.sort_by(|a, b| a["ruta"].as_str().cmp(&b["ruta"].as_str()));
+        l
+    }
+
+    fn ruta_doc(&self, ruta: &str) -> Option<PathBuf> {
+        let partes = crate::almacen::ruta_doc_valida(ruta)?;
+        Some(partes.iter().fold(self.raiz.clone(), |p, x| p.join(x)))
+    }
+}
+
+impl crate::almacen::Almacen for Carpeta {
+    fn etiqueta(&self) -> String {
+        Carpeta::etiqueta(self)
+    }
+    fn leer(&self, con_fotos: bool) -> io::Result<Value> {
+        let mut v = Carpeta::leer(self)?;
+        if con_fotos {
+            let mut docs = v["docs"].as_array().cloned().unwrap_or_default();
+            docs.extend(self.fotos());
+            v["docs"] = Value::Array(docs);
+        }
+        Ok(v)
+    }
+    fn escribir(&self, datos: &Value, eliminados: &Value) -> io::Result<()> {
+        Carpeta::escribir(self, datos, eliminados)
+    }
+    fn leer_doc(&self, ruta: &str) -> Result<Option<Vec<u8>>, crate::almacen::RutaInvalida> {
+        let p = self.ruta_doc(ruta).ok_or(crate::almacen::RutaInvalida)?;
+        Ok(fs::read(p).ok())
+    }
+    fn escribir_doc(&self, ruta: &str, bytes: &[u8]) -> Result<io::Result<()>, crate::almacen::RutaInvalida> {
+        let p = self.ruta_doc(ruta).ok_or(crate::almacen::RutaInvalida)?;
+        Ok(self.escribir_atomico_pub(&p, bytes))
+    }
+    fn base_de(&self, id: &str) -> Option<Value> {
+        Carpeta::base_de(self, id)
+    }
+    fn guardar_base(&self, id: &str, datos: &Value) -> io::Result<()> {
+        Carpeta::guardar_base(self, id, datos)
+    }
+    fn grupo(&self) -> Value {
+        Carpeta::grupo(self)
+    }
+    fn anotar_aparato(&self, id: &str, nombre: &str, ahora_ms: u64, sincronizo: bool) -> io::Result<()> {
+        Carpeta::anotar_aparato(self, id, nombre, ahora_ms, sincronizo)
     }
 }

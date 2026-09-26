@@ -29,7 +29,7 @@ fn main() {
     };
     let server = tiny_http::Server::http(("0.0.0.0", puerto)).expect("no se pudo abrir el puerto");
     let puerto = server.server_addr().to_ip().map(|a| a.port()).unwrap_or(puerto);
-    let s = Arc::new(Sincro { carpeta: Carpeta::nueva(carpeta), clave, clave_b64, puerto, tope: TOPE_CUERPO });
+    let s = Arc::new(Sincro { carpeta: Box::new(Carpeta::nueva(carpeta)), clave, clave_b64, puerto, tope: TOPE_CUERPO });
     println!("{}", serde_json::json!({"puerto": puerto, "codigo": s.codigo(), "clave": s.clave_b64}));
     servir(s, server);
 }

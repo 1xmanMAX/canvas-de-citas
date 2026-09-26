@@ -8,7 +8,7 @@ fn sincro(tope: usize) -> (tempfile::TempDir, Sincro) {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("fuentes.json"), "{\"fuentes\":[{\"id\":\"fuente_001\"}]}").unwrap();
     let (clave, clave_b64) = Clave::nueva();
-    let s = Sincro { carpeta: Carpeta::nueva(dir.path()), clave, clave_b64, puerto: 47481, tope };
+    let s = Sincro { carpeta: Box::new(Carpeta::nueva(dir.path())), clave, clave_b64, puerto: 47481, tope };
     (dir, s)
 }
 fn prueba(s: &Sincro, url: &str) -> String {
