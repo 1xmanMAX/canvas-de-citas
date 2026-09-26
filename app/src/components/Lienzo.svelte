@@ -249,13 +249,19 @@
       pendiente = { dx: (ev.clientX - x0) / k, dy: (ev.clientY - y0) / k }
       if (!cuadro) cuadro = requestAnimationFrame(aplicarMov)
     }
-    const terminar = cancelado => {
+    const terminar = (cancelado, deshacer = false) => {
       removeEventListener('pointermove', mv)
       removeEventListener('pointerup', up)
       removeEventListener('pointercancel', up)
       cancelAnimationFrame(cuadro)
-      aplicarMov()
       arrastre = null
+      // Llegó un segundo dedo (pellizco): lo que el primero alcanzó a arrastrar no cuenta.
+      if (deshacer) {
+        pendiente = null
+        if (movido) alMover?.(0, 0)
+        return fin?.(false, true)
+      }
+      aplicarMov()
       fin?.(movido, cancelado)
     }
     const up = ev => {
@@ -269,7 +275,7 @@
     addEventListener('pointerup', up)
     addEventListener('pointercancel', up)
     // Al llegar un segundo dedo: deja la tarjeta donde esté (sin abrirla) y sigue el pellizco.
-    arrastre = { id, cancelar: () => terminar(true) }
+    arrastre = { id, cancelar: () => terminar(true, true) }
   }
 
   setContext('lienzo', { arrastrar, vista })

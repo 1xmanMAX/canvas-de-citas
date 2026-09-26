@@ -13,6 +13,34 @@ fs.mkdirSync(SALIDA, { recursive: true })
 
 const filtro = process.argv.slice(2)
 const SUITES = {
+  // Gestos en el celular (pantalla táctil simulada): lienzo, PDF y fotos.
+  async celular(b) {
+    const s = suite('Gestos en el celular'), pg = await pagina(b)
+    await pg.setViewport({ width: 412, height: 860, isMobile: true, hasTouch: true })
+    await conEjemplo(pg)
+    const cdp = await pg.createCDPSession()
+    const toque = (type, puntos) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: puntos.map((p, i) => ({ x: p.x, y: p.y, id: i })) })
+    await s.paso('lienzo: si el primer dedo se desliza antes del pellizco, la fuente no se mueve', async () => {
+      await pg.click('.zoom .porc'); await esperar(500)
+      const nodo = await pg.$('g.nodo')
+      const antes = await nodo.evaluate(g => g.getAttribute('transform'))
+      const r = await nodo.boundingBox()
+      const a = { x: r.x + r.width / 2, y: r.y + r.height / 2 }
+      await toque('touchStart', [a]); await esperar(30)
+      for (let i = 1; i <= 4; i++) { await toque('touchMove', [{ x: a.x + 6 * i, y: a.y + 4 * i }]); await esperar(20) } // el dedo se desliza 24 px
+      const a2 = { x: a.x + 24, y: a.y + 16 }, b2 = { x: a2.x + 80, y: a2.y + 60 }
+      await toque('touchStart', [a2, b2]); await esperar(30)
+      for (let i = 1; i <= 6; i++) { await toque('touchMove', [{ x: a2.x - 8 * i, y: a2.y - 6 * i }, { x: b2.x + 8 * i, y: b2.y + 6 * i }]); await esperar(20) }
+      await toque('touchEnd', []); await esperar(500)
+      // (al empezar un arrastre el lienzo pasa a modo libre y redondea posiciones: se tolera 1 px)
+      const pos = tr => (/translate\(([-\d.]+)[ ,]+([-\d.]+)/.exec(tr) || []).slice(1).map(Number)
+      const [x0, y0] = pos(antes), [x1, y1] = pos(await nodo.evaluate(g => g.getAttribute('transform')))
+      if (Math.abs(x1 - x0) > 1 || Math.abs(y1 - y0) > 1) throw new Error(`movió la fuente (${x0},${y0} → ${x1},${y1})`)
+    })
+    if (pg.errores.length) s.fallas.push(...pg.errores)
+    await pg.browserContext().close().catch(() => {})
+    return s
+  },
   // App de Windows: la página con window.canvasWindows usa el puente del servidor real (sin permisos del navegador).
   async windows(b) {
     const s = suite('App de Windows (puente local)')
