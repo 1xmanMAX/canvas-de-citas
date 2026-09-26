@@ -110,7 +110,9 @@ const SUITES = {
       const r = await (await pg.waitForSelector('dialog[open] .hoja svg', { visible: true })).boundingBox()
       await pg.mouse.move(r.x + r.width * .2, r.y + r.height * .3); await pg.mouse.down()
       await pg.mouse.move(r.x + r.width * .7, r.y + r.height * .4, { steps: 8 }); await pg.mouse.up()
-      await clicTexto(pg, 'Guardar')
+      await clicTexto(pg, 'Guardar'); await esperar(600)
+      const f = (await lienzoGuardado(pg)).fotos.at(-1)
+      if (!(f.original || '').startsWith('fotos/' + f.id + '.')) throw new Error('la foto no guardó su original: ' + f.original)
     })
     await s.paso('agrandar una foto desde su esquina (se ve completa)', async () => {
       await esperar(600)

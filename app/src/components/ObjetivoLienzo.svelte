@@ -6,7 +6,7 @@
   import Arrastrable from './Arrastrable.svelte'
   import Icono from './Icono.svelte'
   import Modal from './Modal.svelte'
-  import { S, guardarProyecto, avisar } from '../lib/store.svelte.js'
+  import { S, guardarProyecto, avisar, guardarOriginalFoto } from '../lib/store.svelte.js'
   import { estadoDeCitas, autorCorto, anio } from '../lib/citas.js'
   import { F, envolver, ancho } from '../lib/texto.js'
   import { NODO_W, alturaNodo, limitesDe, rutaConexion } from '../lib/grafo.js'
@@ -19,7 +19,7 @@
   import { accionesAgrupadores } from '../lib/agrupadores.js'
   import { LISTAS, TIPO, cajas, nombreTarjeta, asegurarTablero } from '../lib/tarjetas.js'
   import { redimensionarFoto, lugarLibre, nuevaTarjeta, guardarTarjeta, eliminarTarjeta, duplicarTarjeta, alternarTarea, vinculosDe, ancla, rutaHilo } from '../lib/tablero.js'
-  import { comprimirFoto } from '../lib/imagen.js'
+  import { prepararFoto } from '../lib/imagen.js'
   import { abrirOrigen } from '../lib/visor.svelte.js'
 
   let { p, clave, abrirFuente, cerrar } = $props()
@@ -210,10 +210,16 @@
     const archivo = input.files?.[0]
     input.value = ''
     if (!archivo) return
-    try { crear('fotos', await comprimirFoto(archivo)) } catch { avisar('No se pudo leer la imagen') }
+    try {
+      const { original, extension, ...datos } = await prepararFoto(archivo)
+      crear('fotos', datos)
+      modal.original = { blob: original, extension }
+    } catch { avisar('No se pudo leer la imagen') }
   }
 
-  function guardarModal() {
+  async function guardarModal() {
+    // Foto nueva: su original en alta se guarda con la tarjeta (fotos/<id>.<ext> en la carpeta).
+    if (modal.nueva && modal.original) await guardarOriginalFoto(modal.o, modal.original.blob, modal.original.extension)
     guardarTarjeta(asegurar(), modal.lista, modal.o, modal.nueva, ocupadas)
     guardar()
     modal = null

@@ -266,3 +266,37 @@ export async function importar(datos, modo) {
 
 export const leerMeta = clave => db.leer('meta', clave)
 export const ponerMeta = (clave, valor) => db.poner('meta', valor, clave)
+
+// --- Originales de fotos (alta resolución): mismo almacén `documentos`, clave = id de la foto ---
+const fotosDe = p => [...(p.canvas?.fotos || []), ...Object.values(p.canvas?.objetivos || {}).flatMap(o => o.fotos || [])]
+
+/** Todas las fotos de todos los proyectos (lienzo y sub-lienzos de objetivos). */
+export const todasLasFotos = () => S.proyectos.flatMap(fotosDe)
+
+export function buscarFoto(id) {
+  for (const p of S.proyectos) {
+    const f = fotosDe(p).find(x => x.id === id)
+    if (f) return { proyecto: p, foto: f }
+  }
+  return null
+}
+
+/** Ruta en la carpeta del documento guardado con esa clave (fuente o foto). */
+export function rutaDeDocumento(id) {
+  return S.fuentePorId.get(id)?.documento_original || buscarFoto(id)?.foto.original || null
+}
+
+/** Guarda el original de una foto ya colocada en el lienzo (luego hay que guardar el proyecto). */
+export async function guardarOriginalFoto(foto, blob, extension) {
+  await db.poner('documentos', { nombre: `${foto.id}.${extension}`, tipo: blob.type, blob }, foto.id)
+  foto.original = `fotos/${foto.id}.${extension}`
+  cambio(foto.id)
+}
+
+/** Original de la foto; una duplicada comparte el de su foto de origen (misma ruta). */
+export async function leerOriginalFoto(foto) {
+  const propio = (await db.leer('documentos', foto.id))?.blob
+  if (propio || !foto.original) return propio || null
+  const nombre = foto.original.split('/').pop(), origen = nombre.slice(0, nombre.lastIndexOf('.'))
+  return (await db.leer('documentos', origen))?.blob || null
+}

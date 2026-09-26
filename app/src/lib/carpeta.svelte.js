@@ -2,7 +2,7 @@
 // Con una carpeta elegida, la app guarda sola proyectos.json, fuentes.json, citas.json y los
 // documentos (fuentes/<id>/documento.ext) tras cada cambio, y recarga lo que la skill
 // citas-tesis modifique en esa carpeta (al volver a la ventana y cada pocos segundos).
-import { S, COLECCIONES, avisar, alCambiar, leerMeta, ponerMeta, leerDocumento, idsConDocumento, guardarDocumentoImportado, eliminarCita, eliminarFuente, eliminarProyecto } from './store.svelte.js'
+import { S, COLECCIONES, avisar, alCambiar, leerMeta, ponerMeta, leerDocumento, idsConDocumento, guardarDocumentoImportado, rutaDeDocumento, todasLasFotos, eliminarCita, eliminarFuente, eliminarProyecto } from './store.svelte.js'
 import { serializar, leerArchivos, aplicar } from './io.svelte.js'
 import { generarClaudeMd } from './paraClaude.js'
 
@@ -63,11 +63,11 @@ export const guardarAhora = () => enCola(async () => {
       await escribir(C.dir, `${col}.json`, serializar(col))
       escritos[col] = (await leerRuta(C.dir, `${col}.json`))?.lastModified
     }
-    for (const fid of [...docsPendientes]) {
-      const f = S.fuentePorId.get(fid)
-      const d = await leerDocumento(fid)
-      if (f?.documento_original && d?.blob) await escribir(C.dir, f.documento_original, d.blob)
-      docsPendientes.delete(fid)
+    for (const id of [...docsPendientes]) {
+      const ruta = rutaDeDocumento(id) // documento de una fuente u original de una foto
+      const d = await leerDocumento(id)
+      if (ruta && d?.blob) await escribir(C.dir, ruta, d.blob)
+      docsPendientes.delete(id)
     }
     await escribir(C.dir, 'CLAUDE.md', generarClaudeMd())
     await ponerMeta('carpetaEscritos', { ...escritos })
@@ -110,6 +110,12 @@ async function traerCambios() {
     const a = await leerRuta(C.dir, f.documento_original)
     if (a) await guardarDocumentoImportado(f.id, f.documento_nombre || a.name, a)
   }
+  // Originales de fotos (fotos/<id>.<ext>) que aún no están en este navegador.
+  for (const f of todasLasFotos()) {
+    if (!f.original || locales.has(f.id) || !f.original.includes(f.id)) continue
+    const a = await leerRuta(C.dir, f.original)
+    if (a) await guardarDocumentoImportado(f.id, a.name, a)
+  }
   await aplicarEliminados()
   return true
 }
@@ -140,9 +146,9 @@ async function conectar(dir) {
     await enCola(async () => {
       await traerCambios()
       // Documentos locales que aún no están en la carpeta.
-      for (const fid of await idsConDocumento()) {
-        const f = S.fuentePorId.get(fid)
-        if (f?.documento_original && !(await leerRuta(dir, f.documento_original))) docsPendientes.add(fid)
+      for (const id of await idsConDocumento()) {
+        const ruta = rutaDeDocumento(id)
+        if (ruta && !(await leerRuta(dir, ruta))) docsPendientes.add(id)
       }
     })
     await guardarAhora()

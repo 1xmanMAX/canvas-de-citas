@@ -23,3 +23,14 @@ test('el ancho elegido se respeta dentro de 120–900', () => {
   assert.equal(cajaFoto(foto({ ancho: 50 })).w, 120)
   assert.equal(cajaFoto(foto({ ancho: 5000 })).w, 900)
 })
+
+import { tamanoOriginal } from '../../src/lib/imagen.js'
+
+test('fotos normales se guardan tal cual', () => {
+  assert.deepEqual(tamanoOriginal(4000, 3000, 3e6), { reducir: false, ancho: 4000, alto: 3000 })
+})
+
+test('fotos enormes se reducen a 4096 px de lado mayor', () => {
+  assert.deepEqual(tamanoOriginal(8000, 6000, 20e6), { reducir: true, ancho: 4096, alto: 3072 })
+  assert.deepEqual(tamanoOriginal(3000, 9000, 16e6), { reducir: true, ancho: 1365, alto: 4096 })
+})

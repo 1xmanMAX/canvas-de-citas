@@ -19,12 +19,12 @@
   import { redimensionarFoto, lugarLibre, nuevaTarjeta, guardarTarjeta, eliminarTarjeta, duplicarTarjeta, alternarTarea, vinculosDe, ancla, rutaHilo } from '../lib/tablero.js'
   import { analizar, aDataURL } from '../lib/audio.svelte.js'
   import { listaObjetivos, objetivosPorIndicador } from '../lib/objetivos.js'
-  import { S, guardarProyecto, avisar } from '../lib/store.svelte.js'
+  import { S, guardarProyecto, avisar, guardarOriginalFoto } from '../lib/store.svelte.js'
   import { estadoDeCitas, autorCorto, anio, coincide, TIPOS_PROYECTO, ESTADOS_USO } from '../lib/citas.js'
   import { F, envolver, ancho } from '../lib/texto.js'
   import { NODO_W, alturaNodo, radial, porTema, limitesDe, rutaConexion } from '../lib/grafo.js'
   import { descargarBib } from '../lib/io.svelte.js'
-  import { comprimirFoto } from '../lib/imagen.js'
+  import { prepararFoto } from '../lib/imagen.js'
   import { abrirOrigen } from '../lib/visor.svelte.js'
   import { R } from '../lib/celular.svelte.js'
   import BotonSincro from '../components/BotonSincro.svelte'
@@ -232,10 +232,16 @@
     const archivo = input.files?.[0]
     input.value = ''
     if (!archivo) return
-    try { crear('fotos', await comprimirFoto(archivo)) } catch { avisar('No se pudo leer la imagen') }
+    try {
+      const { original, extension, ...datos } = await prepararFoto(archivo)
+      crear('fotos', datos)
+      modal.original = { blob: original, extension }
+    } catch { avisar('No se pudo leer la imagen') }
   }
 
-  function guardarModal() {
+  async function guardarModal() {
+    // Foto nueva: su original en alta se guarda con la tarjeta (fotos/<id>.<ext> en la carpeta).
+    if (modal.nueva && modal.original) await guardarOriginalFoto(modal.o, modal.original.blob, modal.original.extension)
     guardarTarjeta(cv, modal.lista, modal.o, modal.nueva, ocupadas)
     guardar()
     modal = null
@@ -270,7 +276,9 @@
         if (archivo.type.startsWith('audio/')) {
           cv.audios.push(nuevaTarjeta('audios', x, y, { ...(await analizar(archivo)), audio: await aDataURL(archivo), transcripcion: titulo }, ocupadas))
         } else {
-          cv.fotos.push(nuevaTarjeta('fotos', x, y, { ...(await comprimirFoto(archivo)), titulo }, ocupadas))
+          const { original, extension, ...datos } = await prepararFoto(archivo)
+          cv.fotos.push(nuevaTarjeta('fotos', x, y, { ...datos, titulo }, ocupadas))
+          await guardarOriginalFoto(cv.fotos.at(-1), original, extension)
         }
         n++
       } catch { avisar(`No se pudo leer ${archivo.name}`) }

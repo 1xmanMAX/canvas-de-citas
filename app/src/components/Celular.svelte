@@ -5,10 +5,10 @@
   import { untrack } from 'svelte'
   import Modal from './Modal.svelte'
   import Icono from './Icono.svelte'
-  import { S, guardarFuente, adjuntarDocumento, vincularFuente, guardarProyecto, avisar } from '../lib/store.svelte.js'
+  import { S, guardarFuente, adjuntarDocumento, vincularFuente, guardarProyecto, avisar, guardarOriginalFoto } from '../lib/store.svelte.js'
   import { autorCorto, anio } from '../lib/citas.js'
   import { serializar } from '../lib/io.svelte.js'
-  import { comprimirFoto } from '../lib/imagen.js'
+  import { prepararFoto } from '../lib/imagen.js'
   import { nuevaTarjeta } from '../lib/tablero.js'
   import { asegurarTablero } from '../lib/tarjetas.js'
   import { analizar, aDataURL } from '../lib/audio.svelte.js'
@@ -89,7 +89,11 @@
         if (!p) return avisar('Elige un proyecto')
         const c = asegurarTablero(p.canvas)
         const x = Math.round(360 + Math.random() * 120), y = Math.round(-120 + Math.random() * 120)
-        if (que === 'foto') c.fotos.push(nuevaTarjeta('fotos', x, y, { ...(await comprimirFoto(archivo)), titulo: sinExt }))
+        if (que === 'foto') {
+          const { original, extension, ...datos } = await prepararFoto(archivo)
+          c.fotos.push(nuevaTarjeta('fotos', x, y, { ...datos, titulo: sinExt }))
+          await guardarOriginalFoto(c.fotos.at(-1), original, extension)
+        }
         else if (que === 'nota') c.notas.push(nuevaTarjeta('notas', x, y, { texto: (await archivo.text()).trim().slice(0, 4000) }))
         else {
           const ext = (r.nombre.split('.').pop() || '').toLowerCase()
