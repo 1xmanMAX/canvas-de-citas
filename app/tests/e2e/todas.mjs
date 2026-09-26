@@ -57,6 +57,39 @@ const SUITES = {
       const esperado = (antes.top + caja.height / 2) * f - caja.height / 2
       if (Math.abs(despues.top - esperado) > caja.height * 0.25) throw new Error(`se desplazó de más: scrollTop ${antes.top} → ${despues.top} (esperado ≈ ${Math.round(esperado)})`)
     })
+    await s.paso('foto: arrastrar la barrita hacia arriba muestra los detalles y hacia abajo los recoge', async () => {
+      await pg.keyboard.press('Escape').catch(() => {}); await pg.evaluate(() => (location.hash = '#/p/proyecto_001')); await esperar(800)
+      await (await pg.$('input[type=file][accept="image/*"]')).uploadFile(IMG)
+      await pg.waitForSelector('dialog.visor-foto[open] .ficha.hoja', { timeout: 8000 }); await esperar(400)
+      const asa = await (await pg.$('dialog.visor-foto .asa')).boundingBox()
+      const p = { x: asa.x + asa.width / 2, y: asa.y + asa.height / 2 }
+      await toque('touchStart', [p]); for (let i = 1; i <= 6; i++) { await toque('touchMove', [{ x: p.x, y: p.y - 30 * i }]); await esperar(20) } await toque('touchEnd', []); await esperar(400)
+      if (!(await pg.$eval('dialog.visor-foto .ficha', f => !f.classList.contains('baja') && !!f.querySelector('textarea')?.offsetParent))) throw new Error('no se abrieron los detalles al arrastrar hacia arriba')
+      const asa2 = await (await pg.$('dialog.visor-foto .asa')).boundingBox()
+      const q = { x: asa2.x + asa2.width / 2, y: asa2.y + asa2.height / 2 }
+      await toque('touchStart', [q]); for (let i = 1; i <= 6; i++) { await toque('touchMove', [{ x: q.x, y: q.y + 30 * i }]); await esperar(20) } await toque('touchEnd', []); await esperar(400)
+      if (!(await pg.$eval('dialog.visor-foto .ficha', f => f.classList.contains('baja')))) throw new Error('no se recogió al arrastrar hacia abajo')
+    })
+    await s.paso('foto: el grosor de la tinta sigue al zoom con que se dibuja; hay resaltador', async () => {
+      const trazar = async () => {
+        const r = await (await pg.$('dialog.visor-foto .area')).boundingBox()
+        const a = { x: r.x + r.width / 2 - 30, y: r.y + r.height / 2 }
+        await toque('touchStart', [a]); for (let i = 1; i <= 6; i++) { await toque('touchMove', [{ x: a.x + 10 * i, y: a.y }]); await esperar(20) } await toque('touchEnd', []); await esperar(200)
+      }
+      await pg.click('dialog.visor-foto button[aria-label="Tinta rojo"]'); await esperar(200)
+      await trazar()
+      for (let i = 0; i < 4; i++) await pg.click('dialog.visor-foto button[aria-label="Acercar"]')
+      await esperar(300)
+      await trazar()
+      if (!(await pg.$('dialog.visor-foto button[aria-label="Resaltador"]'))) throw new Error('no hay resaltador')
+      await pg.click('dialog.visor-foto button[aria-label="Resaltador"]'); await esperar(200)
+      await trazar()
+      await clicTexto(pg, 'Guardar'); await esperar(600)
+      const t = (await lienzoGuardado(pg)).fotos.at(-1).trazos
+      if (t.length !== 3) throw new Error('trazos: ' + t.length)
+      if (!(t[0].g > t[1].g * 1.8)) throw new Error(`el grosor no siguió al zoom: ${t[0].g} vs ${t[1].g}`)
+      if (!t[2].r) throw new Error('el último trazo no es de resaltador')
+    })
     if (pg.errores.length) s.fallas.push(...pg.errores)
     await pg.browserContext().close().catch(() => {})
     return s

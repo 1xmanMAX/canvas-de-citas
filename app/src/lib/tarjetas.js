@@ -33,6 +33,11 @@ export const COLORES = {
   amarillo: '#FBEFC0', rosa: '#F7D6D9', verde: '#DCEBD5', celeste: '#D6E6F2', naranja: '#F8DCB8', lila: '#E5DAF0'
 }
 export const TINTAS = { rojo: '#C0392B', azul: '#2F4FB5', verde: '#2E7D4F', amarillo: '#F2C230' }
+/** Colores del resaltador (trazo ancho y semitransparente). */
+export const RESALTADORES = { amarillo: '#F2C230', verdeclaro: '#7ED957', rosa: '#FF6FAE', celeste: '#5BC0EB' }
+export const colorTrazo = t => TINTAS[t.c] || RESALTADORES[t.c] || t.c
+/** Trazo de resaltador: los marcados como tal y los amarillos de antes. */
+export const esResaltado = t => !!t.r || t.c === 'amarillo'
 
 const FT = { titulo: '600 10.5px "Work Sans", system-ui, sans-serif', lista: '600 14px Fraunces, Georgia, serif', audio: 'italic 400 12px "Work Sans", system-ui, sans-serif', mano: '500 19px Caveat, "Segoe Print", cursive' }
 

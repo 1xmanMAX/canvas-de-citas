@@ -8,7 +8,7 @@
   import CampoEtiquetas from './CampoEtiquetas.svelte'
   import { autocompletar } from '../lib/autocompletar.js'
   import { sugerir } from '../lib/buscador.svelte.js'
-  import { TINTAS } from '../lib/tarjetas.js'
+  import { TINTAS, RESALTADORES, colorTrazo, esResaltado } from '../lib/tarjetas.js'
   import { leerOriginalFoto } from '../lib/store.svelte.js'
   import { ajustar, zoomEn, aImagen, limitesZoom } from '../lib/vista.js'
   import { crearDetectorRueda } from '../lib/gestos.js'
@@ -35,7 +35,9 @@
   let modo = $state('mover') // 'mover' | 'dibujar'
   let lapizVisto = false // con lápiz digital, el dedo mueve y el lápiz dibuja
   let color = $state('rojo')
-  let grosor = $state(7)
+  let grosor = $state(7) // px en pantalla (Fino 4 · normal 7 · Grueso 10)
+  let herramienta = $state('lapiz') // 'lapiz' | 'resaltador'
+  let colorResaltador = $state('amarillo')
   const porc = $derived(anchoReal ? Math.round(((v.k * ANCHO) / anchoReal) * 100) : Math.round(v.k * 100))
 
   onMount(() => {
@@ -105,7 +107,12 @@
     if (dibuja) {
       const [x, y] = aImagen(v, p.x, p.y, ANCHO, alto)
       trazo = { id: e.pointerId, x, y, pos: p, tactil: e.pointerType === 'touch', t0: performance.now() }
-      o.trazos = [...o.trazos, { c: color, g: color === 'amarillo' ? 28 : grosor, p: [`${x},${y}`] }]
+      // El grosor se guarda en milésimas del ancho de la foto, calculado para que en pantalla, al zoom
+      // con que se dibuja, mida lo elegido (así se ajusta a la foto a cualquier zoom y tamaño).
+      const resalta = herramienta === 'resaltador'
+      const px = resalta ? 22 : grosor
+      const g = Math.round((px / v.k) * 10) / 10
+      o.trazos = [...o.trazos, resalta ? { c: colorResaltador, g, r: true, p: [`${x},${y}`] } : { c: color, g, p: [`${x},${y}`] }]
       return
     }
     punteros.set(e.pointerId, p)
@@ -179,6 +186,19 @@
   }
 
   const deshacer = () => (o.trazos = o.trazos.slice(0, -1))
+
+  // La barrita de la hoja (celular): arrastrar hacia arriba la abre, hacia abajo la recoge; tocarla alterna.
+  let asa = null
+  function asaAbajo(e) {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    asa = { y: e.clientY }
+  }
+  function asaArriba(e) {
+    if (!asa) return
+    const dy = e.clientY - asa.y
+    asa = null
+    hojaBaja = Math.abs(dy) < 8 ? !hojaBaja : dy > 0
+  }
   // Cerrar: una foto ya guardada conserva los cambios; una nueva sin "Guardar" no se crea.
   const guardar = () => { if (!o.etiquetas?.length) delete o.etiquetas; onguardar?.(o) }
   const cerrar = () => (nueva ? onclose?.() : guardar())
@@ -196,7 +216,7 @@
         <img {src} alt={o.titulo || ''} draggable="false" onload={e => (anchoReal = e.currentTarget.naturalWidth)} />
         <svg viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true">
           {#each o.trazos as t}
-            <polyline points={t.p.join(' ')} stroke={TINTAS[t.c] || t.c} stroke-width={t.g || 8} opacity={t.c === 'amarillo' ? 0.45 : 1} vector-effect="non-scaling-stroke" />
+            <polyline points={t.p.join(' ')} stroke={colorTrazo(t)} stroke-width={t.g || 8} opacity={esResaltado(t) ? 0.45 : 1} vector-effect="non-scaling-stroke" />
           {/each}
         </svg>
       </div>
@@ -224,16 +244,27 @@
     {#if panel || !lateral}
       <aside class="ficha" class:hoja={!lateral} class:baja={!lateral && hojaBaja}>
         {#if !lateral}
-          <button class="asa" aria-label={hojaBaja ? 'Mostrar detalles' : 'Ocultar detalles'} onclick={() => (hojaBaja = !hojaBaja)}><span></span></button>
+          <button class="asa" aria-label={hojaBaja ? 'Mostrar detalles' : 'Ocultar detalles'}
+            onpointerdown={asaAbajo} onpointerup={asaArriba} onpointercancel={() => (asa = null)}
+            onclick={e => { if (e.detail === 0) hojaBaja = !hojaBaja }}><span></span></button>
         {/if}
         <div class="herramientas">
-          {#each Object.entries(TINTAS) as [nombre, valor]}
-            <button class="tinta" class:activa={color === nombre} style="--c:{valor}" aria-label={nombre === 'amarillo' ? 'Resaltador' : `Tinta ${nombre}`} title={nombre === 'amarillo' ? 'Resaltador' : nombre}
-              onclick={() => { color = nombre; modo = 'dibujar' }}></button>
-          {/each}
+          <div class="segmentado herr">
+            <button aria-pressed={herramienta === 'lapiz'} aria-label="Lápiz" onclick={() => { herramienta = 'lapiz'; modo = 'dibujar' }}><Icono nombre="lapiz" tam={13} />Lápiz</button>
+            <button aria-pressed={herramienta === 'resaltador'} aria-label="Resaltador" onclick={() => { herramienta = 'resaltador'; modo = 'dibujar' }}><span class="marcador"></span>Resaltador</button>
+          </div>
+          {#if herramienta === 'lapiz'}
+            {#each Object.entries(TINTAS).filter(([n]) => n !== 'amarillo') as [nombre, valor]}
+              <button class="tinta" class:activa={color === nombre} style="--c:{valor}" aria-label="Tinta {nombre}" title={nombre} onclick={() => { color = nombre; modo = 'dibujar' }}></button>
+            {/each}
+            <button class="btn chico fantasma" aria-pressed={grosor === 4} onclick={() => (grosor = 4)}>Fino</button>
+            <button class="btn chico fantasma" aria-pressed={grosor === 10} onclick={() => (grosor = 10)}>Grueso</button>
+          {:else}
+            {#each Object.entries(RESALTADORES) as [nombre, valor]}
+              <button class="tinta resalt" class:activa={colorResaltador === nombre} style="--c:{valor}" aria-label="Resaltador {nombre}" title={nombre} onclick={() => { colorResaltador = nombre; modo = 'dibujar' }}></button>
+            {/each}
+          {/if}
           <span class="div"></span>
-          <button class="btn chico fantasma" aria-pressed={grosor === 4} onclick={() => (grosor = 4)}>Fino</button>
-          <button class="btn chico fantasma" aria-pressed={grosor === 10} onclick={() => (grosor = 10)}>Grueso</button>
           <button class="icono-btn" aria-label="Deshacer trazo" title="Deshacer (Ctrl+Z)" disabled={!o.trazos.length} onclick={deshacer}><Icono nombre="deshacer" /></button>
           <button class="btn chico peligro" disabled={!o.trazos.length} onclick={() => (o.trazos = [])}>Borrar trazos</button>
         </div>
@@ -309,7 +340,10 @@
   }
   .ficha.hoja.baja { max-height: none; overflow: hidden; }
   .ficha.hoja.baja .detalles { display: none; }
-  .asa { align-self: center; border: none; background: none; padding: 6px 30px; }
+  .asa { align-self: center; border: none; background: none; padding: 8px 40px; touch-action: none; cursor: grab; }
+  .herr button { display: inline-flex; align-items: center; gap: 5px; }
+  .marcador { width: 12px; height: 12px; border-radius: 3px; background: #F2C230; opacity: .7; }
+  .tinta.resalt { border-radius: 5px; opacity: .8; }
   .asa span { display: block; width: 40px; height: 5px; border-radius: 3px; background: var(--line); }
   .herramientas { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .tinta { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--paper); background: var(--c); box-shadow: 0 0 0 1px var(--line); padding: 0; }

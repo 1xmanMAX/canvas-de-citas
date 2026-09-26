@@ -2,7 +2,7 @@
   // Tarjeta libre del lienzo (nota, lista de tareas, nota de voz o foto) dibujada en SVG.
   import { getContext } from 'svelte'
   import Arrastrable from './Arrastrable.svelte'
-  import { medir, COLORES, TINTAS, fechaCorta, duracionTexto } from '../lib/tarjetas.js'
+  import { medir, COLORES, TINTAS, colorTrazo, esResaltado, fechaCorta, duracionTexto } from '../lib/tarjetas.js'
   import { sonando, reproducir } from '../lib/audio.svelte.js'
 
   let { lista, o, origen = false, resaltado = false, atenuado = false, alTocar, alternar, alVinculo = null, inicio, mover, fin, redimensionar = null } = $props()
@@ -99,7 +99,7 @@
     {#if o.trazos?.length}
       <svg x="8" y="8" width={d.iw} height={d.ih} viewBox="0 0 1000 1000" preserveAspectRatio="none" class="trazos">
         {#each o.trazos as t}
-          <polyline points={t.p.join(' ')} stroke={TINTAS[t.c] || t.c} stroke-width={((t.g || 8) * d.iw) / 1000} opacity={t.c === 'amarillo' ? 0.45 : 1} vector-effect="non-scaling-stroke" />
+          <polyline points={t.p.join(' ')} stroke={colorTrazo(t)} stroke-width={((t.g || 8) * d.iw) / 1000} opacity={esResaltado(t) ? 0.45 : 1} vector-effect="non-scaling-stroke" />
         {/each}
       </svg>
     {/if}
