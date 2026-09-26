@@ -104,6 +104,13 @@ paper, skill con referencias y puntos clave.
 `EditorAgrupador.svelte`). Guardan sus `miembros` y el recuadro se ajusta solo a ellos; mover el
 recuadro mueve todo; soltar algo encima lo agrega y arrastrarlo lejos lo saca. Prueba: `npm run test:e2e -- agrupador`.
 
+**Gestos y fotos** (sep. 2026): en PC la rueda del mouse hace zoom y el botón central mueve el lienzo
+(`lib/gestos.js` distingue mouse de trackpad; opción en Configuración, `lib/preferencias.svelte.js`).
+Las fotos se ven completas y se agrandan desde su esquina (`lib/medidas-foto.js`), guardan el original en alta
+(`fotos/<id>.<ext>` en la carpeta, campo opcional `original`) y se abren en `VisorFoto.svelte` (zoom, panel lateral u hoja
+inferior en celular, anotaciones). Prueba: `npm run test:e2e -- gestos fotos`. Plan en curso de proyectos en carpetas,
+app de Windows y etiquetas: `docs/superpowers/specs/2026-09-25-proyectos-en-carpetas-windows-design.md`.
+
 **Siguiente:** probar el APK en el celular de Max y hacer la **Tarea 8 del Plan 1** en su PC
 (receptor de Windows + "Vincular celular" con QR). Mientras tanto sirve `canvas-sincro.exe`
 (ver `android/README.md`).
