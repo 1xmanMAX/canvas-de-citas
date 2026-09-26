@@ -50,6 +50,8 @@ const entrada = clave => CS.lista.find(c => c.clave === clave)
 const conectadas = () => CS.lista.filter(c => c.estado === 'conectada')
 /** Carpetas ya leídas desde que se abrió la app: solo en ellas se escribe. */
 const leidas = new SvelteSet()
+/** Claves de carpetas que se quitaron del registro (el servidor las conservaría si no se le dice). */
+const quitadas = new Set()
 const listas = () => conectadas().filter(c => leidas.has(c.clave))
 
 function fallo(c, e) {
@@ -65,18 +67,23 @@ async function persistir() {
   // En Windows el servidor de sincronización usa el mismo registro (qué carpetas y cuáles sincronizar).
   if (esWindows) {
     const reg = lista.filter(c => c.ruta).map(c => ({ clave: c.clave, nombre: c.nombre, carpeta: c.ruta, proyectos: c.proyectos, biblioteca: c.biblioteca, sincronizar: c.sincronizar }))
-    await puente('registro', { metodo: 'PUT', cuerpo: JSON.stringify(reg) }).catch(() => {})
+    const quitar = [...quitadas].join(',')
+    const r = await puente('registro', { metodo: 'PUT', cuerpo: JSON.stringify(reg), params: quitar ? { quitar } : {} }).catch(() => null)
+    if (r?.ok) quitadas.clear()
   }
 }
 
-/** `leidos`: archivos ya leídos de la carpeta (sus fechas cuentan como vistas: no se reimportan). */
-async function registrar(almacen, { proyectos, biblioteca }, leidos = []) {
+/**
+ * `leidos`: archivos ya leídos de la carpeta (sus fechas cuentan como vistas: no se reimportan).
+ * `leida`: la carpeta ya se leyó (o es nueva y vacía); si no, no se escribe en ella hasta leerla.
+ */
+async function registrar(almacen, { proyectos, biblioteca }, leidos = [], leida = true) {
   const clave = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
   escritos[clave] = Object.fromEntries(leidos.map(f => [f.name, f.lastModified]))
   almacenes.set(clave, almacen)
   registros.set(clave, await registroDe(almacen))
   CS.lista.push({ clave, nombre: almacen.nombre, proyectos, biblioteca, sincronizar: true, estado: 'conectada', error: '', guardado: null })
-  leidas.add(clave) // recién elegida: lo que tenía ya se leyó (o está vacía)
+  if (leida) leidas.add(clave)
   await persistir()
   escuchar()
   return clave
@@ -106,10 +113,9 @@ function propiosDe(clave) {
 async function escribirSiCambio(clave, a, ruta, texto) {
   const previos = textos.get(clave) || textos.set(clave, {}).get(clave)
   if (previos[ruta] === texto) return
-  await a.escribir(ruta, texto)
+  const modificado = await a.escribir(ruta, texto, { si: escritos[clave]?.[ruta] })
   previos[ruta] = texto
-  const f = await a.leer(ruta)
-  ;(escritos[clave] ||= {})[ruta] = f?.lastModified
+  ;(escritos[clave] ||= {})[ruta] = modificado ?? (await a.leer(ruta))?.lastModified
 }
 
 export const guardarAhora = () => enCola(async () => {
@@ -147,7 +153,10 @@ export const guardarAhora = () => enCola(async () => {
       await escribirSiCambio(c.clave, a, 'CLAUDE.md', generarClaudeMd(parte))
       c.guardado = new Date().toISOString()
       c.error = ''
-    } catch (e) { fallo(c, e) }
+    } catch (e) {
+      if (e?.name === 'CambiadoAfuera') releer = true // alguien lo cambió entre medio: se lee y se reintenta
+      else fallo(c, e)
+    }
   }
   for (const [id] of pendientes) docsPendientes.delete(id)
   await ponerMeta('carpetasEscritos', $state.snapshot(escritos))
@@ -243,8 +252,10 @@ async function traerCambios(c) {
   const archivos = []
   for (const [col, f] of cambiados) {
     let items
-    try { items = JSON.parse(await f.text())?.[col] } catch { return false } // a medio escribir: se reintenta
-    if (!Array.isArray(items)) return false
+    // Ilegible (a medio escribir, editado a mano): error visible; no se escribe en esta carpeta hasta que se lea bien.
+    try { items = JSON.parse(await f.text()) } catch { throw new Error(`${col}.json está ilegible en "${c.nombre}": no se guardará ahí hasta que se corrija`) }
+    items = Array.isArray(items) ? items : items?.[col]
+    if (!Array.isArray(items)) throw new Error(`${col}.json no tiene el formato esperado en "${c.nombre}"`)
     for (const x of items) if (x?.id) registrarIds(col, [x])
     // Solo lo que de verdad cambió respecto a lo que la app escribió ahí: una copia vieja de una
     // fuente compartida no revierte lo corregido en otra carpeta (I4).
@@ -275,8 +286,29 @@ async function traerCambios(c) {
 
 function revisar() {
   if (document.visibilityState !== 'visible') return
-  for (const c of listas())
-    enCola(() => traerCambios(c)).then(hubo => hubo && avisar(`Cambios de "${c.nombre}" cargados`)).catch(e => fallo(c, e))
+  if (esWindows) enCola(recogerRegistro).catch(() => {})
+  for (const c of conectadas())
+    enCola(async () => {
+      const hubo = await traerCambios(c)
+      if (!leidas.has(c.clave)) { leidas.add(c.clave); c.error = ''; setTimeout(guardarAhora, 0) }
+      return hubo
+    }).then(hubo => hubo && avisar(`Cambios de "${c.nombre}" cargados`)).catch(e => fallo(c, e))
+}
+
+/** App de Windows: carpetas que registró el servidor (proyectos nuevos del celular) mientras la app estaba abierta. */
+async function recogerRegistro() {
+  const srv = await puente('registro').then(r => (r.ok ? r.json() : [])).catch(() => [])
+  for (const e of srv) {
+    if (CS.lista.some(c => c.clave === e.clave) || quitadas.has(e.clave)) continue
+    const a = await almacenDeRegistro({ ruta: e.carpeta, nombre: e.nombre })
+    almacenes.set(e.clave, a)
+    registros.set(e.clave, { ruta: e.carpeta })
+    const c = { clave: e.clave, nombre: e.nombre, proyectos: e.proyectos || [], biblioteca: !!e.biblioteca, sincronizar: e.sincronizar !== false, estado: 'conectada', error: '', guardado: null }
+    CS.lista.push(c)
+    await ponerMeta('carpetas', CS.lista.map(x => ({ clave: x.clave, nombre: x.nombre, proyectos: [...x.proyectos], biblioteca: x.biblioteca, sincronizar: x.sincronizar !== false, ...registros.get(x.clave) })))
+    await traerCambios(entrada(e.clave))
+    leidas.add(e.clave)
+  }
 }
 
 let escuchando = false
@@ -392,11 +424,19 @@ export async function crearCarpetaDeProyecto(pid) {
   return true
 }
 
+/** ¿La carpeta ya tiene datos de Canvas de Citas? (entonces se abre, no se adopta en blanco) */
+async function tieneDatos(a) {
+  for (const col of COLECCIONES) if (await a.leer(`${col}.json`)) return true
+  return false
+}
+const YA_TIENE_DATOS = 'Esa carpeta ya tiene datos de Canvas de Citas: para usarlos, en Proyectos → Abrir proyecto'
+
 /** Un proyecto sin carpeta: elegir una (se usa tal cual, sin crear subcarpeta). */
 export async function elegirCarpetaPara(pid) {
   let a
   try { a = await elegirAlmacen('canvas-proyecto', 'Carpeta del proyecto') } catch { return false }
   const clave = await yaRegistrada(a)
+  if (!clave && (await tieneDatos(a))) { avisar(YA_TIENE_DATOS); return false }
   if (clave) { const c = entrada(clave); if (!c.proyectos.includes(pid)) c.proyectos.push(pid); await persistir() }
   else await registrar(a, { proyectos: [pid], biblioteca: false })
   await guardarAhora()
@@ -408,6 +448,7 @@ export async function elegirBiblioteca() {
   let a
   try { a = await elegirAlmacen('canvas-biblioteca', 'Carpeta de la biblioteca') } catch { return false }
   const clave = await yaRegistrada(a)
+  if (!clave && (await tieneDatos(a))) { avisar(YA_TIENE_DATOS); return false }
   for (const c of CS.lista) c.biblioteca = c.clave === clave
   if (!clave) await registrar(a, { proyectos: [], biblioteca: true })
   else await persistir()
@@ -477,6 +518,7 @@ export async function cerrarProyecto(pid) {
   if (c.estado !== 'conectada' || c.error) { avisar(`No se cerró: no se pudo guardar en "${c.nombre}"`); return false }
   CS.lista = CS.lista.filter(x => x !== c)
   almacenes.delete(c.clave); registros.delete(c.clave); textos.delete(c.clave); leidas.delete(c.clave); delete escritos[c.clave]
+  quitadas.add(c.clave)
   await persistir()
   const fuentes = new Set((S.citasPorProyecto.get(pid) || []).map(x => x.fuente_id))
   eliminarProyecto(pid)
@@ -509,6 +551,7 @@ export async function darPermiso() {
 export async function quitarCarpeta(clave) {
   CS.lista = CS.lista.filter(c => c.clave !== clave)
   almacenes.delete(clave); registros.delete(clave); textos.delete(clave); leidas.delete(clave); delete escritos[clave]
+  quitadas.add(clave)
   await persistir()
 }
 

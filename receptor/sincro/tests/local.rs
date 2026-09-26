@@ -37,7 +37,7 @@ fn leer_escribir_y_borrar_dentro_de_la_carpeta() {
     let r = p.atender("GET", &format!("/local/leer?carpeta={q}&ruta=fuentes/fuente_001/documento.pdf"), Some("secreto"), b"", true);
     assert_eq!(r.cuerpo, b"%PDF");
     assert!(r.cabeceras.iter().any(|(k, v)| *k == "X-Modificado" && v.parse::<u64>().unwrap() > 0));
-    assert_eq!(p.atender("GET", &format!("/local/leer?carpeta={q}&ruta=no.json"), Some("secreto"), b"", true).estado, 404);
+    assert_eq!(p.atender("GET", &format!("/local/leer?carpeta={q}&ruta=no.json"), Some("secreto"), b"", true).estado, 204);
     assert_eq!(p.atender("POST", &format!("/local/borrar?carpeta={q}&ruta=fuentes/fuente_001/documento.pdf"), Some("secreto"), b"", true).estado, 200);
     assert!(!t.path().join("tesis/fuentes/fuente_001/documento.pdf").exists());
 }

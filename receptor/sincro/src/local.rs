@@ -126,7 +126,8 @@ impl Puente {
                     Ok(b) => Respuesta { estado: 200, tipo: "application/octet-stream", cuerpo: b, cabeceras: vec![("X-Modificado", modificado(&p).to_string())] },
                     // Solo "no existe" es 404: un error de lectura (acceso, archivo en uso, disco) no
                     // puede parecer un archivo vacío, porque la app lo sobrescribiría.
-                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => vacia(404),
+                    // (204 y no 404: el navegador anota cada 404 como error en la consola)
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => vacia(204),
                     Err(e) => error(500, e),
                 },
                 Ok(_) => vacia(400),

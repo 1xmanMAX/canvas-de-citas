@@ -92,13 +92,17 @@ export function almacenWindows(ruta, nombre = ruta.split(/[\\/]/).filter(Boolean
     pedirPermiso: async () => true,
     async leer(r) {
       const res = await puente('leer', { params: p(r) })
-      if (res.status === 404) return null
+      if (res.status === 204 || res.status === 404) return null // no existe
       if (!res.ok) throw new Error(`No se pudo leer ${r} (${res.status})`)
       return new File([await res.blob()], r.split('/').pop(), { lastModified: +res.headers.get('X-Modificado') || 0 })
     },
-    async escribir(r, contenido) {
-      const res = await puente('escribir', { metodo: 'PUT', params: p(r), cuerpo: contenido })
+    /** Con `si` (la fecha que la app vio), el puente rechaza (409) si otro lo cambió entre medio. Devuelve la fecha nueva. */
+    async escribir(r, contenido, { si } = {}) {
+      const res = await puente('escribir', { metodo: 'PUT', params: si ? { ...p(r), si } : p(r), cuerpo: contenido })
+      if (res.status === 409) throw Object.assign(new Error(`${r} cambió mientras se guardaba`), { name: 'CambiadoAfuera' })
+      if (res.status === 404) throw Object.assign(new Error('No se encuentra la carpeta (¿se movió o se desconectó el disco?)'), { name: 'NotFoundError' })
       if (!res.ok) throw new Error(`No se pudo escribir ${r} (${res.status})`)
+      return (await res.json()).modificado
     },
     async borrar(r) { await puente('borrar', { metodo: 'POST', params: p(r) }) },
     async subcarpetaNueva(n) {

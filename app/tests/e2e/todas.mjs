@@ -82,6 +82,17 @@ const SUITES = {
         await pg.reload({ waitUntil: 'load' })
         if (!(await esperarQue(async () => (await cuerpo()).includes('Proyecto del celular')))) throw new Error('no apareció')
       })
+      await s.paso('con la app abierta, un proyecto que registra el servidor aparece y guardar no lo quita del registro (I-4)', async () => {
+        const dir = path.join(nuevos, 'Otro del celular'); fs.mkdirSync(dir, { recursive: true })
+        fs.writeFileSync(path.join(dir, 'proyectos.json'), json('proyectos', [{ id: 'proyecto_051', tipo: 'tesis', titulo: 'Segundo del celular', objetivos_especificos: [], indicadores: [], canvas: lienzo }]))
+        const reg = JSON.parse(leer(registro)); reg.push({ clave: 's2', nombre: 'Otro del celular', carpeta: dir, proyectos: ['proyecto_051'], biblioteca: false, sincronizar: true })
+        fs.writeFileSync(registro, JSON.stringify(reg))
+        // Mientras tanto la app guarda su registro (desmarcar/marcar sincronizar en otro proyecto).
+        const celda = await pg.evaluateHandle(() => [...document.querySelectorAll('.celda')].find(x => x.textContent.includes('Tesis en Windows')))
+        await (await celda.asElement().$('input[aria-label="Sincronizar con el celular"]')).click(); await esperar(500)
+        if (!JSON.parse(leer(registro)).some(e => e.clave === 's2')) throw new Error('guardar el registro de la app borró la entrada del servidor')
+        if (!(await esperarQue(async () => (await cuerpo()).includes('Segundo del celular'), 15000))) throw new Error('no apareció sin recargar')
+      })
     } finally { srv.kill() }
     if (pg.errores.length) s.fallas.push(...pg.errores)
     await pg.browserContext().close().catch(() => {})
@@ -186,6 +197,29 @@ const SUITES = {
       await escribirOpfs(pg, 'rota/citas.json', json('citas', []))
       await inicio(); await pg.elegir('rota'); await clicTexto(pg, 'Abrir proyecto'); await esperar(2000)
       if ((await leerOpfs(pg, 'rota/proyectos.json')) !== '{"proyectos": [ {"id": "proyecto_009", "titulo": "Roto"') throw new Error('se sobrescribió el JSON ilegible')
+    })
+    await s.paso('elegir como biblioteca una carpeta que ya tiene datos no la vacía (C-3)', async () => {
+      await escribirOpfs(pg, 'condatos/fuentes.json', json('fuentes', [{ id: 'fuente_900', tipo_fuente: 'libro', autores: ['X, Y.'], anio: 2000, titulo: 'No me borres' }]))
+      await inicio()
+      await pg.click('button[aria-label="Configuración"]').catch(() => clicTexto(pg, 'Configuración'))
+      await pg.elegir('condatos')
+      await clicTexto(pg, 'carpeta de biblioteca'); await esperar(1500)
+      if (!(await leerOpfs(pg, 'condatos/fuentes.json')).includes('No me borres')) throw new Error('se vació la carpeta elegida')
+      await pg.keyboard.press('Escape'); await esperar(300)
+    })
+    await s.paso('una carpeta con un JSON ilegible al abrir la app no se sobrescribe y avisa (C-2)', async () => {
+      await escribirOpfs(pg, 'mal/proyectos.json', json('proyectos', [{ id: 'proyecto_070', tipo: 'tesis', titulo: 'Proyecto de mal', objetivos_especificos: [], indicadores: [], canvas: lienzo }]))
+      await escribirOpfs(pg, 'mal/citas.json', '{"citas": [ {"id": "cita_070"')
+      await escribirOpfs(pg, 'mal/fuentes.json', json('fuentes', [{ id: 'fuente_070', tipo_fuente: 'libro', autores: ['M, A.'], anio: 2007, titulo: 'Fuente de mal' }]))
+      // Registrada como en otra instalación (la app aún no la leyó nunca).
+      await pg.evaluate(() => new Promise(res => {
+        const r = indexedDB.open('canvas-de-citas')
+        r.onsuccess = () => { const t = r.result.transaction('meta', 'readwrite'); const m = t.objectStore('meta'); const q = m.get('carpetas'); q.onsuccess = () => { m.put([...(q.result || []), { clave: 'cmal', nombre: 'mal', proyectos: ['proyecto_070'], biblioteca: false, opfs: ['mal'] }], 'carpetas') }; t.oncomplete = res }
+      }))
+      await pg.reload({ waitUntil: 'networkidle0' }); await esperar(4000)
+      if ((await leerOpfs(pg, 'mal/citas.json')) !== '{"citas": [ {"id": "cita_070"') throw new Error('se sobrescribió el JSON ilegible')
+      if (!(await leerOpfs(pg, 'mal/fuentes.json')).includes('Fuente de mal')) throw new Error('se vació fuentes.json')
+      if (!(await leerOpfs(pg, 'mal/proyectos.json')).includes('Proyecto de mal')) throw new Error('se vació proyectos.json')
     })
     if (pg.errores.length) s.fallas.push(...pg.errores)
     await pg.browserContext().close().catch(() => {})
@@ -1034,7 +1068,8 @@ const SUITES = {
       })
       await s.paso('al abrir la app sincroniza sola (cambio hecho en la PC)', async () => {
         fs.writeFileSync(path.join(carpeta, 'proyectos.json'), enPc().replace('Tesis en la PC', 'Tesis renombrada en la PC'))
-        await pg.reload({ waitUntil: 'networkidle0' })
+        // (sin esperar 'red inactiva': la sincronización automática deja descargas abiertas un rato)
+        await pg.reload({ waitUntil: 'load' })
         await pg.waitForFunction(() => document.body.textContent.includes('Tesis renombrada en la PC'), { timeout: 15000 })
         if (!enPc().includes('Nota desde Android')) throw new Error('se perdió la nota')
       })

@@ -10,9 +10,10 @@ mount(App, { target: document.getElementById('app') })
 if ('serviceWorker' in navigator && import.meta.env.PROD && !esAndroid) {
   addEventListener('load', async () => {
     const reg = await navigator.serviceWorker.register('./sw.js')
-    // App de Windows: sin preguntar, se pasa a la versión nueva apenas está lista (siempre la última).
+    // App de Windows: al abrir, si ya hay una versión nueva lista, se pasa a ella sin preguntar (siempre la última).
     const lista = w => (window.canvasWindows ? w.postMessage('activar') : (S.actualizacion = w))
-    const esperar = w => w.addEventListener('statechange', () => w.state === 'installed' && lista(w))
+    // A mitad de sesión solo se avisa (activar recargaría y podría perder lo que se está escribiendo).
+    const esperar = w => w.addEventListener('statechange', () => w.state === 'installed' && (S.actualizacion = w))
     if (reg.waiting && navigator.serviceWorker.controller) lista(reg.waiting)
     reg.addEventListener('updatefound', () => navigator.serviceWorker.controller && esperar(reg.installing))
     let recargando = false

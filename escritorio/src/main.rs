@@ -18,7 +18,7 @@ use std::time::Duration;
 use tao::event::{Event, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoop};
 use tao::window::WindowBuilder;
-use wry::{PermissionResponse, WebContext, WebViewBuilder};
+use wry::{NewWindowResponse, PermissionResponse, WebContext, WebViewBuilder};
 
 const URL: &str = "https://1xmanmax.github.io/canvas-de-citas/";
 const PUERTO: u16 = 47481;
@@ -82,6 +82,22 @@ fn arrancar_servidor(r: &Rutas) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Hasta el último "/" de la URL de la app: lo que está debajo es la app; lo demás, otra página.
+fn prefijo_app(url: &str) -> String {
+    match url.rfind('/') {
+        Some(i) if i > url.find("://").map(|j| j + 2).unwrap_or(0) => url[..=i].to_string(),
+        _ => format!("{url}/"),
+    }
+}
+
+/// Una página que no es la app (un DOI, un enlace de una fuente…): en el navegador de siempre.
+fn abrir_fuera(url: &str) {
+    if url.starts_with("http://") || url.starts_with("https://") || url.starts_with("mailto:") {
+        #[cfg(windows)]
+        let _ = std::process::Command::new("rundll32").args(["url.dll,FileProtocolHandler", url]).spawn();
+    }
+}
+
 fn aviso(texto: &str) {
     // Sin consola: se deja constancia en un archivo junto a los datos de la app.
     if let Some(base) = std::env::var_os("LOCALAPPDATA") {
@@ -133,11 +149,29 @@ fn main() {
     ventana.set_maximized(true);
 
     let mut contexto = WebContext::new(Some(r.webview.clone()));
-    let inicio = format!("window.canvasWindows = Object.freeze({{ puerto: {}, token: {:?} }});", puerto(), token);
+    let url_app = arg("--url").unwrap_or_else(|| URL.into());
+    let prefijo = prefijo_app(&url_app);
+    // El token (acceso a las carpetas) solo para la app, nunca para otra página.
+    let inicio = format!("if (location.href.startsWith({:?})) window.canvasWindows = Object.freeze({{ puerto: {}, token: {:?} }});", prefijo, puerto(), token);
+    let (p1, p2) = (prefijo.clone(), prefijo.clone());
     let webview = WebViewBuilder::new_with_web_context(&mut contexto)
-        .with_url(arg("--url").unwrap_or_else(|| URL.into()))
+        .with_url(url_app)
         .with_initialization_script(inicio)
-        // Micrófono (notas de voz), portapapeles, notificaciones…: la app es de confianza.
+        // La ventana solo muestra la app: cualquier otra página se abre en el navegador de siempre.
+        .with_navigation_handler(move |u| {
+            let propia = u.starts_with(&p1) || u.starts_with("about:") || u.starts_with("blob:") || u.starts_with("data:");
+            if !propia {
+                abrir_fuera(&u);
+            }
+            propia
+        })
+        .with_new_window_req_handler(move |u, _| {
+            if !u.starts_with(&p2) {
+                abrir_fuera(&u);
+            }
+            NewWindowResponse::Deny
+        })
+        // Micrófono (notas de voz), portapapeles…: solo la app corre en esta ventana (ver arriba).
         .with_permission_handler(|_| PermissionResponse::Allow)
         .with_devtools(false);
     // La página (de internet) habla con el puente de esta misma PC: que Chromium no lo bloquee como
@@ -159,4 +193,17 @@ fn main() {
             *flujo = ControlFlow::Exit;
         }
     });
+}
+
+#[cfg(test)]
+mod pruebas {
+    use super::prefijo_app;
+    #[test]
+    fn prefijo_de_la_app() {
+        assert_eq!(prefijo_app("https://1xmanmax.github.io/canvas-de-citas/"), "https://1xmanmax.github.io/canvas-de-citas/");
+        assert_eq!(prefijo_app("http://localhost:4199/"), "http://localhost:4199/");
+        assert_eq!(prefijo_app("http://localhost:4199"), "http://localhost:4199/");
+        // Otra página del mismo sitio no es la app.
+        assert!(!"https://1xmanmax.github.io/otra/".starts_with(&prefijo_app("https://1xmanmax.github.io/canvas-de-citas/")));
+    }
 }
