@@ -26,7 +26,10 @@ La lista completa de comandos, opciones y formatos está en `references/comandos
 ## Flujo
 
 1. **Mira antes de tocar.** `resumen` y luego `ver <proyecto>` para conocer los ids, las claves de
-   objetivos (`og`, `oe1`…) y lo que ya existe. Para encontrar algo concreto, `buscar`.
+   objetivos (`og`, `oe1`…) y lo que ya existe. Para encontrar algo concreto, `buscar`; con
+   `buscar "#tema"` o `buscar "@Persona"` (combinables con palabras) encuentra por etiquetas y
+   menciones, escritas en el texto o en el campo opcional `etiquetas` de cualquier elemento
+   (temas sin `#`, personas con `@`, igual que en las fuentes).
 2. **Haz el cambio** con el comando adecuado. Varias acciones seguidas están bien: cada comando
    relee la carpeta, así que no pisa lo que la app haya guardado entre medio.
 3. **Cuéntale a Max qué quedó y dónde** (ids, objetivo), y que la app lo muestra en unos segundos.

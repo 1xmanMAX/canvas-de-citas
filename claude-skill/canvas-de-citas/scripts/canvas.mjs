@@ -12,6 +12,7 @@ import { tamano, ocupadasProyecto, ocupadasObjetivo, lugarLibre } from './dispos
 import { cargarImagen, extraerDataURL } from './imagen.mjs'
 import { grafico } from './grafico.mjs'
 import { aMarkdown } from './convertir.mjs'
+import { indexar as indexarEtiquetas, parsearConsulta, coincideConsulta } from './etiquetas.mjs'
 
 // --- Argumentos ---
 const [cmd = 'ayuda', ...resto] = process.argv.slice(2)
@@ -174,6 +175,17 @@ C.ver = () => {
 
 C.buscar = () => {
   const d = cargar(), q = normal(pos.join(' ') || fallar('Falta el texto a buscar'))
+  // Con #tema o @persona: la misma búsqueda que la app (texto + campo etiquetas: temas sin #, personas con @).
+  if (/(^|\s)[#@]\S/.test(pos.join(' '))) {
+    const c = parsearConsulta(pos.join(' '))
+    for (const i of indexarEtiquetas(d)) {
+      if (!coincideConsulta(i, c)) continue
+      const etq = [...i.temas.map(x => '#' + x), ...i.personas].join(' ')
+      const donde = i.pid ? ` en ${i.pid}${i.clave ? '/' + i.clave : ''}` : ''
+      ok(`${i.tipo} \`${i.id}\`${donde}: ${corta(i.titulo || i.texto)}${etq ? ` [${etq}]` : ''}`)
+    }
+    return
+  }
   const hay = t => normal(t).includes(q)
   for (const f of d.fuentes) if (hay([f.titulo, ...(f.autores || []), f.revista_o_editorial, f.doi_o_url, f.tema, f.entrada_bibliografia].join(' '))) ok(`fuente \`${f.id}\` ${refF(f)} — ${corta(f.titulo)}`)
   for (const c of d.citas) if (hay([c.cita_en_texto, c.contexto].join(' '))) ok(`cita \`${c.id}\` (${c.proyecto_id}, ${c.fuente_id}) ${corta(c.cita_en_texto + ' ' + c.contexto)}`)
