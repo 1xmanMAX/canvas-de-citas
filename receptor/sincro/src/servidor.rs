@@ -14,7 +14,7 @@ use tiny_http::{Header, Request, Response, Server};
 pub const TOPE_CUERPO: usize = 200 * 1024 * 1024;
 
 /// Comprobar la etiqueta y escribir van juntos: dos guardados a la vez no pueden pasar ambos.
-static ESCRITURA: Mutex<()> = Mutex::new(());
+pub static ESCRITURA: Mutex<()> = Mutex::new(());
 
 pub struct Sincro {
     /// Una carpeta (`Carpeta`) o las de los proyectos abiertos (`Carpetas`).
@@ -104,7 +104,9 @@ impl Sincro {
             return Respuesta::vacia(204);
         }
         if metodo == "GET" && ruta == "/sync/emparejar" {
-            if !local {
+            // Con el puente de la app de Windows, la clave solo se da con token (/local/emparejar):
+            // cualquier página web abierta en esta PC podría pedirla aquí.
+            if !local || self.puente.is_some() {
                 return Respuesta::vacia(403);
             }
             let v = json!({"ip": ip_local(), "puerto": self.puerto, "clave": self.clave_b64, "codigo": self.codigo()});
@@ -115,6 +117,12 @@ impl Sincro {
             .map_or(false, |v| v["ruta"].as_str() == Some(url));
         if !autorizado {
             return Respuesta::vacia(401);
+        }
+        // Una carpeta desconectada o un registro roto: mejor "no disponible" que una vista incompleta.
+        if ruta != "/sync/hola" {
+            if let Err(e) = self.carpeta.listo() {
+                return Respuesta::texto(503, e);
+            }
         }
         match (metodo, ruta) {
             // Liviano: el celular lo usa para encontrar la PC si cambió su IP.
@@ -278,6 +286,10 @@ fn atender_http(s: &Sincro, mut rq: Request) {
     let token = rq.headers().iter().find(|h| h.field.equiv("X-Canvas-Local")).map(|h| h.value.as_str().to_string());
     let mut cuerpo = Vec::new();
     if rq.as_reader().take(s.tope as u64 + 1).read_to_end(&mut cuerpo).is_err() {
+        return;
+    }
+    if cuerpo.len() > s.tope {
+        let _ = rq.respond(Response::empty(413));
         return;
     }
     let r = match (&s.puente, url.starts_with("/local/") && metodo != "OPTIONS") {

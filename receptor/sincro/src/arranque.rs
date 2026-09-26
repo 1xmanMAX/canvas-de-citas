@@ -34,9 +34,20 @@ pub fn secreto(ruta: &PathBuf, nuevo: impl FnOnce() -> String) -> io::Result<Str
     if let Some(p) = ruta.parent() {
         std::fs::create_dir_all(p)?;
     }
+    // Dos procesos que arrancan a la vez: el primero lo crea y el otro lee el mismo.
     let s = nuevo();
-    std::fs::write(ruta, &s)?;
-    Ok(s)
+    match std::fs::OpenOptions::new().write(true).create_new(true).open(ruta) {
+        Ok(mut f) => {
+            use std::io::Write;
+            f.write_all(s.as_bytes())?;
+            Ok(s)
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            Ok(std::fs::read_to_string(ruta)?.trim().to_string())
+        }
+        Err(e) => Err(e),
+    }
 }
 
 pub fn token_nuevo() -> String {

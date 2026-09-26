@@ -124,19 +124,36 @@ impl Puente {
                 Err(r) => r,
                 Ok((_, Some(p))) => match fs::read(&p) {
                     Ok(b) => Respuesta { estado: 200, tipo: "application/octet-stream", cuerpo: b, cabeceras: vec![("X-Modificado", modificado(&p).to_string())] },
-                    Err(_) => vacia(404),
+                    // Solo "no existe" es 404: un error de lectura (acceso, archivo en uso, disco) no
+                    // puede parecer un archivo vacío, porque la app lo sobrescribiría.
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => vacia(404),
+                    Err(e) => error(500, e),
                 },
                 Ok(_) => vacia(400),
             },
             ("PUT", "/local/escribir") => match self.destino(url, true) {
                 Err(r) => r,
-                Ok((_, Some(p))) => {
+                Ok((raiz, Some(p))) => {
+                    // Una carpeta registrada que ya no está (movida, disco desconectado) no se recrea vacía.
+                    if !raiz.is_dir() {
+                        return vacia(404);
+                    }
+                    // Con el mismo cerrojo que la sincronización del celular: nunca a la vez.
+                    let _candado = crate::servidor::ESCRITURA.lock().unwrap_or_else(|e| e.into_inner());
+                    // Precondición: la fecha que la app vio. Si otro (celular, skill) lo cambió, 409.
+                    if let Some(si) = parametro(url, "si").and_then(|s| s.parse::<u64>().ok()) {
+                        if p.exists() && modificado(&p) != si {
+                            return vacia(409);
+                        }
+                    }
                     if let Some(dir) = p.parent() {
                         if let Err(e) = fs::create_dir_all(dir) {
                             return error(500, e);
                         }
                     }
-                    let tmp = p.with_extension("tmp-canvas");
+                    let mut azar = [0u8; 4];
+                    let _ = getrandom::getrandom(&mut azar);
+                    let tmp = p.with_file_name(format!("{}.{:08x}.tmp-canvas", p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(), u32::from_le_bytes(azar)));
                     match fs::write(&tmp, cuerpo).and_then(|_| fs::rename(&tmp, &p)) {
                         Ok(()) => json_r(json!({"modificado": modificado(&p)})),
                         Err(e) => error(500, e),
@@ -193,7 +210,8 @@ impl Puente {
                         return vacia(403);
                     }
                 }
-                match self.carpetas.guardar_registro(&v) {
+                let quitar: Vec<String> = parametro(url, "quitar").map(|q| q.split(',').filter(|s| !s.is_empty()).map(String::from).collect()).unwrap_or_default();
+                match self.carpetas.guardar_registro_de_app(&v, &quitar) {
                     Ok(()) => json_r(json!({"ok": true})),
                     Err(e) => error(500, e),
                 }

@@ -5,6 +5,10 @@ use serde_json::Value;
 use std::io;
 
 pub trait Almacen: Send + Sync {
+    /// ¿Se puede servir? (p. ej. todas las carpetas conectadas). Si no, el servidor responde 503.
+    fn listo(&self) -> Result<(), String> {
+        Ok(())
+    }
     /// Cambia cada vez que cambia cualquiera de los JSON (detecta ediciones concurrentes).
     fn etiqueta(&self) -> String;
     /// `{etiqueta, proyectos, fuentes, citas, docs: [{ruta, bytes}]}`. Con `con_fotos`, `docs`

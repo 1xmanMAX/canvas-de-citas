@@ -48,7 +48,9 @@ fn lee_la_union_sin_duplicar() {
     let (_t, c) = escenario();
     let v = c.leer(false).unwrap();
     assert_eq!(ids(&v["proyectos"]), ["proyecto_001", "proyecto_002"]);
-    assert_eq!(ids(&v["fuentes"]), ["fuente_001", "fuente_003", "fuente_002"]);
+    let mut fs_ = ids(&v["fuentes"]);
+    fs_.sort();
+    assert_eq!(fs_, ["fuente_001", "fuente_002", "fuente_003"]); // sin duplicar (el orden: la carpeta más reciente primero)
     assert_eq!(ids(&v["citas"]), ["cita_001", "cita_002", "cita_003"]);
     assert_eq!(v["docs"], json!([{"ruta": "fuentes/fuente_001/documento.pdf", "bytes": 6}]));
     // Los originales de fotos solo para quien los pide.
@@ -155,4 +157,56 @@ fn registro_escrito_por_powershell_con_bom() {
     let texto = fs::read(t.path().join("proyectos-abiertos.json")).unwrap();
     fs::write(t.path().join("proyectos-abiertos.json"), [b"\xef\xbb\xbf".as_slice(), &texto].concat()).unwrap();
     assert_eq!(c.entradas().len(), 2);
+}
+
+// --- Revisión E: el servidor no pisa lo que cada carpeta tiene si el celular no lo tocó (C-1) ---
+#[test]
+fn c1_una_copia_corregida_en_otra_carpeta_no_se_revierte() {
+    let (t, c) = escenario();
+    // La skill corrigió la fuente compartida en Vías (con la app cerrada).
+    let mut f = leer(&t.path().join("vias"), "fuentes");
+    f[0]["titulo"] = json!("A corregida en Vías");
+    escribir(&t.path().join("vias"), "fuentes", f);
+    // El celular solo agrega una cita a la tesis.
+    let mut datos = c.leer(false).unwrap();
+    datos["citas"].as_array_mut().unwrap().push(json!({"id": "cita_009", "proyecto_id": "proyecto_001", "fuente_id": "fuente_003"}));
+    c.escribir(&json!({"citas": datos["citas"]}), &json!({})).unwrap();
+    assert_eq!(leer(&t.path().join("vias"), "fuentes")[0]["titulo"], "A corregida en Vías", "la corrección de Vías se revirtió");
+}
+
+#[test]
+fn c1_ids_que_chocan_entre_carpetas_no_se_pisan_ni_se_pierden() {
+    let (t, c) = escenario();
+    // La skill numeró en Vías mirando solo Vías: fuente_003 y cita_001 ya existen en la tesis (otra cosa).
+    let vias = t.path().join("vias");
+    let mut f = leer(&vias, "fuentes");
+    f.as_array_mut().unwrap().push(json!({"id": "fuente_003", "titulo": "Solo de Vías"}));
+    escribir(&vias, "fuentes", f);
+    let mut k = leer(&vias, "citas");
+    k.as_array_mut().unwrap().push(json!({"id": "cita_001", "proyecto_id": "proyecto_002", "fuente_id": "fuente_003", "pagina": 77}));
+    escribir(&vias, "citas", k);
+    // El celular solo cambia el título de la tesis.
+    let mut datos = c.leer(false).unwrap();
+    datos["proyectos"][0]["titulo"] = json!("Tesis (cel)");
+    c.escribir(&json!({"proyectos": datos["proyectos"]}), &json!({})).unwrap();
+    let fv = leer(&vias, "fuentes");
+    assert!(fv.as_array().unwrap().iter().any(|x| x["id"] == "fuente_003" && x["titulo"] == "Solo de Vías"), "se pisó la fuente de Vías: {fv}");
+    let cv = leer(&vias, "citas");
+    assert!(cv.as_array().unwrap().iter().any(|x| x["id"] == "cita_001" && x["pagina"] == 77), "se perdió la cita de Vías: {cv}");
+    assert_eq!(leer(&t.path().join("tesis"), "proyectos")[0]["titulo"], "Tesis (cel)");
+}
+
+// --- I-5: una carpeta no disponible o un registro ilegible no se sirven como "sin datos" ---
+#[test]
+fn i5_carpeta_no_disponible_o_registro_ilegible_responde_503() {
+    let (t, c) = escenario();
+    fs::rename(t.path().join("vias"), t.path().join("vias-desconectada")).unwrap();
+    let (clave, clave_b64) = Clave::nueva();
+    let s = Sincro { carpeta: Box::new(c), clave, clave_b64, puerto: 47481, tope: 1 << 24, puente: None };
+    let prueba = |url: &str| s.clave.cifrar_json(&json!({ "ruta": url }));
+    let pedido = s.clave.cifrar_json(&json!({"dispositivo": "cel1", "nombre": "Celular", "base": null}));
+    assert_eq!(s.atender("POST", "/sync/v2/leer", Some(&prueba("/sync/v2/leer")), pedido.as_bytes(), false).estado, 503);
+    fs::write(t.path().join("proyectos-abiertos.json"), "{roto").unwrap();
+    fs::rename(t.path().join("vias-desconectada"), t.path().join("vias")).unwrap();
+    assert_eq!(s.atender("POST", "/sync/v2/leer", Some(&prueba("/sync/v2/leer")), pedido.as_bytes(), false).estado, 503);
 }
