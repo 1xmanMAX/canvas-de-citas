@@ -5,6 +5,9 @@
   // sobre la imagen completa, igual que en la tarjeta del lienzo.
   import { onMount, untrack } from 'svelte'
   import Icono from './Icono.svelte'
+  import CampoEtiquetas from './CampoEtiquetas.svelte'
+  import { autocompletar } from '../lib/autocompletar.js'
+  import { sugerir } from '../lib/buscador.svelte.js'
   import { TINTAS } from '../lib/tarjetas.js'
   import { leerOriginalFoto } from '../lib/store.svelte.js'
   import { ajustar, zoomEn, aImagen, limitesZoom } from '../lib/vista.js'
@@ -177,7 +180,8 @@
 
   const deshacer = () => (o.trazos = o.trazos.slice(0, -1))
   // Cerrar: una foto ya guardada conserva los cambios; una nueva sin "Guardar" no se crea.
-  const cerrar = () => (nueva ? onclose?.() : onguardar?.(o))
+  const guardar = () => { if (!o.etiquetas?.length) delete o.etiquetas; onguardar?.(o) }
+  const cerrar = () => (nueva ? onclose?.() : guardar())
 </script>
 
 <svelte:window bind:innerWidth={anchoVentana} />
@@ -234,11 +238,12 @@
           <button class="btn chico peligro" disabled={!o.trazos.length} onclick={() => (o.trazos = [])}>Borrar trazos</button>
         </div>
         <div class="detalles">
-          <label class="campo"><span>Título</span><input type="text" bind:value={o.titulo} placeholder="Ensayo en laboratorio, feb. 2026" /></label>
+          <label class="campo"><span>Título</span><input type="text" bind:value={o.titulo} placeholder="Ensayo en laboratorio, feb. 2026" use:autocompletar={{ sugerir }} /></label>
           <label class="campo"><span>Texto (descripción, análisis, transcripción de la imagen…)</span>
-            <textarea rows="5" bind:value={o.texto} placeholder="Todo lo que quieras anotar sobre esta foto"></textarea></label>
+            <textarea rows="5" bind:value={o.texto} use:autocompletar={{ sugerir }} placeholder="Todo lo que quieras anotar sobre esta foto"></textarea></label>
           <label class="campo"><span>Anotación a mano (se ve en rojo bajo la foto)</span>
-            <input type="text" bind:value={o.anotacion} class="mano" placeholder="¿coincide con Villarreal?" /></label>
+            <input type="text" bind:value={o.anotacion} use:autocompletar={{ sugerir }} class="mano" placeholder="¿coincide con Villarreal?" /></label>
+          <CampoEtiquetas bind:valor={o.etiquetas} />
           {#if o.origen && onvinculo}
             <button class="btn vinculo-doc" onclick={onvinculo}>
               <Icono nombre="externo" tam={14} />Vínculo: ir a la cita en el documento{o.origen.pagina ? ` (pág. ${o.origen.pagina})` : ''}
@@ -258,7 +263,7 @@
             <button class="btn fantasma chico" onclick={onduplicar}><Icono nombre="duplicar" tam={14} />Duplicar</button>
           {/if}
           <span class="espacio"></span>
-          <button class="btn primario" onclick={() => onguardar(o)}>Guardar</button>
+          <button class="btn primario" onclick={guardar}>Guardar</button>
         </div>
       </aside>
     {/if}

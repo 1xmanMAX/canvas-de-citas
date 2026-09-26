@@ -1,6 +1,9 @@
 <script>
   import { untrack } from 'svelte'
   import { ESTADOS_USO, sugerirCitaEnTexto } from '../lib/citas.js'
+  import CampoEtiquetas from './CampoEtiquetas.svelte'
+  import { autocompletar } from '../lib/autocompletar.js'
+  import { sugerir } from '../lib/buscador.svelte.js'
   let { fuente, cita = {}, onguardar, oncancelar } = $props()
 
   const base = untrack(() => $state.snapshot(cita))
@@ -13,6 +16,7 @@
   function enviar(e) {
     e.preventDefault()
     const pag = String(c.pagina ?? '').trim()
+    if (!c.etiquetas?.length) delete c.etiquetas
     onguardar({ ...c, pagina: pag === '' ? null : /^\d+$/.test(pag) ? +pag : pag })
   }
 </script>
@@ -36,7 +40,8 @@
     </span>
     <input type="text" aria-label="Cita en texto" bind:value={c.cita_en_texto} oninput={() => (manual = true)} />
   </div>
-  <label class="campo ancho"><span>Contexto (dónde se usa)</span><input type="text" bind:value={c.contexto} placeholder="Antecedentes, capítulo 2" /></label>
+  <label class="campo ancho"><span>Contexto (dónde se usa)</span><input type="text" bind:value={c.contexto} use:autocompletar={{ sugerir }} placeholder="Antecedentes, capítulo 2" /></label>
+  <div class="ancho"><CampoEtiquetas bind:valor={c.etiquetas} /></div>
   <div class="fila fin ancho">
     <button type="button" class="btn fantasma" onclick={oncancelar}>Cancelar</button>
     <button class="btn primario">Guardar cita</button>

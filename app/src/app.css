@@ -153,3 +153,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 /* Citas resaltadas en el visor (Markdown/texto); en los HTML se inyectan las mismas reglas. */
 ::highlight(cita) { background-color: rgba(242, 194, 48, .45); }
 ::highlight(cita-activa) { background-color: rgba(235, 104, 52, .65); }
+
+/* Autocompletar de #etiquetas y @menciones (lib/autocompletar.js) */
+.autocompletar { position: fixed; z-index: 1000; margin: 0; padding: 4px; list-style: none; min-width: 160px; max-width: 280px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 20px rgba(33, 31, 26, .18); font-size: 13px; }
+.autocompletar li { padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+.autocompletar li.activa, .autocompletar li:hover { background: var(--accent-soft); color: var(--accent); }

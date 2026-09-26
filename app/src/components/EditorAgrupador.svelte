@@ -1,6 +1,8 @@
 <script>
   // Crear o editar un agrupador: nombre, color y qué elementos del lienzo van dentro.
   import Modal from './Modal.svelte'
+  import { autocompletar } from '../lib/autocompletar.js'
+  import { sugerir } from '../lib/buscador.svelte.js'
   import { COLORES_GRUPO } from '../lib/agrupadores.js'
 
   /** `elementos`: [{ id, nombre, tipo }]; `dentro`: ids que ya están en el recuadro. */
@@ -25,7 +27,7 @@
 
 <Modal titulo={nuevo ? 'Nuevo agrupador' : 'Agrupador'} {onclose} ancho={520}>
   <!-- svelte-ignore a11y_autofocus -->
-  <label class="campo"><span>Nombre</span><input type="text" bind:value={nombre} placeholder="Marco teórico, Antecedentes, Pendientes…" autofocus /></label>
+  <label class="campo"><span>Nombre</span><input type="text" bind:value={nombre} use:autocompletar={{ sugerir }} placeholder="Marco teórico, Antecedentes, Pendientes…" autofocus /></label>
   <div class="fila colores" role="radiogroup" aria-label="Color">
     {#each Object.entries(COLORES_GRUPO) as [k, v]}
       <button class="color" role="radio" aria-checked={tinta === k} aria-label={k} style="--c:{v}" onclick={() => (tinta = k)}></button>

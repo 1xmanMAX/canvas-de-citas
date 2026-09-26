@@ -1,12 +1,13 @@
 <script>
   import { untrack } from 'svelte'
   import { TIPOS_FUENTE, ESTADOS_VERIF, sugerirBibliografia } from '../lib/citas.js'
+  import CampoEtiquetas from './CampoEtiquetas.svelte'
   let { fuente = null, onguardar, oncancelar, textoBoton = 'Guardar fuente' } = $props()
 
   const base = untrack(() => (fuente ? $state.snapshot(fuente) : {}))
   let f = $state({ tipo_fuente: 'articulo_cientifico', idioma: 'es', estado_verificacion: 'no_verificado', fuente_verificacion: '', ...base })
   let autores = $state((base.autores || []).join('\n'))
-  let etiquetas = $state((base.etiquetas || []).join(', '))
+  let etiquetas = $state([...(base.etiquetas || [])])
 
   function datos() {
     const anio = String(f.anio ?? '').trim()
@@ -14,7 +15,7 @@
       ...f,
       autores: autores.split('\n').map(s => s.trim()).filter(Boolean),
       anio: /^\d+$/.test(anio) ? +anio : anio || null,
-      etiquetas: etiquetas.split(',').map(s => s.trim()).filter(Boolean)
+      etiquetas: [...etiquetas]
     }
     if (!d.etiquetas.length) delete d.etiquetas
     if (!d.tema?.trim()) delete d.tema
@@ -58,7 +59,7 @@
   </div>
   <label class="campo ancho"><span>Notas de corrección</span><textarea rows="2" bind:value={f.notas_correccion}></textarea></label>
   <label class="campo"><span>Tema (para agrupar)</span><input type="text" bind:value={f.tema} placeholder="Resistencia de materiales" /></label>
-  <label class="campo"><span>Etiquetas (separadas por coma)</span><input type="text" bind:value={etiquetas} placeholder="cap. 2, normativa" /></label>
+  <CampoEtiquetas bind:valor={etiquetas} rotulo="Etiquetas (#tema) y personas (@)" />
   <div class="fila fin ancho">
     {#if oncancelar}<button type="button" class="btn fantasma" onclick={oncancelar}>Cancelar</button>{/if}
     <button class="btn primario">{textoBoton}</button>

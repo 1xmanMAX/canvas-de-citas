@@ -4,6 +4,9 @@
   import Modal from './Modal.svelte'
   import Icono from './Icono.svelte'
   import Grabador from './Grabador.svelte'
+  import CampoEtiquetas from './CampoEtiquetas.svelte'
+  import { autocompletar } from '../lib/autocompletar.js'
+  import { sugerir } from '../lib/buscador.svelte.js'
   import { LETRAS, PAPELES, COLORES, fechaCorta, duracionTexto } from '../lib/tarjetas.js'
   import { esAndroid } from '../lib/plataforma.js'
   import { transcribirAudio } from '../lib/voz.js'
@@ -61,15 +64,16 @@
 
   function guardar() {
     if (lista === 'listas' && nuevaTarea.trim()) agregarTarea()
+    if (!o.etiquetas?.length) delete o.etiquetas
     onguardar(o)
   }
 </script>
 
 <Modal {titulo} {onclose} ancho={480}>
   {#if lista === 'notas'}
-    <label class="campo"><span>Título (opcional)</span><input type="text" bind:value={o.titulo} placeholder="Extended Mind, p. 114" /></label>
+    <label class="campo"><span>Título (opcional)</span><input type="text" bind:value={o.titulo} placeholder="Extended Mind, p. 114" use:autocompletar={{ sugerir }} /></label>
     <!-- svelte-ignore a11y_autofocus -->
-    <textarea rows="6" bind:value={o.texto} autofocus aria-label="Texto de la nota" style="font-family:{LETRAS[o.letra || 'sans'].css};font-size:{o.letra === 'mano' ? 21 : 14}px"
+    <textarea rows="6" bind:value={o.texto} use:autocompletar={{ sugerir }} autofocus aria-label="Texto de la nota" style="font-family:{LETRAS[o.letra || 'sans'].css};font-size:{o.letra === 'mano' ? 21 : 14}px"
       class="texto-nota" placeholder="Escribe la idea, cita o pendiente…"></textarea>
     <div class="opciones">
       <div class="opcion"><span class="rotulo">Papel</span>
@@ -95,12 +99,12 @@
 
   {:else if lista === 'listas'}
     <!-- svelte-ignore a11y_autofocus -->
-    <label class="campo"><span>Título</span><input type="text" bind:value={o.titulo} placeholder="Pendientes del capítulo 2" autofocus={nueva} /></label>
+    <label class="campo"><span>Título</span><input type="text" bind:value={o.titulo} use:autocompletar={{ sugerir }} placeholder="Pendientes del capítulo 2" autofocus={nueva} /></label>
     <div class="tareas">
       {#each o.items as it, i}
         <div class="tarea">
           <input type="checkbox" bind:checked={it.hecho} aria-label="Hecha" />
-          <input type="text" bind:value={it.t} class:hecho={it.hecho} aria-label="Tarea {i + 1}" />
+          <input type="text" bind:value={it.t} use:autocompletar={{ sugerir }} class:hecho={it.hecho} aria-label="Tarea {i + 1}" />
           <button class="icono-btn mini" aria-label="Subir" title="Subir" disabled={i === 0} onclick={() => moverTarea(i, -1)}><span class="flecha">↑</span></button>
           <button class="icono-btn mini" aria-label="Bajar" title="Bajar" disabled={i === o.items.length - 1} onclick={() => moverTarea(i, 1)}><span class="flecha">↓</span></button>
           <button class="icono-btn mini" aria-label="Quitar tarea" title="Quitar" onclick={() => quitarTarea(i)}><Icono nombre="cerrar" tam={14} /></button>
@@ -108,7 +112,7 @@
       {/each}
       <form class="tarea nueva" onsubmit={agregarTarea}>
         <Icono nombre="mas" tam={14} />
-        <input type="text" bind:this={entradaTarea} bind:value={nuevaTarea} placeholder="Nueva tarea y Enter (o pega varias líneas)"
+        <input type="text" bind:this={entradaTarea} bind:value={nuevaTarea} use:autocompletar={{ sugerir }} placeholder="Nueva tarea y Enter (o pega varias líneas)"
           onpaste={e => { const t = e.clipboardData?.getData('text/plain') || ''; if (t.includes('\n')) { e.preventDefault(); nuevaTarea = t; agregarTarea() } }} />
       </form>
     </div>
@@ -120,7 +124,7 @@
       <audio controls src={o.audio} class="reproductor"></audio>
       <div class="suave meta">{duracionTexto(o.duracion)}{#if o.creado} · {fechaCorta(o.creado)}{/if}</div>
       <label class="campo"><span>Transcripción</span>
-        <textarea rows="6" bind:value={o.transcripcion} disabled={transcribiendo} placeholder={transcribiendo ? 'Transcribiendo…' : 'Escribe o corrige lo que se dijo en el audio…'}></textarea></label>
+        <textarea rows="6" bind:value={o.transcripcion} use:autocompletar={{ sugerir }} disabled={transcribiendo} placeholder={transcribiendo ? 'Transcribiendo…' : 'Escribe o corrige lo que se dijo en el audio…'}></textarea></label>
       {#if esAndroid}
         <div class="fila entre">
           <span class="suave pista-voz" class:error={errorVoz} role={errorVoz ? 'alert' : undefined}>{transcribiendo ? 'Transcribiendo en el celular…' : errorVoz || 'Se transcribe en el celular, sin internet.'}</span>
@@ -130,6 +134,8 @@
     {/if}
 
   {/if}
+
+  <CampoEtiquetas bind:valor={o.etiquetas} />
 
   {#if o.origen && onvinculo}
     <button class="btn vinculo-doc" onclick={onvinculo}>

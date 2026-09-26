@@ -27,6 +27,17 @@ const SUITES = {
       const chips = await pg.$$eval('g.tarjeta.notas .etq text', ts => Array.from(ts, t => t.textContent))
       if (!chips.includes('#vial') || !chips.includes('@Villarreal')) throw new Error('chips: ' + chips)
     })
+    await s.paso('etiqueta puesta como chip (sin escribirla en el texto)', async () => {
+      await pg.click('button[aria-label="Añadir nota"]')
+      await pg.type('dialog[open] textarea', 'nota con chip')
+      await pg.type('dialog[open] input[aria-label="Etiquetas y personas"]', '@Ana')
+      await pg.keyboard.press('Enter')
+      await clicTexto(pg, 'Guardar'); await esperar(400)
+      const n = (await lienzoGuardado(pg)).notas.find(x => x.texto === 'nota con chip')
+      if (JSON.stringify(n?.etiquetas) !== '["@Ana"]') throw new Error('etiquetas: ' + JSON.stringify(n?.etiquetas))
+      const chips = await pg.$$eval('g.tarjeta.notas .etq text', ts => Array.from(ts, x => x.textContent))
+      if (!chips.includes('@Ana')) throw new Error('sin chip @Ana en el lienzo')
+    })
     await s.paso('autocompletar al escribir #', async () => {
       await pg.click('button[aria-label="Añadir nota"]')
       await pg.type('dialog[open] textarea', 'otra idea #vi')
