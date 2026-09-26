@@ -37,6 +37,26 @@ const SUITES = {
       const [x0, y0] = pos(antes), [x1, y1] = pos(await nodo.evaluate(g => g.getAttribute('transform')))
       if (Math.abs(x1 - x0) > 1 || Math.abs(y1 - y0) > 1) throw new Error(`movió la fuente (${x0},${y0} → ${x1},${y1})`)
     })
+    await s.paso('PDF: pellizcar con dos dedos acerca sin saltos de desplazamiento', async () => {
+      await adjuntar(pg, 'fuente_003', PDF)
+      await clicTexto(pg, 'Abrir')
+      await pg.waitForFunction(() => [...document.querySelectorAll('.pag-pdf canvas')].some(c => c.width > 0), { timeout: 30000 }); await esperar(800)
+      const caja = await (await pg.$('.pdf')).boundingBox()
+      await pg.$eval('.pdf', c => { c.scrollTop = 300 }); await esperar(300)
+      const antes = await pg.$eval('.pdf', c => ({ top: c.scrollTop, porc: parseInt(document.querySelector('.zoom-pdf .porc').textContent) }))
+      const cy = caja.y + caja.height / 2, cx = caja.x + caja.width / 2
+      const a = { x: cx - 40, y: cy }, b = { x: cx + 40, y: cy }
+      await toque('touchStart', [a]); await esperar(20)
+      await toque('touchStart', [a, b]); await esperar(20)
+      for (let i = 1; i <= 10; i++) { await toque('touchMove', [{ x: a.x - 8 * i, y: a.y }, { x: b.x + 8 * i, y: b.y }]); await esperar(25) }
+      await toque('touchEnd', []); await esperar(700)
+      const despues = await pg.$eval('.pdf', c => ({ top: c.scrollTop, porc: parseInt(document.querySelector('.zoom-pdf .porc').textContent) }))
+      const f = despues.porc / antes.porc
+      if (!(f > 1.5)) throw new Error(`no acercó (${antes.porc}% → ${despues.porc}%)`)
+      // El punto del documento que estaba entre los dedos sigue ahí (sin desplazamientos extra).
+      const esperado = (antes.top + caja.height / 2) * f - caja.height / 2
+      if (Math.abs(despues.top - esperado) > caja.height * 0.25) throw new Error(`se desplazó de más: scrollTop ${antes.top} → ${despues.top} (esperado ≈ ${Math.round(esperado)})`)
+    })
     if (pg.errores.length) s.fallas.push(...pg.errores)
     await pg.browserContext().close().catch(() => {})
     return s

@@ -172,23 +172,61 @@
     return () => cont.removeEventListener('wheel', rueda)
   })
 
-  // Pellizco con dos dedos (celular).
+  // Pellizco con dos dedos (celular). Mientras dura, solo se agranda la lámina con una transformación
+  // (la GPU; nada se vuelve a maquetar ni a dibujar: sin parpadeo) y el desplazamiento nativo queda
+  // bloqueado; al soltar se aplica el zoom una sola vez, con el punto entre los dedos en su lugar.
   const dedos = new Map()
   let pellizco = null
+  let lamina
+  const medio = () => {
+    const [a, b] = [...dedos.values()], r = cont.getBoundingClientRect()
+    return { x: (a.x + b.x) / 2 - r.left, y: (a.y + b.y) / 2 - r.top, d: Math.hypot(a.x - b.x, a.y - b.y) || 1 }
+  }
   function dedoAbajo(e) {
     if (e.pointerType !== 'touch') return
     dedos.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    if (dedos.size === 2) { const [a, b] = [...dedos.values()]; pellizco = { d: Math.hypot(a.x - b.x, a.y - b.y), e: escala, y: (a.y + b.y) / 2 - cont.getBoundingClientRect().top } }
+    if (dedos.size === 2) {
+      const m = medio()
+      // Punto de la lámina (contenido) que está entre los dedos.
+      pellizco = { d: m.d, e: escala, mx: m.x, my: m.y, ox: cont.scrollLeft + m.x, oy: cont.scrollTop + m.y, s: 1, tx: 0, ty: 0 }
+      lamina.style.transformOrigin = `${pellizco.ox}px ${pellizco.oy}px`
+      enZoom = true
+    }
   }
   function dedoMueve(e) {
     if (!dedos.has(e.pointerId)) return
     dedos.set(e.pointerId, { x: e.clientX, y: e.clientY })
     if (pellizco && dedos.size === 2) {
-      const [a, b] = [...dedos.values()]
-      fijarEscala(pellizco.e * Math.hypot(a.x - b.x, a.y - b.y) / pellizco.d, pellizco.y)
+      const m = medio()
+      pellizco.s = Math.min(6, Math.max(0.15, pellizco.e * (m.d / pellizco.d))) / pellizco.e
+      pellizco.tx = m.x - pellizco.mx
+      pellizco.ty = m.y - pellizco.my
+      lamina.style.transform = `translate(${pellizco.tx}px, ${pellizco.ty}px) scale(${pellizco.s})`
     }
   }
-  function dedoArriba(e) { dedos.delete(e.pointerId); if (dedos.size < 2) pellizco = null }
+  function dedoArriba(e) {
+    dedos.delete(e.pointerId)
+    if (dedos.size >= 2 || !pellizco) return
+    const p = pellizco
+    pellizco = null
+    lamina.style.transform = ''
+    escala = p.e * p.s
+    requestAnimationFrame(() => {
+      // Mismo punto del documento bajo el centro final de los dedos.
+      cont.scrollTop = p.oy * p.s - (p.my + p.ty)
+      cont.scrollLeft = p.ox * p.s - (p.mx + p.tx)
+      scrollTop = cont.scrollTop
+      clearTimeout(tZoom)
+      tZoom = setTimeout(() => (enZoom = false), 120)
+    })
+  }
+  // Con dos dedos, el navegador no desplaza ni hace zoom a la página: el pellizco es solo nuestro.
+  $effect(() => {
+    const bloquear = e => { if (e.touches.length > 1 && e.cancelable) e.preventDefault() }
+    cont.addEventListener('touchstart', bloquear, { passive: false })
+    cont.addEventListener('touchmove', bloquear, { passive: false })
+    return () => { cont.removeEventListener('touchstart', bloquear); cont.removeEventListener('touchmove', bloquear) }
+  })
 
   function irAPagina(n) {
     n = Math.min(tamanos.length, Math.max(1, n)) - 1
@@ -345,7 +383,7 @@
   onpointerdown={dedoAbajo} onpointermove={dedoMueve} onpointerup={dedoArriba} onpointercancel={dedoArriba} role="document">
   {#if cargando}<p class="estado">Abriendo PDF…</p>{/if}
   {#if error}<p class="estado error">{error}</p>{/if}
-  <div class="lamina" style="height:{alto}px;width:{ancho}px">
+  <div class="lamina" bind:this={lamina} style="height:{alto}px;width:{ancho}px">
     {#each visibles as n (n)}
       {@const t = tamanos[n]}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
