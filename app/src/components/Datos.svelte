@@ -5,7 +5,7 @@
   import Icono from './Icono.svelte'
   import { S, avisar } from '../lib/store.svelte.js'
   import { descargarTodo, descargarBib, leerArchivos, aplicar } from '../lib/io.svelte.js'
-  import { C, establecerCarpeta, reconectar, dejarDeUsarCarpeta, guardarAhora } from '../lib/carpeta.svelte.js'
+  import { CS, guardarAhora, darPermiso, elegirBiblioteca, usarComoBiblioteca } from '../lib/carpetas.svelte.js'
   import { haceCuanto } from '../lib/citas.js'
   import Sincronizar from './Sincronizar.svelte'
   import { esAndroid } from '../lib/plataforma.js'
@@ -39,10 +39,6 @@
     onclose()
   })
 
-  function dejar() {
-    if (confirm(`¿Dejar de guardar en "${C.dir?.name}"? Los archivos que ya están en la carpeta no se borran.`)) dejarDeUsarCarpeta()
-  }
-
   const COLS = ['proyectos', 'fuentes', 'citas']
   const cuenta = col => previa?.[col]?.length
 </script>
@@ -72,40 +68,35 @@
     <Sincronizar primera />
     {:else}
     <section class="primera">
-      <div class="rotulo">Carpeta de almacenamiento</div>
-      {#if C.estado === 'no-soportado'}
+      <div class="rotulo">Carpetas de los proyectos</div>
+      {#if !CS.soportado}
         <p class="suave nota">
-          Este navegador no permite guardar en una carpeta del disco. Usa <b>Chrome</b> o <b>Edge</b> en una computadora
-          para elegir una. Mientras tanto, tus datos se guardan en este navegador y puedes exportarlos abajo.
+          Este navegador no permite guardar en carpetas del disco. Usa la app de Windows, <b>Chrome</b> o <b>Edge</b> en una computadora.
+          Mientras tanto, tus datos se guardan en este navegador y puedes exportarlos abajo.
         </p>
-      {:else if C.estado === 'ninguna'}
-        <p class="suave nota">
-          Elige una carpeta y la app guardará ahí todo automáticamente: <code>proyectos.json</code>, <code>fuentes.json</code>,
-          <code>citas.json</code> (con notas, fotos y conexiones) y los documentos en <code>fuentes/&lt;id&gt;/</code>.
-          Si la skill <b>citas-tesis</b> trabaja en esa misma carpeta, sus cambios aparecen solos en la app.
-        </p>
-        <div class="fila"><button class="btn primario" disabled={ocupado} onclick={() => tarea(establecerCarpeta)}><Icono nombre="carpeta" />Elegir carpeta…</button></div>
       {:else}
-        <div class="carpeta" class:alerta={C.estado === 'sin-permiso'}>
-          <Icono nombre="carpeta" tam={22} />
-          <div class="carpeta-txt">
-            <b>{C.dir?.name}</b>
-            {#if C.estado === 'sin-permiso'}
-              <span>El navegador pide permiso otra vez para usar esta carpeta.</span>
-            {:else}
-              <span class="suave">Guardado automático{C.guardado ? ` · último guardado ${haceCuanto(C.guardado)}` : ''}</span>
-            {/if}
-            {#if C.error && C.estado === 'conectada'}<span class="error">{C.error}</span>{/if}
+        <p class="suave nota">Cada proyecto se guarda solo en su carpeta (sus JSON, documentos, fotos y un <code>CLAUDE.md</code>). Para abrir uno, en Proyectos → <b>Abrir proyecto</b>.</p>
+        {#each CS.lista as c (c.clave)}
+          <div class="carpeta" class:alerta={c.estado !== 'conectada'}>
+            <Icono nombre="carpeta" tam={22} />
+            <div class="carpeta-txt">
+              <b>{c.nombre}</b>
+              <span class="suave">{c.proyectos.map(id => S.proyectoPorId.get(id)?.titulo).filter(Boolean).join(' · ') || 'Sin proyectos'}{c.biblioteca ? ' · biblioteca (fuentes sin proyecto)' : ''}</span>
+              {#if c.estado === 'sin-permiso'}<span>El navegador pide permiso otra vez para usar esta carpeta.</span>
+              {:else if c.estado === 'error'}<span class="error">{c.error}</span>
+              {:else}<span class="suave">Guardado automático{c.guardado ? ` · último guardado ${haceCuanto(c.guardado)}` : ''}</span>{/if}
+              {#if c.error && c.estado === 'conectada'}<span class="error">{c.error}</span>{/if}
+            </div>
+            {#if !c.biblioteca}<button class="btn chico fantasma" onclick={() => tarea(() => usarComoBiblioteca(c.clave))}>Usar como biblioteca</button>{/if}
           </div>
-        </div>
+        {/each}
+        {#if CS.sueltasSinLugar}
+          <p class="aviso-imp">{CS.sueltasSinLugar} fuentes no las cita ningún proyecto con carpeta: elige una carpeta de biblioteca para guardarlas.</p>
+        {/if}
         <div class="fila envolver">
-          {#if C.estado === 'sin-permiso'}
-            <button class="btn primario" onclick={() => tarea(reconectar)}>Dar permiso</button>
-          {:else}
-            <button class="btn" disabled={ocupado} onclick={() => tarea(async () => { await guardarAhora(); avisar('Guardado en la carpeta') })}>Guardar ahora</button>
-          {/if}
-          <button class="btn" disabled={ocupado} onclick={() => tarea(establecerCarpeta)}>Cambiar carpeta…</button>
-          <button class="btn peligro" onclick={dejar}>Dejar de usar</button>
+          {#if CS.pendientesDePermiso}<button class="btn primario" onclick={() => tarea(darPermiso)}>Dar permiso</button>{/if}
+          {#if CS.lista.length}<button class="btn" disabled={ocupado} onclick={() => tarea(async () => { await guardarAhora(); avisar('Guardado en las carpetas') })}>Guardar ahora</button>{/if}
+          <button class="btn" disabled={ocupado} onclick={() => tarea(elegirBiblioteca)}>{CS.lista.some(c => c.biblioteca) ? 'Cambiar carpeta de biblioteca…' : 'Elegir carpeta de biblioteca…'}</button>
         </div>
       {/if}
     </section>

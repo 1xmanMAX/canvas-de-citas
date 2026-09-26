@@ -86,3 +86,39 @@ export function suite(nombre) {
   console.log(`\n${nombre}`)
   return r
 }
+
+// --- Carpetas simuladas (File System Access sobre OPFS, el sistema de archivos privado del navegador) ---
+/** showDirectoryPicker devuelve subcarpetas de OPFS; qué carpeta "elige" el usuario: pg.elegir('nombre'). */
+export async function carpetasSimuladas(pg) {
+  await pg.evaluateOnNewDocument(() => {
+    window.showDirectoryPicker = async () => {
+      const nombre = JSON.parse(sessionStorage.getItem('__elegir') || '[]')
+      const n = nombre.shift()
+      sessionStorage.setItem('__elegir', JSON.stringify(nombre))
+      if (!n) throw new DOMException('Cancelado', 'AbortError')
+      let d = await navigator.storage.getDirectory()
+      for (const p of n.split('/')) d = await d.getDirectoryHandle(p, { create: true })
+      return d
+    }
+  })
+  pg.elegir = (...nombres) => pg.evaluate(n => sessionStorage.setItem('__elegir', JSON.stringify(n)), nombres)
+}
+
+/** Escribe un archivo de texto en OPFS (ruta con "/"). */
+export const escribirOpfs = (pg, ruta, texto) => pg.evaluate(async (ruta, texto) => {
+  const partes = ruta.split('/'), nombre = partes.pop()
+  let d = await navigator.storage.getDirectory()
+  for (const p of partes) d = await d.getDirectoryHandle(p, { create: true })
+  const w = await (await d.getFileHandle(nombre, { create: true })).createWritable()
+  await w.write(texto); await w.close()
+}, ruta, texto)
+
+/** Lee un archivo de OPFS como texto (null si no existe). */
+export const leerOpfs = (pg, ruta) => pg.evaluate(async ruta => {
+  try {
+    const partes = ruta.split('/'), nombre = partes.pop()
+    let d = await navigator.storage.getDirectory()
+    for (const p of partes) d = await d.getDirectoryHandle(p)
+    return await (await d.getFileHandle(nombre)).getFile().then(f => f.text())
+  } catch { return null }
+}, ruta)

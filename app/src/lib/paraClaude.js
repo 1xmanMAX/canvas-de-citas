@@ -101,9 +101,9 @@ function proyecto(p) {
   return L
 }
 
-function biblioteca() {
+function biblioteca(fuentes) {
   const L = ['## Biblioteca (todas las fuentes)', '']
-  const orden = [...S.fuentes].sort((a, b) => autorCorto(a).localeCompare(autorCorto(b)))
+  const orden = [...fuentes].sort((a, b) => autorCorto(a).localeCompare(autorCorto(b)))
   for (const f of orden) {
     const datos = [TIPOS_FUENTE[f.tipo_fuente] || f.tipo_fuente, ESTADOS_VERIF[f.estado_verificacion] || f.estado_verificacion, f.tema, f.documento_original ? `documento: ${f.documento_original}` : ''].filter(Boolean)
     L.push(`- ${ref(f)} — ${una(f.titulo)}${datos.length ? ` _(${datos.join(' · ')})_` : ''}`)
@@ -157,10 +157,10 @@ que la app no lo restaure. Lo de abajo describe el formato por si hay que editar
 `
 
 /** Markdown con todo el contenido de la app, para que Claude lo lea desde la carpeta. */
-export function generarClaudeMd() {
+export function generarClaudeMd({ proyectos, fuentes } = { proyectos: S.proyectos, fuentes: S.fuentes }) {
   const L = ['# Canvas de Citas — datos de la tesis', '', `_Generado por la app el ${new Date().toLocaleString('es-PE')}_`, '']
-  for (const p of S.proyectos) L.push(...proyecto(p))
-  if (!S.proyectos.length) L.push('_Todavía no hay proyectos._', '')
-  L.push(...biblioteca(), INSTRUCCIONES)
+  for (const p of proyectos) L.push(...proyecto(p))
+  if (!proyectos.length) L.push('_Todavía no hay proyectos._', '')
+  L.push(...biblioteca(fuentes), INSTRUCCIONES)
   return L.join('\n')
 }

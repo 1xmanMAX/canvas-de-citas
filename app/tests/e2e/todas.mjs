@@ -5,7 +5,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
-import { APP, FIXTURES, SALIDA, URL_APP, servidor, navegador, pagina, esperar, clicTexto, conEjemplo, lienzoGuardado, adjuntar, suite } from './comun.mjs'
+import { APP, FIXTURES, SALIDA, URL_APP, servidor, navegador, pagina, esperar, clicTexto, conEjemplo, lienzoGuardado, adjuntar, suite, carpetasSimuladas, escribirOpfs, leerOpfs } from './comun.mjs'
 
 const PDF = path.join(FIXTURES, 'paper.pdf'), HTML = path.join(FIXTURES, 'paper.html'), IMG = path.join(APP, 'public', 'icon-512.png')
 if (!fs.existsSync(PDF)) spawnSync(process.execPath, [path.join(FIXTURES, 'crear.mjs')], { stdio: 'inherit' })
@@ -13,6 +13,57 @@ fs.mkdirSync(SALIDA, { recursive: true })
 
 const filtro = process.argv.slice(2)
 const SUITES = {
+  // Un proyecto, una carpeta (carpetas simuladas con OPFS).
+  async carpetas(b) {
+    const s = suite('Proyectos en carpetas'), pg = await pagina(b)
+    await carpetasSimuladas(pg)
+    const cuerpo = () => pg.evaluate(() => document.body.textContent)
+    const esperarQue = async (fn, ms = 12000) => { for (let t = 0; t < ms; t += 250) { if (await fn()) return true; await esperar(250) } return false }
+    const lienzo = { modo: 'libre', posiciones: {}, notas: [], fotos: [], listas: [], audios: [], conexiones: [], objetivos: {} }
+    const json = (col, items) => JSON.stringify({ [col]: items }, null, 2) + '\n'
+    // La primera visita activa el service worker, que recarga la página una vez: se espera a eso.
+    const recargar = async () => { await pg.goto(URL_APP, { waitUntil: 'networkidle0' }).catch(() => {}); await esperar(1500); await pg.waitForSelector('body') }
+    await pg.goto(URL_APP, { waitUntil: 'networkidle0' }); await esperar(2500)
+    await s.paso('migra la carpeta del formato anterior sin perder nada', async () => {
+      await escribirOpfs(pg, 'tesis/proyectos.json', json('proyectos', [{ id: 'proyecto_001', tipo: 'tesis', titulo: 'Tesis de prueba', objetivos_especificos: [], indicadores: [], canvas: lienzo }]))
+      await escribirOpfs(pg, 'tesis/fuentes.json', json('fuentes', [
+        { id: 'fuente_001', tipo_fuente: 'libro', autores: ['Pérez, A.'], anio: 2020, titulo: 'Citada', documento_original: 'fuentes/fuente_001/documento.pdf' },
+        { id: 'fuente_002', tipo_fuente: 'libro', autores: ['Soto, B.'], anio: 2021, titulo: 'Sin citas', documento_original: null }]))
+      await escribirOpfs(pg, 'tesis/citas.json', json('citas', [{ id: 'cita_001', proyecto_id: 'proyecto_001', fuente_id: 'fuente_001', estado_uso: 'usando', cita_textual_o_parafraseo: 'textual', pagina: 3, cita_en_texto: '(Pérez, 2020)', contexto: '' }]))
+      await escribirOpfs(pg, 'tesis/fuentes/fuente_001/documento.pdf', '%PDF-falso')
+      // Así quedaba registrada la carpeta en la versión anterior (una sola carpeta para todo). En OPFS se
+      // registra por ruta: Chrome se cae al leer de IndexedDB un handle de OPFS (las carpetas reales sí son handles).
+      await pg.evaluate(() => new Promise((res, rej) => {
+        const r = indexedDB.open('canvas-de-citas')
+        r.onsuccess = () => { const t = r.result.transaction('meta', 'readwrite'); t.objectStore('meta').put({ opfs: ['tesis'] }, 'carpeta'); t.oncomplete = res; t.onerror = rej }
+      }))
+      await recargar()
+      if (!(await esperarQue(async () => (await cuerpo()).includes('Tesis de prueba')))) throw new Error('no cargó el proyecto de la carpeta')
+      const registro = await pg.evaluate(() => new Promise(res => {
+        const r = indexedDB.open('canvas-de-citas')
+        r.onsuccess = () => { const q = r.result.transaction('meta').objectStore('meta').get('carpetas'); q.onsuccess = () => res((q.result || []).map(c => ({ nombre: c.nombre, proyectos: c.proyectos, biblioteca: c.biblioteca }))) }
+      }))
+      if (JSON.stringify(registro) !== JSON.stringify([{ nombre: 'tesis', proyectos: ['proyecto_001'], biblioteca: true }])) throw new Error('registro: ' + JSON.stringify(registro))
+      await esperarQue(async () => (await leerOpfs(pg, 'tesis/CLAUDE.md')) !== null)
+      const fuentes = await leerOpfs(pg, 'tesis/fuentes.json')
+      if (!fuentes.includes('fuente_001') || !fuentes.includes('fuente_002')) throw new Error('se perdió una fuente: ' + fuentes.slice(0, 300))
+      if ((await leerOpfs(pg, 'tesis/fuentes/fuente_001/documento.pdf')) !== '%PDF-falso') throw new Error('se perdió el documento')
+    })
+    await s.paso('un cambio externo (la skill) en la carpeta se recoge', async () => {
+      const p = JSON.parse(await leerOpfs(pg, 'tesis/proyectos.json'))
+      p.proyectos[0].titulo = 'Tesis renombrada por la skill'
+      await escribirOpfs(pg, 'tesis/proyectos.json', JSON.stringify(p, null, 2) + '\n')
+      if (!(await esperarQue(async () => (await cuerpo()).includes('Tesis renombrada por la skill')))) throw new Error('no recogió el cambio')
+    })
+    await s.paso('eliminados.json borra la cita y se consume', async () => {
+      await escribirOpfs(pg, 'tesis/eliminados.json', JSON.stringify({ citas: ['cita_001'] }))
+      if (!(await esperarQue(async () => (await leerOpfs(pg, 'tesis/eliminados.json')) === null))) throw new Error('no consumió eliminados.json')
+      if (!(await esperarQue(async () => !(await leerOpfs(pg, 'tesis/citas.json')).includes('cita_001')))) throw new Error('la cita sigue en citas.json')
+    })
+    if (pg.errores.length) s.fallas.push(...pg.errores)
+    await pg.browserContext().close().catch(() => {})
+    return s
+  },
   // Etiquetas #/@ y buscador general (Ctrl+F).
   async etiquetas(b) {
     const s = suite('Etiquetas y buscador'), pg = await pagina(b)

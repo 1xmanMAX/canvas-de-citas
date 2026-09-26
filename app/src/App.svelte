@@ -7,7 +7,7 @@
   import Datos from './components/Datos.svelte'
   import Celular from './components/Celular.svelte'
   import { iniciarCelular } from './lib/celular.svelte.js'
-  import { C, iniciarCarpeta, reconectar } from './lib/carpeta.svelte.js'
+  import { CS, iniciarCarpetas, darPermiso } from './lib/carpetas.svelte.js'
   import Visor from './components/Visor.svelte'
   import { esAndroid } from './lib/plataforma.js'
   import { iniciarSincroAutomatica } from './lib/sincro-app.svelte.js'
@@ -101,7 +101,7 @@
     cargar().then(() => { iniciarSincroAutomatica(); revisarRecibidos() })
     document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && revisarRecibidos())
   }
-  else cargar().then(() => { iniciarSincroAutomatica(); return iniciarCarpeta() }).then(iniciarCelular)
+  else cargar().then(() => { iniciarSincroAutomatica(); return iniciarCarpetas() }).then(iniciarCelular)
 </script>
 
 <svelte:window
@@ -145,10 +145,10 @@
 
 {#if S.aviso}<div class="aviso" role="status">{S.aviso}</div>{/if}
 
-{#if C.estado === 'sin-permiso' && !S.aviso && !datos}
+{#if CS.pendientesDePermiso && !S.aviso && !datos}
   <div class="aviso fila" role="status">
-    La carpeta "{C.dir?.name}" necesita permiso para seguir guardando
-    <button class="btn chico" onclick={reconectar}>Dar permiso</button>
+    {CS.pendientesDePermiso === 1 ? `La carpeta "${CS.lista.find(c => c.estado === 'sin-permiso').nombre}" necesita` : `${CS.pendientesDePermiso} carpetas necesitan`} permiso para seguir guardando
+    <button class="btn chico" onclick={darPermiso}>Dar permiso</button>
   </div>
 {:else if S.actualizacion && !S.aviso}
   <div class="aviso fila" role="status">

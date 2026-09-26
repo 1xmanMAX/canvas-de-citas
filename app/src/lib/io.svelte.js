@@ -1,5 +1,5 @@
 // Exportar / importar los tres JSON con el mismo esquema que la skill citas-tesis
-// (references/formato-datos.md). La carpeta de almacenamiento vive en carpeta.svelte.js.
+// (references/formato-datos.md). Las carpetas de los proyectos viven en carpetas.svelte.js.
 import { S, COLECCIONES, importar, registrarIds, nuevoId, avisar } from './store.svelte.js'
 import { guardarArchivo, guardarArchivos } from './archivos.js'
 import { aBibtex, extraerDoi, normalizar } from './citas.js'
@@ -20,8 +20,11 @@ function ordenar(obj, campos) {
   return o
 }
 
-export function serializar(col) {
-  const items = $state.snapshot(S[col]).sort(porId).map(x => ordenar(x, CAMPOS[col]))
+export const serializar = col => serializarLista(col, $state.snapshot(S[col]))
+
+/** El JSON de una colección con solo esos elementos (la parte de una carpeta de proyecto). */
+export function serializarLista(col, lista) {
+  const items = [...lista].sort(porId).map(x => ordenar(x, CAMPOS[col]))
   return JSON.stringify({ [col]: items }, null, 2) + '\n'
 }
 
