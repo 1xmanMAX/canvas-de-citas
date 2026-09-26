@@ -23,7 +23,8 @@ van en español.
 | `app/tests/` | `unit/` (node:test), `e2e/` (Chrome headless), `fixtures/` (documentos de prueba propios) |
 | `claude-skill/canvas-de-citas/` | Copia versionada de la skill de Claude Code (`~/.claude/skills/canvas-de-citas` en la PC de Max): CLI `scripts/canvas.mjs` que lee/edita la carpeta de datos |
 | `receptor/` | Receptor Windows en Rust (127.0.0.1:47480): pasa archivos con el celular / PixPin |
-| `receptor/sincro/` | Servidor de sincronización con el celular (Rust, **sin PixPin**: compila y se prueba en la nube) |
+| `receptor/sincro/` | Servidor de sincronización **por Wi-Fi, sin internet** (Rust, **sin PixPin**): una carpeta (`--carpeta`) o las carpetas de los proyectos (`carpetas.rs` + `reparto.rs` ≡ `lib/reparto.js`) y el puente `/local/*` de la app de Windows (`local.rs`) |
+| `escritorio/` | **`Canvas de Citas.exe`** (tao + wry/WebView2): la app publicada en su ventana, permisos concedidos, `window.canvasWindows` para el puente, servidor incorporado (`--segundo-plano` al iniciar Windows). Compila con MSVC en la PC de Max; opciones de prueba `--url --base --puerto` |
 | `android/` | App Android con Capacitor 8: empaqueta `app/dist` (ver `android/README.md`); en la app, `lib/plataforma.js` (`esAndroid`) |
 | `docs/superpowers/specs/` | Diseños aprobados o en revisión |
 | `spec.md`, `*.html` (raíz) | Especificación y mockups originales |
@@ -123,6 +124,12 @@ chocan); la carpeta única anterior se migra sola (queda como carpeta de su proy
 `npm run test:e2e -- carpetas` (carpetas simuladas en OPFS; ojo: Chrome se cae si se guarda en IndexedDB un handle de
 OPFS, por eso se registran por ruta).
 
-**Siguiente:** probar el APK en el celular de Max y hacer la **Tarea 8 del Plan 1** en su PC
-(receptor de Windows + "Vincular celular" con QR). Mientras tanto sirve `canvas-sincro.exe`
-(ver `android/README.md`).
+**App de Windows** (sep. 2026, plan `docs/superpowers/plans/2026-09-26-app-windows.md`): `Canvas de Citas.exe` +
+instalador (`instalador-windows/`, registra la carpeta de datos anterior en
+`%LOCALAPPDATA%\CanvasDeCitas\proyectos-abiertos.json`). La sincronización es **solo por el Wi-Fi local, sin internet ni
+nube** (pedido de Max). Proyectos nuevos del celular: carpeta en `Documentos\Canvas de Citas`. Fotos en alta viajan solo
+si el servidor declara `capacidades: ["fotos"]` (el APK viejo sigue igual). Pruebas: `npm run test:e2e -- windows`
+(servidor real + `canvasWindows` simulado), `cargo test` en `receptor/sincro`. **La ventana carga la app publicada**:
+tras cambiar la app hay que publicar `gh-pages` para que la app de Windows la tenga.
+
+**Siguiente:** probar el APK en el celular de Max (sin compilar APK salvo que lo pida) contra la app de Windows.
