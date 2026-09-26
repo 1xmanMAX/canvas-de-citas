@@ -13,6 +13,110 @@ fs.mkdirSync(SALIDA, { recursive: true })
 
 const filtro = process.argv.slice(2)
 const SUITES = {
+  // Carpetas: casos de pérdida de datos encontrados en la revisión (C1–C5, I3–I6).
+  async carpetas2(b) {
+    const s = suite('Carpetas: sin perder datos'), pg = await pagina(b)
+    await carpetasSimuladas(pg)
+    const cuerpo = () => pg.evaluate(() => document.body.textContent)
+    const esperarQue = async (fn, ms = 12000) => { for (let t = 0; t < ms; t += 250) { if (await fn()) return true; await esperar(250) } return false }
+    const lienzo = { modo: 'libre', posiciones: {}, notas: [], fotos: [], listas: [], audios: [], conexiones: [], objetivos: {} }
+    const json = (col, items) => JSON.stringify({ [col]: items }, null, 2) + '\n'
+    const jl = async ruta => JSON.parse((await leerOpfs(pg, ruta)) || 'null')
+    const inicio = async () => { await pg.goto(URL_APP + '#/', { waitUntil: 'networkidle0' }); await esperar(800) }
+    await pg.goto(URL_APP, { waitUntil: 'networkidle0' }); await esperar(2500)
+    // A: la tesis (fuente 1 citada, fuente 2 sin citas). B: otro proyecto que cita la misma fuente 1.
+    await escribirOpfs(pg, 'A/proyectos.json', json('proyectos', [{ id: 'proyecto_001', tipo: 'tesis', titulo: 'Tesis A', objetivos_especificos: [], indicadores: [], canvas: lienzo }]))
+    await escribirOpfs(pg, 'A/fuentes.json', json('fuentes', [{ id: 'fuente_001', tipo_fuente: 'libro', autores: ['Uno, A.'], anio: 2001, titulo: 'F1' }, { id: 'fuente_002', tipo_fuente: 'libro', autores: ['Dos, B.'], anio: 2002, titulo: 'F2 sin citas' }]))
+    await escribirOpfs(pg, 'A/citas.json', json('citas', [{ id: 'cita_001', proyecto_id: 'proyecto_001', fuente_id: 'fuente_001', estado_uso: 'usando', cita_textual_o_parafraseo: 'textual', pagina: 11, cita_en_texto: '', contexto: '' }]))
+    await escribirOpfs(pg, 'B/proyectos.json', json('proyectos', [{ id: 'proyecto_002', tipo: 'tesis', titulo: 'Proyecto B', objetivos_especificos: [], indicadores: [], canvas: lienzo }]))
+    await escribirOpfs(pg, 'B/fuentes.json', json('fuentes', [{ id: 'fuente_001', tipo_fuente: 'libro', autores: ['Uno, A.'], anio: 2001, titulo: 'F1' }]))
+    await escribirOpfs(pg, 'B/citas.json', json('citas', [{ id: 'cita_101', proyecto_id: 'proyecto_002', fuente_id: 'fuente_001', estado_uso: 'usando', cita_textual_o_parafraseo: 'textual', pagina: 5, cita_en_texto: '', contexto: '' }]))
+
+    await s.paso('abrir una carpeta con fuentes sin citas (sin biblioteca) no las borra del disco (C5)', async () => {
+      await inicio(); await pg.elegir('A'); await clicTexto(pg, 'Abrir proyecto')
+      if (!(await esperarQue(async () => (await cuerpo()).includes('Tesis A')))) throw new Error('no abrió A')
+      await esperarQue(async () => (await leerOpfs(pg, 'A/CLAUDE.md')) !== null)
+      if (!(await leerOpfs(pg, 'A/fuentes.json')).includes('F2 sin citas')) throw new Error('A/fuentes.json perdió la fuente sin citas')
+      await inicio(); await pg.elegir('B'); await clicTexto(pg, 'Abrir proyecto')
+      if (!(await esperarQue(async () => (await cuerpo()).includes('Proyecto B')))) throw new Error('no abrió B')
+    })
+    await s.paso('una cita que la skill crea con un id que ya existe en otra carpeta no pisa la otra (C2)', async () => {
+      const c = await jl('B/citas.json')
+      c.citas.push({ id: 'cita_001', proyecto_id: 'proyecto_002', fuente_id: 'fuente_001', estado_uso: 'usando', cita_textual_o_parafraseo: 'parafraseo', pagina: 77, cita_en_texto: '', contexto: 'nueva en B' })
+      await escribirOpfs(pg, 'B/citas.json', JSON.stringify(c, null, 2) + '\n')
+      if (!(await esperarQue(async () => (await jl('B/citas.json')).citas.some(x => x.pagina === 77 && x.id !== 'cita_001')))) throw new Error('la cita nueva de B no se renumeró en su carpeta')
+      const a = await jl('A/citas.json')
+      if (a.citas.length !== 1 || a.citas[0].pagina !== 11 || a.citas[0].proyecto_id !== 'proyecto_001') throw new Error('se pisó la cita de A: ' + JSON.stringify(a.citas))
+    })
+    await s.paso('una copia vieja de una fuente compartida no revierte una corrección (I4)', async () => {
+      const a = await jl('A/fuentes.json')
+      a.fuentes.find(f => f.id === 'fuente_001').titulo = 'F1 corregida'
+      await escribirOpfs(pg, 'A/fuentes.json', JSON.stringify(a, null, 2) + '\n')
+      // En seguida, la skill reescribe B/fuentes.json entero (con su copia vieja de F1) para agregar una fuente.
+      await escribirOpfs(pg, 'B/fuentes.json', json('fuentes', [{ id: 'fuente_001', tipo_fuente: 'libro', autores: ['Uno, A.'], anio: 2001, titulo: 'F1' }, { id: 'fuente_050', tipo_fuente: 'libro', autores: ['Cinco, C.'], anio: 2005, titulo: 'F50 de B' }]))
+      // (y la cita en B, como hace la skill al agregar una fuente a un proyecto; sin cita iría a la biblioteca)
+      const cb = await jl('B/citas.json')
+      cb.citas.push({ id: 'cita_150', proyecto_id: 'proyecto_002', fuente_id: 'fuente_050', estado_uso: 'no_revisado', cita_textual_o_parafraseo: 'parafraseo', pagina: null, cita_en_texto: '', contexto: '' })
+      await escribirOpfs(pg, 'B/citas.json', JSON.stringify(cb, null, 2) + '\n')
+      if (!(await esperarQue(async () => (await leerOpfs(pg, 'B/fuentes.json')).includes('F50 de B') && (await leerOpfs(pg, 'B/fuentes.json')).includes('F1 corregida')))) throw new Error('B no quedó con F1 corregida y F50: ' + JSON.stringify((await jl('B/fuentes.json')).fuentes.map(f => f.id + '=' + f.titulo)) + ' A: ' + JSON.stringify((await jl('A/fuentes.json')).fuentes.map(f => f.id + '=' + f.titulo)))
+      await esperar(1500)
+      if (!(await leerOpfs(pg, 'A/fuentes.json')).includes('F1 corregida')) throw new Error('la copia vieja revirtió la corrección en A')
+    })
+    await s.paso('eliminados.json de una carpeta no borra lo que la otra carpeta usa (I3)', async () => {
+      await escribirOpfs(pg, 'B/eliminados.json', JSON.stringify({ fuentes: ['fuente_001'] }))
+      if (!(await esperarQue(async () => (await leerOpfs(pg, 'B/eliminados.json')) === null))) throw new Error('no se consumió')
+      await esperar(1500)
+      const a = await jl('A/fuentes.json'), ac = await jl('A/citas.json')
+      if (!a.fuentes.some(f => f.id === 'fuente_001') || !ac.citas.some(c => c.id === 'cita_001')) throw new Error('se borró de A lo que A usa')
+      if ((await jl('B/citas.json')).citas.some(c => c.fuente_id === 'fuente_001')) throw new Error('en B la fuente sigue citada')
+    })
+    await s.paso('al abrir la app, lo que la skill cambió con la app cerrada en cualquier carpeta se conserva (C1)', async () => {
+      await pg.goto(URL_APP + 'manifest.webmanifest'); await esperar(300) // la app queda cerrada
+      const pa = await jl('A/proyectos.json'); pa.proyectos[0].titulo = 'Tesis A editada fuera'
+      await escribirOpfs(pg, 'A/proyectos.json', JSON.stringify(pa, null, 2) + '\n')
+      const pb = await jl('B/proyectos.json'); pb.proyectos[0].titulo = 'Proyecto B editado fuera'
+      await escribirOpfs(pg, 'B/proyectos.json', JSON.stringify(pb, null, 2) + '\n')
+      await inicio()
+      if (!(await esperarQue(async () => (await cuerpo()).includes('Tesis A editada fuera') && (await cuerpo()).includes('Proyecto B editado fuera')))) throw new Error('se perdió un cambio hecho con la app cerrada')
+      await esperar(1500)
+      if (!(await leerOpfs(pg, 'B/proyectos.json')).includes('Proyecto B editado fuera')) throw new Error('B/proyectos.json se sobrescribió')
+    })
+    await s.paso('reabrir una carpeta cerrada no revierte lo editado mientras tanto (I5)', async () => {
+      pg.once('dialog', d => d.accept())
+      const tarjeta = await pg.evaluateHandle(() => [...document.querySelectorAll('.celda')].find(x => x.textContent.includes('Proyecto B')))
+      await (await tarjeta.asElement().$('button[aria-label="Cerrar proyecto"]')).click()
+      if (!(await esperarQue(async () => !(await cuerpo()).includes('Proyecto B')))) throw new Error('no se cerró B')
+      // Mientras B está cerrado, se corrige F50 en A... no: F50 es solo de B. Se corrige F1 en A.
+      const a = await jl('A/fuentes.json'); a.fuentes.find(f => f.id === 'fuente_001').titulo = 'F1 versión 3'
+      await escribirOpfs(pg, 'A/fuentes.json', JSON.stringify(a, null, 2) + '\n')
+      if (!(await esperarQue(async () => (await cuerpo()).includes('Tesis A')))) throw new Error('perdió A')
+      await esperar(9000) // recogida
+      await inicio(); await pg.elegir('B'); await clicTexto(pg, 'Abrir proyecto')
+      if (!(await esperarQue(async () => (await cuerpo()).includes('Proyecto B')))) throw new Error('no reabrió B')
+      await esperar(1500)
+      if (!(await leerOpfs(pg, 'A/fuentes.json')).includes('F1 versión 3')) throw new Error('reabrir B revirtió F1 en A')
+    })
+    await s.paso('un proyecto sin carpeta no ofrece "Cerrar" (se borraría del todo) (C4)', async () => {
+      await inicio()
+      await pg.evaluate(() => sessionStorage.setItem('__elegir', '[]')) // cancelar el selector de carpeta
+      await pg.click('button[aria-label="Nuevo proyecto"]')
+      await pg.type('dialog[open] input[type=text]', 'Sin carpeta de prueba')
+      await clicTexto(pg, 'Crear proyecto'); await esperar(800)
+      await inicio()
+      const celda = await pg.evaluateHandle(() => [...document.querySelectorAll('.celda')].find(x => x.textContent.includes('Sin carpeta de prueba')))
+      if (!celda.asElement()) throw new Error('no se ve el proyecto')
+      if (await celda.asElement().$('button[aria-label="Cerrar proyecto"]')) throw new Error('ofrece cerrar un proyecto sin carpeta')
+    })
+    await s.paso('abrir una carpeta con un JSON ilegible no lo sobrescribe (I6)', async () => {
+      await escribirOpfs(pg, 'rota/proyectos.json', '{"proyectos": [ {"id": "proyecto_009", "titulo": "Roto"')
+      await escribirOpfs(pg, 'rota/citas.json', json('citas', []))
+      await inicio(); await pg.elegir('rota'); await clicTexto(pg, 'Abrir proyecto'); await esperar(2000)
+      if ((await leerOpfs(pg, 'rota/proyectos.json')) !== '{"proyectos": [ {"id": "proyecto_009", "titulo": "Roto"') throw new Error('se sobrescribió el JSON ilegible')
+    })
+    if (pg.errores.length) s.fallas.push(...pg.errores)
+    await pg.browserContext().close().catch(() => {})
+    return s
+  },
   // Un proyecto, una carpeta (carpetas simuladas con OPFS).
   async carpetas(b) {
     const s = suite('Proyectos en carpetas'), pg = await pagina(b)

@@ -9,7 +9,7 @@
   import BotonSincro from '../components/BotonSincro.svelte'
   import { B } from '../lib/buscador.svelte.js'
   import { esAndroid } from '../lib/plataforma.js'
-  import { CS, crearCarpetaDeProyecto, abrirCarpeta, elegirCarpetaPara, cerrarProyecto } from '../lib/carpetas.svelte.js'
+  import { CS, crearCarpetaDeProyecto, abrirCarpeta, elegirCarpetaPara, cerrarProyecto, sePuedeCerrar } from '../lib/carpetas.svelte.js'
 
   let { abrirDatos, abrirCelular } = $props()
   let nuevo = $state(false)
@@ -79,7 +79,7 @@
           <Icono nombre="carpeta" tam={14} />
           {#if c}<span class="nombre-c" title={c.nombre}>{c.nombre}{c.estado === 'sin-permiso' ? ' · sin permiso' : c.estado === 'error' ? ' · no se encuentra' : ''}</span>
           {:else}<span class="nombre-c">Sin carpeta</span><button class="btn chico" onclick={() => elegirCarpetaPara(p.id)}>Elegir carpeta</button>{/if}
-          <button class="icono-btn mini" aria-label="Cerrar proyecto" title="Cerrar proyecto (su carpeta queda igual)" onclick={() => cerrar(p)}><Icono nombre="cerrar" tam={14} /></button>
+          {#if sePuedeCerrar(p.id)}<button class="icono-btn mini" aria-label="Cerrar proyecto" title="Cerrar proyecto (su carpeta queda igual)" onclick={() => cerrar(p)}><Icono nombre="cerrar" tam={14} /></button>{/if}
         </div>
       {/if}
       </div>

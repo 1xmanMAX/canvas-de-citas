@@ -62,18 +62,21 @@ export function renumerar(entrantes, existentes, nuevoId) {
   const datos = structuredClone({ proyectos: entrantes.proyectos || [], fuentes: entrantes.fuentes || [], citas: entrantes.citas || [] })
   const mapa = { proyectos: {}, fuentes: {}, citas: {} }
   const ex = { proyectos: existentes.proyectos || [], fuentes: existentes.fuentes || [], citas: existentes.citas || [] }
+  // Un id nuevo nunca puede ser uno que ya exista aquí ni otro que traiga la misma carpeta.
+  const ocupados = Object.fromEntries(['proyectos', 'fuentes', 'citas'].map(col => [col, new Set([...ex[col], ...datos[col]].map(x => x.id))]))
+  const libre = col => { let id; do id = nuevoId(col); while (ocupados[col].has(id)); ocupados[col].add(id); return id }
 
   // Fuentes: la misma que aquí conserva el id de aquí; la distinta con un id ocupado recibe uno nuevo.
   const fuentesAqui = new Map(ex.fuentes.map(f => [f.id, f]))
   for (const f of datos.fuentes) {
     const igual = ex.fuentes.find(e => mismaFuente(f, e))
     if (igual) { if (igual.id !== f.id) mapa.fuentes[f.id] = igual.id }
-    else if (fuentesAqui.has(f.id)) mapa.fuentes[f.id] = nuevoId('fuentes')
+    else if (fuentesAqui.has(f.id)) mapa.fuentes[f.id] = libre('fuentes')
   }
   const proyectosAqui = new Map(ex.proyectos.map(p => [p.id, p]))
   for (const p of datos.proyectos) {
     const aqui = proyectosAqui.get(p.id)
-    if (aqui && norm(aqui.titulo) !== norm(p.titulo)) mapa.proyectos[p.id] = nuevoId('proyectos')
+    if (aqui && norm(aqui.titulo) !== norm(p.titulo)) mapa.proyectos[p.id] = libre('proyectos')
   }
 
   const F = id => mapa.fuentes[id] ?? id, P = id => mapa.proyectos[id] ?? id
@@ -92,7 +95,7 @@ export function renumerar(entrantes, existentes, nuevoId) {
     c.proyecto_id = P(c.proyecto_id)
     c.fuente_id = F(c.fuente_id)
     const aqui = citasAqui.get(c.id)
-    if (aqui && !mismaCita(aqui, c)) { const n = nuevoId('citas'); mapa.citas[c.id] = n; c.id = n }
+    if (aqui && !mismaCita(aqui, c)) { const n = libre('citas'); mapa.citas[c.id] = n; c.id = n }
   }
   return { datos, mapa }
 }
@@ -105,6 +108,8 @@ function reescribirLienzo(c, F) {
     for (const x of t.conexiones || []) { x.desde = F(x.desde); x.hasta = F(x.hasta) }
     for (const g of t.agrupadores || []) g.miembros = (g.miembros || []).map(F)
     for (const f of t.fuentes || []) f.id = F(f.id)
+    // Notas y fotos creadas desde el visor recuerdan de qué documento salieron.
+    for (const l of ['notas', 'fotos', 'listas', 'audios']) for (const x of t[l] || []) if (x.origen?.fuente) x.origen.fuente = F(x.origen.fuente)
   }
   tablero(c)
   for (const o of Object.values(c.objetivos || {})) tablero(o)

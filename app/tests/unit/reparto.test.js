@@ -107,3 +107,37 @@ test('renumerar: el mismo proyecto y la misma cita (reabrir la propia carpeta) c
   assert.deepEqual(mapa, { proyectos: {}, fuentes: {}, citas: {} })
   assert.equal(datos.proyectos[0].area, 'otra cosa')
 })
+
+test('renumerar: los ids nuevos no chocan con otros ids que trae la carpeta (C3)', () => {
+  const existentes = { proyectos: [], citas: [{ id: 'cita_001', proyecto_id: 'p', fuente_id: 'fuente_001', pagina: 1 }], fuentes: [{ id: 'fuente_001', titulo: 'Mía' }, { id: 'fuente_002', titulo: 'Mía 2' }] }
+  const entrantes = {
+    proyectos: [],
+    fuentes: [{ id: 'fuente_001', titulo: 'Ajena' }, { id: 'fuente_003', titulo: 'Ajena 3' }],
+    citas: [{ id: 'cita_001', proyecto_id: 'q', fuente_id: 'fuente_001', pagina: 9 }, { id: 'cita_002', proyecto_id: 'q', fuente_id: 'fuente_003', pagina: 2 }]
+  }
+  // El contador local solo conoce lo de aquí: propondría fuente_003 y cita_002, que ya vienen en la carpeta.
+  const { datos } = renumerar(entrantes, existentes, generador({ proyectos: 0, fuentes: 2, citas: 1 }))
+  const fs = ids(datos.fuentes), cs = ids(datos.citas)
+  assert.equal(new Set(fs).size, 2, 'no se pierde ninguna fuente: ' + fs)
+  assert.equal(new Set(cs).size, 2, 'no se pierde ninguna cita: ' + cs)
+  assert.ok(fs.includes('fuente_003') && !fs.includes('fuente_001'))
+  assert.equal(datos.citas.find(c => c.pagina === 2).fuente_id, 'fuente_003')
+  assert.notEqual(datos.citas.find(c => c.pagina === 9).fuente_id, 'fuente_003')
+})
+
+test('renumerar: también el origen (vínculo al documento) de notas y fotos, en lienzo y sub-lienzos (I1)', () => {
+  const existentes = { proyectos: [], citas: [], fuentes: [{ id: 'fuente_001', titulo: 'Mía' }] }
+  const entrantes = {
+    fuentes: [{ id: 'fuente_001', titulo: 'Ajena' }], citas: [],
+    proyectos: [{ id: 'p', titulo: 'P', canvas: {
+      notas: [{ id: 'n', origen: { fuente: 'fuente_001', pagina: 3 } }],
+      fotos: [{ id: 'f', origen: { fuente: 'fuente_001' } }],
+      objetivos: { oe1: { notas: [{ id: 'n2', origen: { fuente: 'fuente_001' } }], fotos: [] } }
+    } }]
+  }
+  const { datos } = renumerar(entrantes, existentes, generador({ proyectos: 0, fuentes: 1, citas: 0 }))
+  const c = datos.proyectos[0].canvas
+  assert.equal(c.notas[0].origen.fuente, 'fuente_002')
+  assert.equal(c.fotos[0].origen.fuente, 'fuente_002')
+  assert.equal(c.objetivos.oe1.notas[0].origen.fuente, 'fuente_002')
+})

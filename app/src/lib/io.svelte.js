@@ -58,6 +58,9 @@ function normCita(c) {
 }
 const NORM = { proyectos: normProyecto, fuentes: normFuente, citas: normCita }
 
+/** Un elemento con la misma forma con que la app lo escribe (para comparar copias). */
+export const normalizarElemento = (col, x) => ordenar(NORM[col](x), CAMPOS[col])
+
 function detectar(j, nombre) {
   for (const col of COLECCIONES) if (Array.isArray(j?.[col])) return [col, j[col]]
   if (Array.isArray(j)) {

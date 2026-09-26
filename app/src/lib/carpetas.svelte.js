@@ -5,13 +5,14 @@
 // ellas (al volver a la ventana y cada pocos segundos). IndexedDB sigue siendo la caché rápida.
 import {
   S, COLECCIONES, avisar, alCambiar, leerMeta, ponerMeta, leerDocumento, idsConDocumento, guardarDocumentoImportado,
-  rutaDeDocumento, todasLasFotos, eliminarCita, eliminarFuente, eliminarProyecto, nuevoId
+  rutaDeDocumento, todasLasFotos, eliminarCita, eliminarFuente, eliminarProyecto, nuevoId, registrarIds, quitarFuenteDeProyecto
 } from './store.svelte.js'
-import { serializarLista, leerArchivos, aplicar } from './io.svelte.js'
+import { serializarLista, leerArchivos, aplicar, normalizarElemento } from './io.svelte.js'
 import { generarClaudeMd } from './paraClaude.js'
 import { repartir, docsDe, renumerar } from './reparto.js'
 import { almacenDeHandle, almacenDeRegistro, registroDe, nombreSeguro } from './almacen-carpeta.js'
 import { esAndroid } from './plataforma.js'
+import { SvelteSet } from 'svelte/reactivity'
 
 export const soportaCarpetas = !esAndroid && typeof window !== 'undefined' && 'showDirectoryPicker' in window
 
@@ -46,6 +47,9 @@ let cola = Promise.resolve()
 const enCola = fn => (cola = cola.then(fn, fn))
 const entrada = clave => CS.lista.find(c => c.clave === clave)
 const conectadas = () => CS.lista.filter(c => c.estado === 'conectada')
+/** Carpetas ya leídas desde que se abrió la app: solo en ellas se escribe. */
+const leidas = new SvelteSet()
+const listas = () => conectadas().filter(c => leidas.has(c.clave))
 
 function fallo(c, e) {
   if (!c) return
@@ -66,6 +70,7 @@ async function registrar(almacen, { proyectos, biblioteca }, leidos = []) {
   almacenes.set(clave, almacen)
   registros.set(clave, await registroDe(almacen))
   CS.lista.push({ clave, nombre: almacen.nombre, proyectos, biblioteca, estado: 'conectada', error: '', guardado: null })
+  leidas.add(clave) // recién elegida: lo que tenía ya se leyó (o está vacía)
   await persistir()
   escuchar()
   return clave
@@ -79,12 +84,18 @@ async function yaRegistrada(almacen) {
 // --- Guardado automático ---
 alCambiar(docId => {
   if (docId) docsPendientes.add(docId)
-  if (!conectadas().length) return
+  if (!listas().length) return
   clearTimeout(temporizador)
   temporizador = setTimeout(guardarAhora, 700)
 })
 
 const datosActuales = () => ({ proyectos: $state.snapshot(S.proyectos), fuentes: $state.snapshot(S.fuentes), citas: $state.snapshot(S.citas) })
+const regs = () => CS.lista.map(x => ({ clave: x.clave, proyectos: x.proyectos, biblioteca: x.biblioteca }))
+/** Ids de lo que hoy le toca a una carpeta (lo "propio" de esa carpeta). */
+function propiosDe(clave) {
+  const p = repartir(datosActuales(), regs()).get(clave) || { proyectos: [], fuentes: [], citas: [] }
+  return Object.fromEntries(COLECCIONES.map(col => [col, new Set(p[col].map(x => x.id))]))
+}
 
 async function escribirSiCambio(clave, a, ruta, texto) {
   const previos = textos.get(clave) || textos.set(clave, {}).get(clave)
@@ -96,13 +107,18 @@ async function escribirSiCambio(clave, a, ruta, texto) {
 }
 
 export const guardarAhora = () => enCola(async () => {
-  const activas = conectadas()
+  // Solo en carpetas ya leídas: nunca se escribe una carpeta antes de recoger lo que tenga (C1).
+  const activas = listas()
   if (!activas.length) return
-  const partes = repartir(datosActuales(), CS.lista.map(c => ({ clave: c.clave, proyectos: c.proyectos, biblioteca: c.biblioteca })))
+  const partes = repartir(datosActuales(), regs())
   const pendientes = [...docsPendientes].map(id => [id, rutaDeDocumento(id)])
+  let releer = false
   for (const c of activas) {
     const a = almacenes.get(c.clave), parte = partes.get(c.clave)
     try {
+      // Si algo (la skill) cambió esta carpeta desde la última vez, primero se lee: escribir ahora
+      // pisaría ese cambio sin haberlo visto.
+      if (await cambiadaAfuera(c.clave, a)) { releer = true; continue }
       for (const col of COLECCIONES) await escribirSiCambio(c.clave, a, `${col}.json`, serializarLista(col, parte[col]))
       const rutas = new Set(docsDe(parte))
       const hay = presentes.get(c.clave) || presentes.set(c.clave, new Set()).get(c.clave)
@@ -129,18 +145,42 @@ export const guardarAhora = () => enCola(async () => {
   }
   for (const [id] of pendientes) docsPendientes.delete(id)
   await ponerMeta('carpetasEscritos', $state.snapshot(escritos))
+  if (releer) setTimeout(revisar, 0) // lee lo cambiado y, al combinar, se vuelve a guardar
 })
 
+/** ¿Algún JSON de la carpeta tiene otra fecha que la que dejó la app? */
+async function cambiadaAfuera(clave, a) {
+  for (const col of COLECCIONES) {
+    const visto = escritos[clave]?.[`${col}.json`]
+    if (visto === undefined) continue
+    const f = await a.leer(`${col}.json`)
+    if (f && f.lastModified !== visto) return true
+  }
+  return false
+}
+
 // --- Traer cambios hechos fuera de la app (la skill) ---
-async function aplicarEliminados(a) {
+/**
+ * eliminados.json de una carpeta solo borra lo de esa carpeta (I3): una fuente que también usan
+ * proyectos de otras carpetas se quita solo de los proyectos de esta.
+ */
+async function aplicarEliminados(c) {
+  const a = almacenes.get(c.clave)
   const f = await a.leer('eliminados.json')
   if (!f) return false
   let d
   try { d = JSON.parse(await f.text()) } catch { return false } // a medio escribir: se reintenta
+  const propios = propiosDe(c.clave)
   let n = 0
-  for (const id of d.citas || []) if (S.citaPorId.has(id)) { eliminarCita(id); n++ }
-  for (const id of d.fuentes || []) if (S.fuentePorId.has(id)) { eliminarFuente(id); n++ }
-  for (const id of d.proyectos || []) if (S.proyectoPorId.has(id)) { eliminarProyecto(id); n++ }
+  for (const id of d.citas || []) if (propios.citas.has(id)) { eliminarCita(id); n++ }
+  for (const id of d.fuentes || []) {
+    if (!propios.fuentes.has(id)) continue
+    const deOtras = (S.citasPorFuente.get(id) || []).some(x => !c.proyectos.includes(x.proyecto_id))
+    if (deOtras) for (const pid of c.proyectos) quitarFuenteDeProyecto(pid, id)
+    else eliminarFuente(id)
+    n++
+  }
+  for (const id of d.proyectos || []) if (c.proyectos.includes(id) && S.proyectoPorId.has(id)) { eliminarProyecto(id); n++ }
   await a.borrar('eliminados.json')
   return n > 0
 }
@@ -160,29 +200,76 @@ async function traerDocumentos(a) {
   }
 }
 
+/**
+ * Documentos de fuentes renumeradas: pasan a la ruta de su id nuevo. Primero se leen todos y
+ * luego se escriben, así ninguno pisa a otro que todavía no se movió (C3).
+ */
+async function moverDocs(a, mapa, fuentesLeidas, existentes) {
+  const mover = []
+  for (const [viejo, nuevo] of Object.entries(mapa.fuentes)) {
+    const f = (fuentesLeidas || []).find(x => x.id === viejo)
+    if (!f?.documento_original || existentes.has(nuevo)) continue
+    const archivo = await a.leer(f.documento_original)
+    if (archivo) mover.push([f.documento_original, f.documento_original.replace(`fuentes/${viejo}/`, `fuentes/${nuevo}/`), new Blob([await archivo.arrayBuffer()])])
+  }
+  for (const [, destino, blob] of mover) await a.escribir(destino, blob)
+  const destinos = new Set(mover.map(m => m[1]))
+  for (const [origen] of mover) if (!destinos.has(origen)) await a.borrar(origen)
+}
+
+// Para comparar un elemento de un JSON con el que escribió la app, con el mismo formato.
+const canonico = (col, x) => JSON.stringify(ordenarClaves(normalizarElemento(col, x)))
+function ordenarClaves(v) {
+  if (Array.isArray(v)) return v.map(ordenarClaves)
+  if (v && typeof v === 'object') return Object.fromEntries(Object.keys(v).sort().map(k => [k, ordenarClaves(v[k])]))
+  return v
+}
+
 async function traerCambios(c) {
   const a = almacenes.get(c.clave)
-  const archivos = []
+  const cambiados = []
   for (const col of COLECCIONES) {
     const f = await a.leer(`${col}.json`)
-    if (f && f.lastModified !== escritos[c.clave]?.[`${col}.json`]) archivos.push(f)
+    if (f && f.lastModified !== escritos[c.clave]?.[`${col}.json`]) cambiados.push([col, f])
   }
-  if (!archivos.length) return aplicarEliminados(a)
-  const datos = await leerArchivos(archivos)
-  if (!COLECCIONES.some(k => datos[k])) return false // p. ej. JSON a medio escribir: se reintenta luego
+  if (!cambiados.length) return aplicarEliminados(c)
+  const previos = textos.get(c.clave) || {}
+  const archivos = []
+  for (const [col, f] of cambiados) {
+    let items
+    try { items = JSON.parse(await f.text())?.[col] } catch { return false } // a medio escribir: se reintenta
+    if (!Array.isArray(items)) return false
+    for (const x of items) if (x?.id) registrarIds(col, [x])
+    // Solo lo que de verdad cambió respecto a lo que la app escribió ahí: una copia vieja de una
+    // fuente compartida no revierte lo corregido en otra carpeta (I4).
+    const antes = previos[`${col}.json`] ? new Map(JSON.parse(previos[`${col}.json`])[col].map(x => [x.id, canonico(col, x)])) : null
+    const nuevos = items.filter(x => x?.id && (!antes || antes.get(x.id) !== canonico(col, x)))
+    archivos.push(new File([JSON.stringify({ [col]: nuevos })], `${col}.json`))
+  }
+  const leidos = await leerArchivos(archivos)
+  // Ids que la skill escribió en esta carpeta y que ya usa otra carpeta para otra cosa: se
+  // renumeran (la skill numera mirando solo esta carpeta) (C2).
+  const propios = propiosDe(c.clave)
+  const actuales = datosActuales()
+  const ajenos = Object.fromEntries(COLECCIONES.map(col => [col, actuales[col].filter(x => !propios[col].has(x.id))]))
+  const { datos, mapa } = renumerar({ proyectos: leidos.proyectos || [], fuentes: leidos.fuentes || [], citas: leidos.citas || [] }, ajenos, nuevoId)
+  const renumerados = COLECCIONES.some(col => Object.keys(mapa[col]).length)
+  if (renumerados) {
+    await moverDocs(a, mapa, leidos.fuentes, new Set(actuales.fuentes.map(f => f.id)))
+    textos.delete(c.clave) // la carpeta se reescribe con los ids nuevos
+  }
   // Un proyecto nuevo que la skill escribió en esta carpeta queda asignado a ella.
-  for (const p of datos.proyectos || []) if (!CS.lista.some(x => x.proyectos.includes(p.id))) { c.proyectos.push(p.id); await persistir() }
-  for (const f of archivos) (escritos[c.clave] ||= {})[f.name] = f.lastModified
-  textos.delete(c.clave) // se reescribe la versión combinada
-  await aplicar(datos, 'combinar')
+  for (const p of datos.proyectos) if (!CS.lista.some(x => x.proyectos.includes(p.id))) { c.proyectos.push(p.id); await persistir() }
+  for (const [, f] of cambiados) (escritos[c.clave] ||= {})[f.name] = f.lastModified
+  await aplicar({ ...datos, avisos: [] }, 'combinar')
   await traerDocumentos(a)
-  await aplicarEliminados(a)
+  await aplicarEliminados(c)
   return true
 }
 
 function revisar() {
   if (document.visibilityState !== 'visible') return
-  for (const c of conectadas())
+  for (const c of listas())
     enCola(() => traerCambios(c)).then(hubo => hubo && avisar(`Cambios de "${c.nombre}" cargados`)).catch(e => fallo(c, e))
 }
 
@@ -195,23 +282,32 @@ function escuchar() {
   setInterval(revisar, 8000)
 }
 
-async function conectar(c) {
+/** Lee la carpeta (queda "leída") y, si se pide, guarda. */
+async function conectar(c, guardar = true) {
   c.estado = 'conectada'
   c.error = ''
   const a = almacenes.get(c.clave)
   try {
     await enCola(async () => {
       await traerCambios(c)
+      leidas.add(c.clave)
       // Lo que tiene este navegador y aún no está en la carpeta (documentos y originales de fotos).
-      const parte = repartir(datosActuales(), CS.lista.map(x => ({ clave: x.clave, proyectos: x.proyectos, biblioteca: x.biblioteca }))).get(c.clave)
+      const parte = repartir(datosActuales(), regs()).get(c.clave)
       const rutas = new Set(docsDe(parte))
       for (const id of await idsConDocumento()) {
         const ruta = rutaDeDocumento(id)
         if (ruta && rutas.has(ruta) && !(await a.leer(ruta))) docsPendientes.add(id)
       }
     })
-    await guardarAhora()
+    if (guardar) await guardarAhora()
   } catch (e) { fallo(c, e) }
+}
+
+/** Fecha del último cambio de sus JSON (para leer primero las más viejas y al final las más nuevas). */
+async function ultimaModificacion(c) {
+  let t = 0
+  for (const col of COLECCIONES) t = Math.max(t, (await almacenes.get(c.clave).leer(`${col}.json`).catch(() => null))?.lastModified || 0)
+  return t
 }
 
 // --- Al abrir la app ---
@@ -230,7 +326,11 @@ export async function iniciarCarpetas() {
     CS.lista.push({ clave: r.clave, nombre: r.nombre || a.nombre, proyectos: r.proyectos || [], biblioteca: !!r.biblioteca, estado: permiso === 'granted' ? 'conectada' : 'sin-permiso', error: '', guardado: null })
   }
   escuchar()
-  for (const c of conectadas()) await conectar(c)
+  // Primero se leen todas (la más reciente al final: su copia de una fuente compartida es la que
+  // queda) y recién entonces se guarda una vez (C1).
+  const orden = await Promise.all(conectadas().map(async c => [await ultimaModificacion(c), c]))
+  for (const [, c] of orden.sort((x, y) => x[0] - y[0])) await conectar(c, false)
+  await guardarAhora()
 }
 
 /**
@@ -304,28 +404,33 @@ export async function usarComoBiblioteca(clave) {
 
 /**
  * Abrir un proyecto desde su carpeta (p. ej. después de reinstalar o traído de otra PC). Lo que
- * choca con ids de aquí se renumera; devuelve el id del primer proyecto que traía (o null).
+ * choca con ids de aquí se renumera; lo que ya está aquí se queda como está aquí (una copia vieja
+ * no revierte ediciones). Devuelve el id del primer proyecto que traía (o null).
  */
 export async function abrirCarpeta() {
   let a
   try { a = almacenDeHandle(await elegir('canvas-proyecto')) } catch { return null }
   if (await yaRegistrada(a)) { avisar(`"${a.nombre}" ya está abierta`); return null }
   const archivos = (await Promise.all(COLECCIONES.map(col => a.leer(`${col}.json`)))).filter(Boolean)
-  const leidos = archivos.length ? await leerArchivos(archivos) : {}
+  const leidos = archivos.length ? await leerArchivos(archivos) : { avisos: [] }
+  // Un JSON ilegible (a medio escribir o editado a mano) no se toca: no se abre la carpeta (I6).
+  const invalido = leidos.avisos.find(x => x.includes('JSON inválido'))
+  if (invalido) { avisar(`No se abrió "${a.nombre}": ${invalido}`); return null }
+  for (const col of COLECCIONES) registrarIds(col, leidos[col] || [])
   const actuales = datosActuales()
   const { datos, mapa } = renumerar({ proyectos: leidos.proyectos || [], fuentes: leidos.fuentes || [], citas: leidos.citas || [] }, actuales, nuevoId)
-  // Documentos de fuentes renumeradas: se mueven a la ruta de su id nuevo.
-  for (const [viejo, nuevo] of Object.entries(mapa.fuentes)) {
-    const f = (leidos.fuentes || []).find(x => x.id === viejo)
-    if (!f?.documento_original || actuales.fuentes.some(x => x.id === nuevo)) continue
-    const archivo = await a.leer(f.documento_original)
-    if (!archivo) continue
-    const ruta = f.documento_original.replace(`fuentes/${viejo}/`, `fuentes/${nuevo}/`)
-    await a.escribir(ruta, archivo)
-    await a.borrar(f.documento_original)
+  await moverDocs(a, mapa, leidos.fuentes, new Set(actuales.fuentes.map(f => f.id)))
+  const nuevos = {
+    proyectos: datos.proyectos.filter(x => !S.proyectoPorId.has(x.id)),
+    fuentes: datos.fuentes.filter(x => !S.fuentePorId.has(x.id)),
+    citas: datos.citas.filter(x => !S.citaPorId.has(x.id))
   }
-  await aplicar({ ...datos, avisos: [] }, 'combinar')
-  await registrar(a, { proyectos: datos.proyectos.map(p => p.id), biblioteca: !datos.proyectos.length }, archivos)
+  // Proyectos que ya tienen su carpeta abierta (p. ej. una copia de la misma carpeta) no se duplican.
+  const suyos = datos.proyectos.map(p => p.id).filter(id => !CS.lista.some(x => x.proyectos.includes(id)))
+  // Fuentes que ninguno de sus proyectos cita: la carpeta también es biblioteca, para no borrarlas del disco (C5).
+  const sueltas = datos.fuentes.some(f => !datos.citas.some(c => c.fuente_id === f.id))
+  await aplicar({ ...nuevos, avisos: [] }, 'combinar')
+  await registrar(a, { proyectos: suyos, biblioteca: !suyos.length || sueltas }, archivos)
   await traerDocumentos(a)
   await guardarAhora()
   const cambiados = Object.keys(mapa.proyectos).length + Object.keys(mapa.fuentes).length + Object.keys(mapa.citas).length
@@ -333,22 +438,27 @@ export async function abrirCarpeta() {
   return datos.proyectos[0]?.id || null
 }
 
+/** Se puede cerrar un proyecto solo si su carpeta es solo suya, está conectada y ya se leyó. */
+export function sePuedeCerrar(pid) {
+  const c = CS.lista.find(x => x.proyectos.includes(pid))
+  return !!c && c.proyectos.length === 1 && !c.biblioteca && c.estado === 'conectada' && leidas.has(c.clave)
+}
+
 /**
  * Cerrar un proyecto: se guarda y se quita de la app (con sus citas y las fuentes que ya nadie usa).
- * Su carpeta no se toca: se puede volver a abrir. Solo si la carpeta es solo de ese proyecto.
+ * Su carpeta no se toca: se puede volver a abrir. Si no se pudo guardar, no se quita nada (C4).
  */
 export async function cerrarProyecto(pid) {
-  const c = CS.lista.find(x => x.proyectos.includes(pid))
-  if (c && (c.proyectos.length > 1 || c.biblioteca)) {
-    avisar('Este proyecto comparte carpeta con otros datos: no se puede cerrar por separado')
+  if (!sePuedeCerrar(pid)) {
+    avisar('Solo se puede cerrar un proyecto que está guardado en su propia carpeta')
     return false
   }
-  if (c?.estado === 'conectada') await guardarAhora()
-  if (c) {
-    CS.lista = CS.lista.filter(x => x !== c)
-    almacenes.delete(c.clave); registros.delete(c.clave); textos.delete(c.clave); delete escritos[c.clave]
-    await persistir()
-  }
+  const c = CS.lista.find(x => x.proyectos.includes(pid))
+  await guardarAhora()
+  if (c.estado !== 'conectada' || c.error) { avisar(`No se cerró: no se pudo guardar en "${c.nombre}"`); return false }
+  CS.lista = CS.lista.filter(x => x !== c)
+  almacenes.delete(c.clave); registros.delete(c.clave); textos.delete(c.clave); leidas.delete(c.clave); delete escritos[c.clave]
+  await persistir()
   const fuentes = new Set((S.citasPorProyecto.get(pid) || []).map(x => x.fuente_id))
   eliminarProyecto(pid)
   for (const fid of fuentes) if (!(S.citasPorFuente.get(fid) || []).length) eliminarFuente(fid)
@@ -364,17 +474,21 @@ export async function cerrarProyecto(pid) {
   return true
 }
 
-/** Pide permiso a todas las carpetas que lo necesitan (en el mismo clic). */
+/**
+ * Pide permiso a todas las carpetas que lo necesitan en el mismo clic (sin leer ni escribir entre
+ * medio, que haría vencer el clic) y luego las lee todas y guarda una vez (I2).
+ */
 export async function darPermiso() {
-  for (const c of CS.lista.filter(x => x.estado === 'sin-permiso')) {
-    const ok = await almacenes.get(c.clave).pedirPermiso().catch(() => false)
-    if (ok) await conectar(c)
-  }
+  const concedidas = []
+  for (const c of CS.lista.filter(x => x.estado === 'sin-permiso'))
+    if (await almacenes.get(c.clave).pedirPermiso().catch(() => false)) concedidas.push(c)
+  for (const c of concedidas) await conectar(c, false)
+  await guardarAhora()
 }
 
 /** Quitar una carpeta de la lista (sus archivos no se borran). */
 export async function quitarCarpeta(clave) {
   CS.lista = CS.lista.filter(c => c.clave !== clave)
-  almacenes.delete(clave); registros.delete(clave); textos.delete(clave); delete escritos[clave]
+  almacenes.delete(clave); registros.delete(clave); textos.delete(clave); leidas.delete(clave); delete escritos[clave]
   await persistir()
 }
