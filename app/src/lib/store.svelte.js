@@ -123,7 +123,11 @@ function guardarEn(col, mapa, obj) {
   if (!item) {
     S[col].push(obj)
     item = S[col].at(-1)
-  } else if (item !== obj) Object.assign(item, obj)
+  } else if (item !== obj) {
+    Object.assign(item, obj)
+    // Fuentes y citas: si se quitaron todas las etiquetas, el campo desaparece también aquí.
+    if (!obj.etiquetas?.length) delete item.etiquetas
+  }
   db.poner(col, snap(item)).catch(fallo)
   cambio()
   return item

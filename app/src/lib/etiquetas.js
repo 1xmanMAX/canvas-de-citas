@@ -51,16 +51,24 @@ export function parsearConsulta(q) {
 
 /** Todas las partes de la consulta deben estar en el elemento. */
 export function coincideConsulta(item, c) {
+  // Los elementos del índice traen su versión normalizada (`_n`): así buscar no vuelve a
+  // normalizar todo el texto en cada tecla.
+  const n = item._n || normalizado(item)
+  return c.temas.every(t => n.temas.includes(t)) && c.personas.every(p => n.personas.includes(p)) && c.palabras.every(w => n.texto.includes(w))
+}
+
+function normalizado(item) {
   const temas = item.temas.map(normalizar), personas = item.personas.map(normalizar)
-  const texto = normalizar(item.texto) + ' ' + temas.join(' ') + ' ' + personas.join(' ')
-  return c.temas.every(t => temas.includes(t)) && c.personas.every(p => personas.includes(p)) && c.palabras.every(w => texto.includes(w))
+  return { temas, personas, texto: normalizar(item.texto) + ' ' + temas.join(' ') + ' ' + personas.join(' ') }
 }
 
 const TIPO_LISTA = { notas: 'nota', listas: 'lista', audios: 'audio', fotos: 'foto' }
 export const textosTarjeta = o => [o.titulo, o.texto, o.anotacion, o.transcripcion, ...(o.items || []).map(i => i.t)].filter(Boolean)
 
 function item(tipo, id, pid, clave, titulo, textos, campo) {
-  return { tipo, id, pid, clave, titulo, texto: textos.join(' '), ...etiquetasDe(textos, campo) }
+  const i = { tipo, id, pid, clave, titulo, texto: textos.join(' '), ...etiquetasDe(textos, campo) }
+  Object.defineProperty(i, '_n', { value: normalizado(i) }) // no enumerable: no se copia ni se compara
+  return i
 }
 
 /** Todo lo buscable: tarjetas (también de los sub-lienzos), agrupadores, objetivos, fuentes y citas. */

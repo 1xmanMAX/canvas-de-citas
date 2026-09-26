@@ -62,6 +62,22 @@ const SUITES = {
       if (notas.some(([es, at]) => es && at)) throw new Error('atenuó la nota con @Ana en su campo de etiquetas')
       await pg.$eval('#buscar-fuente', i => { i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })) }); await esperar(200)
     })
+    await s.paso('quitar el último chip se guarda', async () => {
+      const g = await pg.evaluateHandle(() => [...document.querySelectorAll('g.tarjeta.notas')].find(x => x.textContent.includes('nota con chip')))
+      await g.asElement().click(); await pg.waitForSelector('dialog[open] button[aria-label="Quitar @Ana"]', { timeout: 5000 })
+      await pg.click('dialog[open] button[aria-label="Quitar @Ana"]')
+      await clicTexto(pg, 'Guardar'); await esperar(400)
+      const n = (await lienzoGuardado(pg)).notas.find(x => x.texto === 'nota con chip')
+      if (n.etiquetas?.length) throw new Error('el chip volvió: ' + JSON.stringify(n.etiquetas))
+    })
+    await s.paso('Ctrl+F escribiendo en un editor no abre el buscador ni cierra el editor', async () => {
+      await pg.click('button[aria-label="Añadir nota"]')
+      await pg.type('dialog[open] textarea', 'texto a medias')
+      await pg.keyboard.down('Control'); await pg.keyboard.press('f'); await pg.keyboard.up('Control'); await esperar(300)
+      if (await pg.$('.buscador')) throw new Error('abrió el buscador general')
+      if (await pg.$eval('dialog[open] textarea', x => x.value) !== 'texto a medias') throw new Error('se perdió el texto')
+      await pg.keyboard.press('Escape'); await esperar(300)
+    })
     await s.paso('Ctrl+F abre el buscador general y encuentra por @persona', async () => {
       await pg.keyboard.down('Control'); await pg.keyboard.press('f'); await pg.keyboard.up('Control')
       await pg.waitForSelector('dialog[open] .buscador input', { timeout: 3000 })

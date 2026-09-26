@@ -62,7 +62,9 @@
   function teclas(e) {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') { e.preventDefault(); abrirArchivos() }
     // Ctrl+F: buscador general (con un documento abierto, el visor busca dentro de él).
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'f' && !V.archivo) { e.preventDefault(); B.abierto = true }
+    // Escribiendo en un campo o con otra ventana abierta no se interrumpe (se perdería lo que se edita).
+    const escribiendo = e.target.closest?.('input, textarea, [contenteditable]') || document.querySelector('dialog[open]')
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'f' && !V.archivo && !escribiendo) { e.preventDefault(); B.abierto = true }
   }
 
   // En Android no hay carpeta de almacenamiento ni receptor local: se sincroniza con la PC.

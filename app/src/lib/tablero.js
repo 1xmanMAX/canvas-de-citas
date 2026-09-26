@@ -49,7 +49,12 @@ export function guardarTarjeta(c, lista, o, nueva, ocupadas = null) {
     Object.assign(datos, lugarLibre(ocupadas, d.w, d.h, datos.x + antes.w / 2, datos.y + antes.h / 2))
   }
   if (nueva) c[lista].push(datos)
-  else Object.assign(c[lista].find(x => x.id === datos.id) || {}, datos)
+  else {
+    const guardada = c[lista].find(x => x.id === datos.id) || {}
+    Object.assign(guardada, datos)
+    // Se quitaron todas las etiquetas: el editor ya no envía el campo, hay que borrarlo aquí.
+    if (!datos.etiquetas?.length) delete guardada.etiquetas
+  }
 }
 
 export function eliminarTarjeta(c, lista, id) {

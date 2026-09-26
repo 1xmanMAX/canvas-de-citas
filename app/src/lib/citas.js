@@ -133,7 +133,7 @@ export const normalizar = s => sinTildes(String(s ?? '').toLowerCase())
 export function coincide(f, q) {
   if (!q) return true
   // Con #tema o @persona: la misma búsqueda que el resto del lienzo (lib/etiquetas.js).
-  if (/(^|s)[#@]S/.test(q)) {
+  if (/(^|\s)[#@]\S/.test(q)) {
     const textos = [f.titulo, f.anio, f.revista_o_editorial, f.tema, ...(f.autores || [])].filter(Boolean).map(String)
     return coincideConsulta({ texto: textos.join(' '), ...etiquetasDe(textos, f.etiquetas) }, parsearConsulta(q))
   }

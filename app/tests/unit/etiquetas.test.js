@@ -75,3 +75,30 @@ test('sugerencias por prefijo y autores', () => {
   assert.deepEqual(sugerencias(items, '#', 'vi', []), ['vial', 'vivienda'])
   assert.deepEqual(sugerencias(items, '@', 'v', ['Villarreal, J.', 'Otro, A.']), ['@Vera', '@Villarreal'])
 })
+
+import { coincide } from '../../src/lib/citas.js'
+
+test('búsqueda de fuentes por #tema y @persona (campo etiquetas)', () => {
+  const f = { titulo: 'Pavimentos', autores: ['Vera, J.'], etiquetas: ['vial', '@Ana'] }
+  assert.ok(coincide(f, '#vial'))
+  assert.ok(coincide(f, '#Vial'))
+  assert.ok(coincide(f, 'pavimentos #vial'))
+  assert.ok(coincide(f, '@ana'))
+  assert.ok(!coincide(f, '#otro'))
+})
+
+test('buscar en un tablero grande no normaliza todo el texto en cada tecla', () => {
+  const texto = 'Revisar el costo del retrabajo en la obra de pavimentación con el asesor y el ingeniero residente. '.repeat(5)
+  const notas = Array.from({ length: 3000 }, (_, i) => ({ id: 'n' + i, texto: texto + (i % 7 ? '#vial' : '@Ana') }))
+  const i0 = performance.now()
+  const items = indexar({ proyectos: [{ id: 'p', canvas: { notas } }] })
+  const indice = performance.now() - i0
+  const t0 = performance.now()
+  for (const q of ['r', 're', 'ret', 'retr', 'retra', 'retrab', '#vial', '#vial c', '#vial co', '#vial cos', '@ana', '@ana res']) {
+    items.filter(i => coincideConsulta(i, parsearConsulta(q)))
+  }
+  const ms = performance.now() - t0
+  // Medida relativa (estable aunque la PC vaya lenta). Si cada consulta volviera a normalizar todo,
+  // 12 consultas costarían ~10 veces armar el índice; con el texto ya normalizado, ~1,5 veces.
+  assert.ok(ms < 4 * indice, `12 consultas: ${Math.round(ms)} ms; armar el índice: ${Math.round(indice)} ms`)
+})
