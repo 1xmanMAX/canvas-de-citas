@@ -9,9 +9,24 @@
   import BotonSincro from '../components/BotonSincro.svelte'
   import { B } from '../lib/buscador.svelte.js'
   import { esAndroid } from '../lib/plataforma.js'
+  import { CS, crearCarpetaDeProyecto, abrirCarpeta, elegirCarpetaPara, cerrarProyecto } from '../lib/carpetas.svelte.js'
 
   let { abrirDatos, abrirCelular } = $props()
   let nuevo = $state(false)
+
+  // Cada proyecto vive en su carpeta: la del proyecto, o "Sin carpeta" (creado antes o llegado por sincronización).
+  const carpetaDe = pid => CS.lista.find(c => c.proyectos.includes(pid))
+  async function creado(id) {
+    if (CS.soportado && !(await crearCarpetaDeProyecto(id))) S.aviso = 'Proyecto sin carpeta: elígela en su tarjeta para guardarlo en el disco'
+    location.hash = `#/p/${id}`
+  }
+  async function abrir() {
+    const id = await abrirCarpeta()
+    if (id) location.hash = `#/p/${id}`
+  }
+  function cerrar(p) {
+    if (confirm(`¿Cerrar "${p.titulo}"? Se quita de la app; su carpeta queda igual y puedes volver a abrirla.`)) cerrarProyecto(p.id)
+  }
 
   const tarjetas = $derived(
     S.proyectos
@@ -38,6 +53,7 @@
 <BotonSincro {abrirDatos} />{#if !esAndroid}<button class="icono-btn celular-btn" aria-label="Celular y PixPin" title="Pasar archivos con el celular o PixPin" onclick={abrirCelular}><Icono nombre="celular" tam={18} />{#if R.recibidos.length}<span class="insignia">{R.recibidos.length}</span>{/if}</button>{/if}
   <button class="btn solo-escritorio" onclick={abrirDatos}><Icono nombre="ajustes" />Configuración</button>
   <button class="icono-btn solo-movil" aria-label="Configuración" onclick={abrirDatos}><Icono nombre="ajustes" tam={18} /></button>
+  {#if CS.soportado}<button class="btn" onclick={abrir}><Icono nombre="carpeta" /><span class="solo-escritorio">Abrir proyecto</span></button>{/if}
   <button class="btn primario" aria-label="Nuevo proyecto" onclick={() => (nuevo = true)}>+ <span class="solo-escritorio">Nuevo proyecto</span></button>
 </header>
 
@@ -45,6 +61,8 @@
   <div class="rotulo encabezado">Tus proyectos</div>
   <div class="rejilla-p">
     {#each tarjetas as { p, n } (p.id)}
+      {@const c = carpetaDe(p.id)}
+      <div class="celda">
       <a class="tarjeta" href="#/p/{p.id}">
         <span class="chip"><Icono nombre={p.tipo === 'otro' ? 'maletin' : 'tesis'} tam={12} trazo={2} />{TIPOS_PROYECTO[p.tipo] || 'Tesis'}</span>
         <div class="titulo serif">{p.titulo}</div>
@@ -56,6 +74,15 @@
         </div>
         <div class="pie suave">Actualizado {haceCuanto(p.actualizado)}</div>
       </a>
+      {#if CS.soportado}
+        <div class="carpeta-p" class:alerta={!c || c.estado !== 'conectada'}>
+          <Icono nombre="carpeta" tam={14} />
+          {#if c}<span class="nombre-c" title={c.nombre}>{c.nombre}{c.estado === 'sin-permiso' ? ' · sin permiso' : c.estado === 'error' ? ' · no se encuentra' : ''}</span>
+          {:else}<span class="nombre-c">Sin carpeta</span><button class="btn chico" onclick={() => elegirCarpetaPara(p.id)}>Elegir carpeta</button>{/if}
+          <button class="icono-btn mini" aria-label="Cerrar proyecto" title="Cerrar proyecto (su carpeta queda igual)" onclick={() => cerrar(p)}><Icono nombre="cerrar" tam={14} /></button>
+        </div>
+      {/if}
+      </div>
     {/each}
     <button class="tarjeta nueva" onclick={() => (nuevo = true)}>
       <Icono nombre="mas" tam={24} trazo={2} />
@@ -79,7 +106,7 @@
 </main>
 
 {#if nuevo}
-  <ProyectoForm onclose={() => (nuevo = false)} oncreado={id => (location.hash = `#/p/${id}`)} />
+  <ProyectoForm onclose={() => (nuevo = false)} oncreado={creado} />
 {/if}
 
 <style>
@@ -91,6 +118,12 @@
     border: 1px solid var(--line); background: var(--paper-dim); box-shadow: 0 1px 3px rgba(33, 31, 26, .06); text-align: left;
   }
   .tarjeta:hover { border-color: var(--ink-soft); color: inherit; }
+  .celda { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .celda .tarjeta { flex-grow: 1; }
+  .carpeta-p { display: flex; align-items: center; gap: 6px; padding: 0 6px; font-size: 12px; color: var(--using); min-width: 0; }
+  .carpeta-p.alerta { color: var(--reviewed); }
+  .nombre-c { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mini { width: 26px; height: 26px; }
   .titulo { font-size: 19px; line-height: 1.3; margin-top: 14px; min-height: 76px; }
   .area { font-size: 13px; margin-top: 4px; }
   .cuentas { display: flex; gap: 16px; margin-top: 18px; font-size: 13px; }

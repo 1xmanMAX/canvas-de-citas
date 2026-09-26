@@ -32,7 +32,7 @@ export async function servidor() {
   if (!fs.existsSync(path.join(APP, 'dist', 'index.html'))) throw new Error('Falta dist/: ejecuta npm run build')
   const vite = path.join(APP, 'node_modules', 'vite', 'bin', 'vite.js')
   const p = spawn(process.execPath, [vite, 'preview', '--port', String(PUERTO), '--strictPort'], { cwd: APP, stdio: 'ignore' })
-  for (let i = 0; i < 60 && !(await vivo()); i++) await esperar(250)
+  for (let i = 0; i < 240 && !(await vivo()); i++) await esperar(250)
   if (!(await vivo())) { p.kill(); throw new Error('vite preview no respondió') }
   return () => p.kill()
 }
@@ -91,6 +91,11 @@ export function suite(nombre) {
 /** showDirectoryPicker devuelve subcarpetas de OPFS; qué carpeta "elige" el usuario: pg.elegir('nombre'). */
 export async function carpetasSimuladas(pg) {
   await pg.evaluateOnNewDocument(() => {
+    // Simula que el navegador olvidó el permiso (sessionStorage __sinPermiso): hasta pedirlo, 'prompt'.
+    for (const proto of [window.FileSystemHandle?.prototype, window.FileSystemDirectoryHandle?.prototype, window.FileSystemFileHandle?.prototype].filter(Boolean)) {
+      proto.queryPermission = async function () { return sessionStorage.getItem('__sinPermiso') ? 'prompt' : 'granted' }
+      proto.requestPermission = async function () { sessionStorage.removeItem('__sinPermiso'); return 'granted' }
+    }
     window.showDirectoryPicker = async () => {
       const nombre = JSON.parse(sessionStorage.getItem('__elegir') || '[]')
       const n = nombre.shift()

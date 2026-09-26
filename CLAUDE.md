@@ -14,7 +14,7 @@ van en español.
 |---|---|
 | `app/` | La app: Svelte 5 + Vite, sin librerías de UI. `src/views` (Proyectos, Hub = lienzo, General = biblioteca), `src/components`, `src/lib` |
 | `app/src/lib/store.svelte.js` | Estado global y persistencia en IndexedDB (escritura inmediata) |
-| `app/src/lib/carpeta.svelte.js` | Carpeta de almacenamiento (File System Access): guarda los JSON + documentos y recoge cambios externos cada ~8 s; aplica `eliminados.json` |
+| `app/src/lib/carpetas.svelte.js` | **Un proyecto, una carpeta**: registro de carpetas (cada una con sus proyectos y opcionalmente la biblioteca de fuentes sin proyecto), guardado por carpeta, cambios externos cada ~8 s, `eliminados.json`; `lib/reparto.js` (qué va a cada carpeta, renumerar ids al abrir) y `lib/almacen-carpeta.js` (archivos de una carpeta) |
 | `app/src/components/Lienzo.svelte` | Motor del lienzo: capa con transform CSS (GPU), ventana de dibujo (solo lo cercano a la vista), nivel de detalle con muchos elementos |
 | `app/src/components/Tarjeta.svelte`, `lib/tarjetas.js`, `lib/tablero.js` | Notas, listas, notas de voz, fotos; medidas y colocación |
 | `app/src/components/Visor*.svelte`, `lib/pdf.worker.js`, `lib/visor.svelte.js` | Visor: PDF con **PDFium (WASM) en un Web Worker**, HTML aislado, Markdown; recortes, citas con vínculo (`origen`) y marcas |
@@ -117,6 +117,11 @@ app de Windows y etiquetas: `docs/superpowers/specs/2026-09-25-proyectos-en-carp
 chips en las tarjetas y buscador general **Ctrl+F** (`Buscador.svelte`, `lib/buscador.svelte.js`; con un PDF abierto
 Ctrl+F busca en el documento). Prueba: `npm run test:e2e -- etiquetas`. Ojo: clases globales `.chip` y `.panel`
 en `app.css` chocan con nombres locales; y al insertar texto con `String.replace`, `$$` se vuelve `$`.
+
+**Proyectos en carpetas** (sep. 2026): "Nuevo proyecto" crea su carpeta y "Abrir proyecto" carga una (renumera ids que
+chocan); la carpeta única anterior se migra sola (queda como carpeta de su proyecto y biblioteca). Prueba:
+`npm run test:e2e -- carpetas` (carpetas simuladas en OPFS; ojo: Chrome se cae si se guarda en IndexedDB un handle de
+OPFS, por eso se registran por ruta).
 
 **Siguiente:** probar el APK en el celular de Max y hacer la **Tarea 8 del Plan 1** en su PC
 (receptor de Windows + "Vincular celular" con QR). Mientras tanto sirve `canvas-sincro.exe`

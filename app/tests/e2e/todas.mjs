@@ -60,6 +60,70 @@ const SUITES = {
       if (!(await esperarQue(async () => (await leerOpfs(pg, 'tesis/eliminados.json')) === null))) throw new Error('no consumió eliminados.json')
       if (!(await esperarQue(async () => !(await leerOpfs(pg, 'tesis/citas.json')).includes('cita_001')))) throw new Error('la cita sigue en citas.json')
     })
+    await s.paso('nuevo proyecto crea su propia carpeta', async () => {
+      await pg.goto(URL_APP + '#/', { waitUntil: 'networkidle0' }); await esperar(800)
+      await pg.elegir('madre')
+      await pg.click('button[aria-label="Nuevo proyecto"]')
+      await pg.type('dialog[open] input[type=text]', 'Vías urbanas')
+      await clicTexto(pg, 'Crear proyecto')
+      if (!(await esperarQue(async () => (await leerOpfs(pg, 'madre/Vías urbanas/proyectos.json'))?.includes('Vías urbanas')))) throw new Error('no se creó madre/Vías urbanas/proyectos.json')
+      if ((await leerOpfs(pg, 'tesis/proyectos.json')).includes('Vías urbanas')) throw new Error('el proyecto nuevo también quedó en la carpeta de la tesis')
+    })
+    await s.paso('una fuente citada en dos proyectos queda en las dos carpetas y se actualiza en ambas', async () => {
+      const vias = JSON.parse(await leerOpfs(pg, 'madre/Vías urbanas/proyectos.json')).proyectos[0].id
+      // Como lo haría la skill: una cita nueva en la carpeta del proyecto nuevo que usa la fuente de la tesis.
+      await escribirOpfs(pg, 'madre/Vías urbanas/citas.json', json('citas', [{ id: 'cita_050', proyecto_id: vias, fuente_id: 'fuente_001', estado_uso: 'usando', cita_textual_o_parafraseo: 'parafraseo', pagina: null, cita_en_texto: '', contexto: '' }]))
+      if (!(await esperarQue(async () => (await leerOpfs(pg, 'madre/Vías urbanas/fuentes.json'))?.includes('fuente_001')))) throw new Error('la fuente no llegó a la carpeta del proyecto nuevo')
+      if (!(await esperarQue(async () => (await leerOpfs(pg, 'madre/Vías urbanas/fuentes/fuente_001/documento.pdf')) === '%PDF-falso'))) throw new Error('su documento no llegó a la carpeta del proyecto nuevo')
+      const citasTesis = JSON.parse(await leerOpfs(pg, 'tesis/citas.json'))
+      citasTesis.citas.push({ id: 'cita_051', proyecto_id: 'proyecto_001', fuente_id: 'fuente_001', estado_uso: 'usando', cita_textual_o_parafraseo: 'textual', pagina: 5, cita_en_texto: '', contexto: '' })
+      await escribirOpfs(pg, 'tesis/citas.json', JSON.stringify(citasTesis, null, 2) + '\n')
+      if (!(await esperarQue(async () => (await leerOpfs(pg, 'tesis/fuentes.json')).includes('fuente_001')))) throw new Error('la fuente no volvió a la tesis')
+      const f = JSON.parse(await leerOpfs(pg, 'tesis/fuentes.json'))
+      f.fuentes.find(x => x.id === 'fuente_001').titulo = 'Citada (corregida)'
+      await escribirOpfs(pg, 'tesis/fuentes.json', JSON.stringify(f, null, 2) + '\n')
+      if (!(await esperarQue(async () => (await leerOpfs(pg, 'madre/Vías urbanas/fuentes.json')).includes('Citada (corregida)')))) throw new Error('la corrección no llegó a la otra carpeta')
+    })
+    await s.paso('abrir una carpeta de otra instalación renumera lo que choca', async () => {
+      await escribirOpfs(pg, 'otra/proyectos.json', json('proyectos', [{ id: 'proyecto_001', tipo: 'tesis', titulo: 'Otra tesis', objetivos_especificos: [], indicadores: [],
+        canvas: { ...lienzo, notas: [{ id: 'nota_ajena', texto: 'idea ajena', x: 0, y: 0 }], conexiones: [{ desde: 'nota_ajena', hasta: 'fuente_001' }], posiciones: { fuente_001: { x: 300, y: 0 } } } }]))
+      await escribirOpfs(pg, 'otra/fuentes.json', json('fuentes', [{ id: 'fuente_001', tipo_fuente: 'libro', autores: ['Ajeno, Z.'], anio: 1999, titulo: 'Fuente ajena', documento_original: 'fuentes/fuente_001/documento.pdf' }]))
+      await escribirOpfs(pg, 'otra/citas.json', json('citas', [{ id: 'cita_001', proyecto_id: 'proyecto_001', fuente_id: 'fuente_001', estado_uso: 'usando', cita_textual_o_parafraseo: 'textual', pagina: 7, cita_en_texto: '', contexto: '' }]))
+      await escribirOpfs(pg, 'otra/fuentes/fuente_001/documento.pdf', '%PDF-ajeno')
+      await pg.goto(URL_APP + '#/', { waitUntil: 'networkidle0' }); await esperar(800)
+      await pg.elegir('otra')
+      await clicTexto(pg, 'Abrir proyecto')
+      if (!(await esperarQue(async () => (await cuerpo()).includes('Otra tesis')))) throw new Error('no apareció el proyecto abierto')
+      await pg.goto(URL_APP + '#/', { waitUntil: 'networkidle0' }); await esperar(600)
+      if (!(await cuerpo()).includes('Tesis renombrada por la skill')) throw new Error('desapareció la tesis')
+      await esperarQue(async () => !(await leerOpfs(pg, 'otra/proyectos.json')).includes('"proyecto_001"'))
+      const p = JSON.parse(await leerOpfs(pg, 'otra/proyectos.json')).proyectos[0]
+      const f = JSON.parse(await leerOpfs(pg, 'otra/fuentes.json')).fuentes[0]
+      const c = JSON.parse(await leerOpfs(pg, 'otra/citas.json')).citas[0]
+      if (p.id === 'proyecto_001' || f.id === 'fuente_001') throw new Error(`no renumeró: ${p.id} ${f.id}`)
+      if (c.proyecto_id !== p.id || c.fuente_id !== f.id) throw new Error('la cita no apunta a los ids nuevos')
+      if (p.canvas.conexiones[0].hasta !== f.id || !(f.id in p.canvas.posiciones)) throw new Error('el lienzo no apunta a la fuente nueva')
+      if ((await leerOpfs(pg, `otra/fuentes/${f.id}/documento.pdf`)) !== '%PDF-ajeno') throw new Error('el documento no se movió a la ruta nueva')
+      if ((await leerOpfs(pg, 'tesis/fuentes.json')).includes('Fuente ajena')) throw new Error('la fuente ajena se metió en la tesis')
+    })
+    await s.paso('cerrar un proyecto lo quita de la app sin borrar su carpeta', async () => {
+      pg.once('dialog', d => d.accept())
+      const tarjeta = await pg.evaluateHandle(() => [...document.querySelectorAll('.celda')].find(x => x.textContent.includes('Otra tesis')))
+      await (await tarjeta.asElement().$('button[aria-label="Cerrar proyecto"]')).click()
+      if (!(await esperarQue(async () => !(await cuerpo()).includes('Otra tesis')))) throw new Error('sigue en la lista')
+      if (!(await leerOpfs(pg, 'otra/proyectos.json')).includes('Otra tesis')) throw new Error('se borró de su carpeta')
+    })
+    await s.paso('sin permiso: el aviso "Dar permiso" reconecta las carpetas', async () => {
+      await pg.evaluate(() => sessionStorage.setItem('__sinPermiso', '1'))
+      await pg.reload({ waitUntil: 'networkidle0' }); await esperar(800) // como abrir la app otro día
+      await pg.waitForSelector('::-p-xpath(//button[contains(., "Dar permiso")])', { timeout: 8000 }).catch(async () => { throw new Error('sin aviso; se ve: ' + (await cuerpo()).replace(/\s+/g, ' ').slice(-400) + ' | errores: ' + pg.errores.join(' / ')) })
+      await clicTexto(pg, 'Dar permiso')
+      if (!(await esperarQue(async () => !(await cuerpo()).includes('necesita')))) throw new Error('el aviso sigue')
+      const antes = await leerOpfs(pg, 'madre/Vías urbanas/CLAUDE.md')
+      await escribirOpfs(pg, 'madre/Vías urbanas/eliminados.json', JSON.stringify({ citas: ['cita_050'] }))
+      if (!(await esperarQue(async () => (await leerOpfs(pg, 'madre/Vías urbanas/eliminados.json')) === null))) throw new Error('no volvió a leer la carpeta')
+      if (!(await esperarQue(async () => (await leerOpfs(pg, 'madre/Vías urbanas/CLAUDE.md')) !== antes))) throw new Error('no volvió a guardar')
+    })
     if (pg.errores.length) s.fallas.push(...pg.errores)
     await pg.browserContext().close().catch(() => {})
     return s

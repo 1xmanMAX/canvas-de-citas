@@ -37,6 +37,10 @@ const registros = new Map() // clave → { handle } | { opfs }
 let escritos = {} // clave → { archivo: lastModified } de lo que escribió la app (si cambia, fue otro)
 const textos = new Map() // clave → { archivo: texto } último escrito (no se reescribe lo que no cambió)
 const docsPendientes = new Set()
+const presentes = new Map() // clave → rutas de documentos que ya se sabe que están en esa carpeta
+/** Id con que se guarda en este navegador el documento de esa ruta (fuente o foto). */
+// (Una foto duplicada comparte el original de su foto de origen: fotos/<id de origen>.<ext>.)
+const idDeRuta = ruta => S.fuentes.find(f => f.documento_original === ruta)?.id || ruta.split('/').pop().replace(/\.[^.]+$/, '')
 let temporizador
 let cola = Promise.resolve()
 const enCola = fn => (cola = cola.then(fn, fn))
@@ -101,10 +105,22 @@ export const guardarAhora = () => enCola(async () => {
     try {
       for (const col of COLECCIONES) await escribirSiCambio(c.clave, a, `${col}.json`, serializarLista(col, parte[col]))
       const rutas = new Set(docsDe(parte))
+      const hay = presentes.get(c.clave) || presentes.set(c.clave, new Set()).get(c.clave)
       for (const [id, ruta] of pendientes) {
         if (!ruta || !rutas.has(ruta)) continue
         const d = await leerDocumento(id)
-        if (d?.blob) await a.escribir(ruta, d.blob)
+        if (d?.blob) { await a.escribir(ruta, d.blob); hay.add(ruta) }
+      }
+      // Documentos que le tocan a esta carpeta por primera vez (p. ej. una fuente que ahora cita
+      // también este proyecto): se copian si aún no están.
+      for (const ruta of rutas) {
+        if (hay.has(ruta)) continue
+        if (!(await a.leer(ruta))) {
+          const d = await leerDocumento(idDeRuta(ruta))
+          if (!d?.blob) continue // tampoco está en este navegador: se reintenta en otro guardado
+          await a.escribir(ruta, d.blob)
+        }
+        hay.add(ruta)
       }
       await escribirSiCambio(c.clave, a, 'CLAUDE.md', generarClaudeMd(parte))
       c.guardado = new Date().toISOString()
