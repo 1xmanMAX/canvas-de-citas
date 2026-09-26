@@ -12,6 +12,8 @@
   import { NODO_W, alturaNodo, limitesDe, rutaConexion } from '../lib/grafo.js'
   import { listaObjetivos, vacio } from '../lib/objetivos.js'
   import Tarjeta from './Tarjeta.svelte'
+  import { untrack } from 'svelte'
+  import { B } from '../lib/buscador.svelte.js'
   import Chinchetas from './Chinchetas.svelte'
   import EditorTarjeta from './EditorTarjeta.svelte'
   import VisorFoto from './VisorFoto.svelte'
@@ -42,6 +44,21 @@
 
   let grande = $state(false)
   let lienzo
+
+  // --- Llegar desde el buscador general: centrar y resaltar el elemento pedido ---
+  let destacado = $state(null)
+  $effect(() => {
+    const r = B.resaltar
+    if (!r || !lienzo) return
+    const caja = cajaPorId(r.id) || cajasGrupos.get(r.id)
+    if (!caja) return // no está en este lienzo (p. ej. en un sub-lienzo de objetivo)
+    untrack(() => (B.resaltar = null))
+    setTimeout(() => {
+      lienzo?.centrarEn(caja)
+      destacado = r.id
+      setTimeout(() => (destacado = null), 2500)
+    }, 250)
+  })
   let modal = $state(null) // 'indicadores' | 'fuentes' | { lista, o, nueva } | { indicador } | { conexion }
   let entradaFoto
   let conectando = $state(null)
@@ -360,14 +377,14 @@
       <!-- Fuentes que sustentan el objetivo -->
       {#each fuentes as x (x.id)}
         <NodoFuente x={x.x} y={x.y} anio={anio(x.f)} autor={autorCorto(x.f)} chips={x.f.etiquetas || []}
-          estado={estadoDe(x.id)} resaltado={conectando?.desde === x.id}
+          estado={estadoDe(x.id)} resaltado={conectando?.desde === x.id || destacado === x.id}
           alAbrir={() => tocar(x.id, () => abrirFuente(x.id))} {...arrastre(o.fuentes.find(y => y.id === x.id))} />
       {/each}
 
       <!-- Tarjetas libres: notas, listas, notas de voz y fotos -->
       {#each LISTAS as l (l)}
         {#each tarjVista[l] as t (t.id)}
-          <Tarjeta lista={l} o={t} origen={conectando?.desde === t.id} alVinculo={() => abrirOrigen(t.origen, p.id, t.id)}
+          <Tarjeta lista={l} o={t} origen={conectando?.desde === t.id} resaltado={destacado === t.id} alVinculo={() => abrirOrigen(t.origen, p.id, t.id)}
             alTocar={() => tocar(t.id, () => (modal = { lista: l, o: copia(t) }))}
             alternar={i => { alternarTarea(t, i); guardar() }} {...arrastre(t)} redimensionar={l === 'fotos' ? redimensionarFoto(t, guardar) : null} />
         {/each}

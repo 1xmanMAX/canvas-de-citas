@@ -31,7 +31,8 @@
   import BotonSincro from '../components/BotonSincro.svelte'
   import { esAndroid } from '../lib/plataforma.js'
   import { lienzoAbierto } from '../lib/archivos.js'
-  import { onMount } from 'svelte'
+  import { onMount, untrack } from 'svelte'
+  import { B } from '../lib/buscador.svelte.js'
 
   let { p, fid = null, oid = null, abrirDatos, abrirCelular, abrirArchivos, atras } = $props()
 
@@ -158,6 +159,21 @@
 
   // --- Interacción ---
   let lienzo
+
+  // --- Llegar desde el buscador general: centrar y resaltar el elemento pedido ---
+  let destacado = $state(null)
+  $effect(() => {
+    const r = B.resaltar
+    if (!r || !lienzo) return
+    const caja = r.id === 'hub' ? null : cajaDe(r.id) || cajasGrupos.get(r.id)
+    if (!caja) return // no está en este lienzo (p. ej. en un sub-lienzo de objetivo)
+    untrack(() => (B.resaltar = null))
+    setTimeout(() => {
+      lienzo?.centrarEn(caja)
+      destacado = r.id
+      setTimeout(() => (destacado = null), 2500)
+    }, 250)
+  })
   let q = $state('')
   let ficha = $state(false)
   let modal = $state(null) // 'agregar' | 'ficha' | { lista, o, nueva } | { conexion }
@@ -468,7 +484,7 @@
   <Lienzo bind:this={lienzo} bind:simple={lejos} bind:ventana pesado={pesado} {limites} {corcho} cursor={conectando ? 'conectando' : ''} alTocarFondo={() => { if (conectando) conectando = null }}>
     <!-- Agrupadores: debajo de todo -->
     {#each agrupadoresVista as g (g.id)}
-      <Agrupador {g} caja={cajasGrupos.get(g.id)} resaltado={!!q && g.titulo.toLowerCase().includes(q.toLowerCase())}
+      <Agrupador {g} caja={cajasGrupos.get(g.id)} resaltado={(!!q && g.titulo.toLowerCase().includes(q.toLowerCase())) || destacado === g.id}
         alTocar={() => editarAgrupador(g)} arrastre={grupos.arrastre(g)} />
     {/each}
 
@@ -513,7 +529,7 @@
         x={q0.x} y={q0.y}
         anio={anio(it.f)} autor={autorCorto(it.f)} chips={it.f.etiquetas || []}
         estado={estados.get(it.id)}
-        resaltado={coin || conectando?.desde === it.id}
+        resaltado={coin || conectando?.desde === it.id || destacado === it.id}
         atenuado={!!q && !coin}
         pista={coin ? 'Ver citas →' : ''}
         alAbrir={() => tocar(it.id, () => abrirFuente(it.id))}
@@ -525,7 +541,7 @@
     {#each LISTAS as l (l)}
       {#each tarjVista[l] as o (o.id)}
         {@const coin = !!q && coincideTarjeta(o, q)}
-        <Tarjeta lista={l} {o} origen={conectando?.desde === o.id} resaltado={coin} atenuado={!!q && !coin} alVinculo={() => abrirOrigen(o.origen, p.id, o.id)}
+        <Tarjeta lista={l} {o} origen={conectando?.desde === o.id} resaltado={coin || destacado === o.id} atenuado={!!q && !coin} alVinculo={() => abrirOrigen(o.origen, p.id, o.id)}
           alTocar={() => tocar(o.id, () => abrirTarjeta(l, o))} alternar={i => alternar(o, i)} {...arrastreLibre(o)} redimensionar={l === 'fotos' ? redimensionarFoto(o, () => guardarProyecto(p)) : null} />
       {/each}
     {/each}

@@ -88,6 +88,17 @@
     programar(true)
   }
 
+  /** Centra una caja del mundo en la vista, con zoom para verla cómoda (lo pide el buscador). */
+  export function centrarEn(c) {
+    if (!W || !H || !c) return
+    ajustado = true // que el encuadre inicial no la mueva después
+    const nk = acotar(Math.min(1, (W * 0.6) / c.w, (H * 0.6) / c.h))
+    k = nk
+    tx = W / 2 - (c.x + c.w / 2) * nk
+    ty = H / 2 - (c.y + c.h / 2) * nk
+    programar(true)
+  }
+
   /** Punto del mundo que está en el centro de la vista. */
   export const centro = () => ({ x: (W / 2 - tx) / k, y: (H / 2 - ty) / k })
 
