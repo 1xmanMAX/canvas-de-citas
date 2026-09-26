@@ -1,0 +1,53 @@
+[
+  {
+    "nombre": "un proyecto por carpeta; fuente compartida en las dos; fuente sin citas a la biblioteca",
+    "datos": {
+      "proyectos": [{ "id": "proyecto_001", "titulo": "Tesis" }, { "id": "proyecto_002", "titulo": "Vías" }],
+      "fuentes": [{ "id": "fuente_001", "titulo": "A" }, { "id": "fuente_002", "titulo": "B" }, { "id": "fuente_003", "titulo": "Suelta" }],
+      "citas": [
+        { "id": "cita_001", "proyecto_id": "proyecto_001", "fuente_id": "fuente_001" },
+        { "id": "cita_002", "proyecto_id": "proyecto_002", "fuente_id": "fuente_001" },
+        { "id": "cita_003", "proyecto_id": "proyecto_002", "fuente_id": "fuente_002" }
+      ]
+    },
+    "carpetas": [
+      { "clave": "c1", "proyectos": ["proyecto_001"], "biblioteca": true },
+      { "clave": "c2", "proyectos": ["proyecto_002"], "biblioteca": false }
+    ],
+    "esperado": {
+      "c1": { "proyectos": ["proyecto_001"], "fuentes": ["fuente_001", "fuente_003"], "citas": ["cita_001"] },
+      "c2": { "proyectos": ["proyecto_002"], "fuentes": ["fuente_001", "fuente_002"], "citas": ["cita_002", "cita_003"] }
+    }
+  },
+  {
+    "nombre": "carpeta antigua con dos proyectos; proyecto sin carpeta no se escribe; sin biblioteca la fuente suelta no va a ninguna",
+    "datos": {
+      "proyectos": [{ "id": "proyecto_001", "titulo": "A" }, { "id": "proyecto_002", "titulo": "B" }, { "id": "proyecto_003", "titulo": "Sin carpeta" }],
+      "fuentes": [{ "id": "fuente_001", "titulo": "X" }, { "id": "fuente_002", "titulo": "Solo del 3" }, { "id": "fuente_003", "titulo": "Suelta" }],
+      "citas": [
+        { "id": "cita_001", "proyecto_id": "proyecto_002", "fuente_id": "fuente_001" },
+        { "id": "cita_002", "proyecto_id": "proyecto_003", "fuente_id": "fuente_002" }
+      ]
+    },
+    "carpetas": [{ "clave": "vieja", "proyectos": ["proyecto_001", "proyecto_002"], "biblioteca": false }],
+    "esperado": {
+      "vieja": { "proyectos": ["proyecto_001", "proyecto_002"], "fuentes": ["fuente_001"], "citas": ["cita_001"] }
+    }
+  },
+  {
+    "nombre": "carpeta que solo es biblioteca",
+    "datos": {
+      "proyectos": [{ "id": "proyecto_001", "titulo": "A" }],
+      "fuentes": [{ "id": "fuente_001", "titulo": "Citada" }, { "id": "fuente_002", "titulo": "Suelta" }],
+      "citas": [{ "id": "cita_001", "proyecto_id": "proyecto_001", "fuente_id": "fuente_001" }]
+    },
+    "carpetas": [
+      { "clave": "p", "proyectos": ["proyecto_001"], "biblioteca": false },
+      { "clave": "bib", "proyectos": [], "biblioteca": true }
+    ],
+    "esperado": {
+      "p": { "proyectos": ["proyecto_001"], "fuentes": ["fuente_001"], "citas": ["cita_001"] },
+      "bib": { "proyectos": [], "fuentes": ["fuente_002"], "citas": [] }
+    }
+  }
+]
