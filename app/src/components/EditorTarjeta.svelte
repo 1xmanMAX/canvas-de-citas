@@ -1,10 +1,9 @@
 <script>
-  // Ventana para crear o editar una tarjeta libre del lienzo (nota, lista, nota de voz o foto).
+  // Ventana para crear o editar una tarjeta libre del lienzo (nota, lista o nota de voz; las fotos usan VisorFoto).
   import { untrack } from 'svelte'
   import Modal from './Modal.svelte'
   import Icono from './Icono.svelte'
   import Grabador from './Grabador.svelte'
-  import Dibujo from './Dibujo.svelte'
   import { LETRAS, PAPELES, COLORES, fechaCorta, duracionTexto } from '../lib/tarjetas.js'
   import { esAndroid } from '../lib/plataforma.js'
   import { transcribirAudio } from '../lib/voz.js'
@@ -14,7 +13,6 @@
 
   const TITULOS = { notas: ['Nueva nota', 'Nota'], listas: ['Nueva lista de tareas', 'Lista de tareas'], audios: ['Nueva nota de voz', 'Nota de voz'], fotos: ['Nueva foto', 'Foto'] }
   const titulo = $derived(TITULOS[lista][nueva ? 0 : 1])
-  let pestana = $state('detalles')
   let nuevaTarea = $state('')
   let entradaTarea = $state()
 
@@ -22,7 +20,6 @@
   // Tarjetas antiguas pueden no tener estos campos (el editor se recrea por tarjeta: {#key}).
   untrack(() => {
     if (lista === 'listas') o.items ||= []
-    if (lista === 'fotos') o.trazos ||= []
   })
   function agregarTarea(e) {
     e?.preventDefault()
@@ -68,7 +65,7 @@
   }
 </script>
 
-<Modal {titulo} {onclose} ancho={lista === 'fotos' ? 640 : 480}>
+<Modal {titulo} {onclose} ancho={480}>
   {#if lista === 'notas'}
     <label class="campo"><span>Título (opcional)</span><input type="text" bind:value={o.titulo} placeholder="Extended Mind, p. 114" /></label>
     <!-- svelte-ignore a11y_autofocus -->
@@ -132,21 +129,6 @@
       {/if}
     {/if}
 
-  {:else}
-    <div class="segmentado pestanas">
-      <button aria-pressed={pestana === 'detalles'} onclick={() => (pestana = 'detalles')}>Detalles</button>
-      <button aria-pressed={pestana === 'dibujar'} onclick={() => (pestana = 'dibujar')}><Icono nombre="lapiz" tam={13} /> Anotar sobre la foto</button>
-    </div>
-    {#if pestana === 'detalles'}
-      <img src={o.imagen} alt={o.titulo || ''} class="foto-grande" />
-      <label class="campo"><span>Título</span><input type="text" bind:value={o.titulo} placeholder="Ensayo en laboratorio, feb. 2026" /></label>
-      <label class="campo"><span>Texto (descripción, análisis, transcripción de la imagen…)</span>
-        <textarea rows="6" bind:value={o.texto} placeholder="Todo lo que quieras anotar sobre esta foto"></textarea></label>
-      <label class="campo"><span>Anotación a mano (se ve en rojo bajo la foto)</span>
-        <input type="text" bind:value={o.anotacion} class="mano" placeholder="¿coincide con Villarreal?" /></label>
-    {:else}
-      <Dibujo imagen={o.imagen} proporcion={o.proporcion || 4 / 3} bind:trazos={o.trazos} />
-    {/if}
   {/if}
 
   {#if o.origen && onvinculo}
@@ -192,9 +174,6 @@
   .flecha { font-size: 13px; }
   .reproductor { width: 100%; }
   .meta { font-size: 12px; margin-top: -10px; }
-  .pestanas { align-self: flex-start; }
-  .pestanas button { display: inline-flex; align-items: center; gap: 5px; }
-  .foto-grande { width: 100%; max-height: 42dvh; object-fit: contain; border-radius: 10px; background: var(--paper-dim); }
   .mano { font-family: var(--mano); font-size: 20px; color: #C0392B; }
   .vinculos { border-top: 1px solid var(--line); padding-top: 12px; }
   .vinculo-doc { align-self: flex-start; border-color: var(--accent); color: var(--accent); }

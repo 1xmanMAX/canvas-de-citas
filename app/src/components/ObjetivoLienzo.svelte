@@ -14,6 +14,7 @@
   import Tarjeta from './Tarjeta.svelte'
   import Chinchetas from './Chinchetas.svelte'
   import EditorTarjeta from './EditorTarjeta.svelte'
+  import VisorFoto from './VisorFoto.svelte'
   import Agrupador from './Agrupador.svelte'
   import EditorAgrupador from './EditorAgrupador.svelte'
   import { accionesAgrupadores } from '../lib/agrupadores.js'
@@ -456,8 +457,13 @@
   </Modal>
 {:else if modal?.lista}
   {#key modal.o.id}
-    <EditorTarjeta lista={modal.lista} bind:o={modal.o} nueva={modal.nueva} vinculos={modal.nueva ? [] : vinculosDe(o, modal.o.id, nombreDe)} onvinculo={() => { const t = modal.o; modal = null; abrirOrigen(t.origen, p.id, t.id) }}
-      onguardar={guardarModal} oneliminar={eliminarModal} onduplicar={duplicarModal} onclose={() => (modal = null)} />
+    {#if modal.lista === 'fotos'}
+      <VisorFoto bind:o={modal.o} nueva={modal.nueva} vinculos={modal.nueva ? [] : vinculosDe(o, modal.o.id, nombreDe)} onvinculo={() => { const t = modal.o; modal = null; abrirOrigen(t.origen, p.id, t.id) }}
+        onguardar={guardarModal} oneliminar={eliminarModal} onduplicar={duplicarModal} onclose={() => (modal = null)} />
+    {:else}
+      <EditorTarjeta lista={modal.lista} bind:o={modal.o} nueva={modal.nueva} vinculos={modal.nueva ? [] : vinculosDe(o, modal.o.id, nombreDe)} onvinculo={() => { const t = modal.o; modal = null; abrirOrigen(t.origen, p.id, t.id) }}
+        onguardar={guardarModal} oneliminar={eliminarModal} onduplicar={duplicarModal} onclose={() => (modal = null)} />
+    {/if}
   {/key}
 {:else if modal?.grupo}
   <EditorAgrupador nuevo={!modal.agrupador} titulo={modal.agrupador?.titulo || ''} color={modal.agrupador?.color || 'azul'}

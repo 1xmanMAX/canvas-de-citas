@@ -13,6 +13,53 @@ fs.mkdirSync(SALIDA, { recursive: true })
 
 const filtro = process.argv.slice(2)
 const SUITES = {
+  // Visor de fotos: abrir, hacer zoom con la rueda, dibujar un trazo y guardarlo; panel en celular.
+  async fotos(b) {
+    const s = suite('Visor de fotos'), pg = await pagina(b)
+    await conEjemplo(pg)
+    const escala = () => pg.$eval('.visor-foto .capa', e => new DOMMatrix(getComputedStyle(e).transform).a)
+    await s.paso('insertar una foto la abre en el visor a pantalla completa', async () => {
+      await (await pg.$('input[type=file][accept="image/*"]')).uploadFile(IMG)
+      await pg.waitForSelector('dialog.visor-foto[open] .capa img', { timeout: 8000 })
+      const r = await (await pg.$('dialog.visor-foto .area')).boundingBox()
+      if (r.width < 900 || r.height < 800) throw new Error(`área chica: ${Math.round(r.width)}×${Math.round(r.height)}`)
+    })
+    await s.paso('la rueda del mouse hace zoom en el visor', async () => {
+      await esperar(300)
+      const k0 = await escala()
+      const r = await (await pg.$('dialog.visor-foto .area')).boundingBox()
+      for (let i = 0; i < 4; i++) {
+        await pg.$eval('dialog.visor-foto .area', (el, p) => el.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, wheelDeltaY: 120, clientX: p.x, clientY: p.y, bubbles: true, cancelable: true })), { x: r.x + r.width / 2, y: r.y + r.height / 2 })
+        await esperar(30)
+      }
+      const k1 = await escala()
+      if (!(k1 > k0 * 1.5)) throw new Error(`no hizo zoom (${k0.toFixed(2)} → ${k1.toFixed(2)})`)
+    })
+    await s.paso('dibujar un trazo (tecla D) y guardarlo', async () => {
+      await pg.keyboard.press('d')
+      const r = await (await pg.$('dialog.visor-foto .area')).boundingBox()
+      await pg.mouse.move(r.x + r.width / 2, r.y + r.height / 2); await pg.mouse.down()
+      await pg.mouse.move(r.x + r.width / 2 + 80, r.y + r.height / 2 + 30, { steps: 8 }); await pg.mouse.up()
+      await pg.type('dialog.visor-foto input.mano', 'revisar')
+      await pg.screenshot({ path: path.join(SALIDA, 'visor-foto.png') })
+      await clicTexto(pg, 'Guardar'); await esperar(600)
+      const f = (await lienzoGuardado(pg)).fotos.at(-1)
+      if (!f.trazos?.length || f.trazos[0].p.length < 3) throw new Error('no guardó el trazo')
+      if (f.anotacion !== 'revisar') throw new Error('no guardó la anotación')
+      if (await pg.$('dialog.visor-foto[open]')) throw new Error('no se cerró')
+    })
+    await s.paso('en pantalla de celular el panel es una hoja inferior', async () => {
+      await pg.setViewport({ width: 390, height: 800, isMobile: true, hasTouch: true }); await esperar(500)
+      await pg.click('.zoom .porc'); await esperar(500)
+      await pg.evaluate(() => { const g = [...document.querySelectorAll('g.tarjeta.fotos')].at(-1); g.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 9, button: 0, clientX: 1, clientY: 1 })); dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 9, button: 0, clientX: 1, clientY: 1 })) })
+      await pg.waitForSelector('dialog.visor-foto[open] .ficha.hoja', { timeout: 5000 })
+      await pg.screenshot({ path: path.join(SALIDA, 'visor-foto-movil.png') })
+      await pg.keyboard.press('Escape'); await esperar(400)
+      if (await pg.$('dialog.visor-foto[open]')) throw new Error('Escape no cerró el visor')
+    })
+    if (pg.errores.length) s.fallas.push(...pg.errores)
+    return s
+  },
   // Gestos del lienzo en PC: rueda del mouse = zoom; botón central = mover.
   async gestos(b) {
     const s = suite('Gestos del lienzo'), pg = await pagina(b)
@@ -53,7 +100,6 @@ const SUITES = {
       if (await pg.$('dialog[open]')) throw new Error('abrió la fuente')
     })
     if (pg.errores.length) s.fallas.push(...pg.errores)
-    await pg.close()
     return s
   },
   // Tarjetas del lienzo: notas, listas, voz, fotos, conexiones, corcho, búsqueda, sub-lienzo.
@@ -104,10 +150,10 @@ const SUITES = {
     })
     await s.paso('foto con anotación y dibujo', async () => {
       await (await pg.$('input[type=file][accept="image/*"]')).uploadFile(IMG)
-      await pg.waitForSelector('dialog[open] .foto-grande', { timeout: 8000 })
-      await pg.type('dialog[open] input.mano', 'revisar')
-      await clicTexto(pg, 'Anotar sobre la foto')
-      const r = await (await pg.waitForSelector('dialog[open] .hoja svg', { visible: true })).boundingBox()
+      await pg.waitForSelector('dialog.visor-foto[open] .capa img', { timeout: 8000 })
+      await pg.type('dialog.visor-foto input.mano', 'revisar')
+      await pg.click('dialog.visor-foto button[aria-label="Tinta rojo"]')
+      const r = await (await pg.$('dialog.visor-foto .capa')).boundingBox()
       await pg.mouse.move(r.x + r.width * .2, r.y + r.height * .3); await pg.mouse.down()
       await pg.mouse.move(r.x + r.width * .7, r.y + r.height * .4, { steps: 8 }); await pg.mouse.up()
       await clicTexto(pg, 'Guardar'); await esperar(600)
