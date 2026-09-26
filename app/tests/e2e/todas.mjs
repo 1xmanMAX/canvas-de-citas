@@ -13,6 +13,49 @@ fs.mkdirSync(SALIDA, { recursive: true })
 
 const filtro = process.argv.slice(2)
 const SUITES = {
+  // Gestos del lienzo en PC: rueda del mouse = zoom; botón central = mover.
+  async gestos(b) {
+    const s = suite('Gestos del lienzo'), pg = await pagina(b)
+    await conEjemplo(pg)
+    await pg.evaluate(() => (location.hash = '#/p/proyecto_001')); await esperar(900)
+    const zoom = () => pg.$eval('.zoom .porc', e => parseInt(e.textContent))
+    const capa = () => pg.$eval('.capa', e => e.style.transform)
+    const rueda = (opc) => pg.$eval('.lienzo', (el, o) => el.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaMode: 0, ...o })), opc)
+    await s.paso('rueda del mouse (muescas de 120) acerca hacia el cursor', async () => {
+      const k0 = await zoom()
+      const r = await (await pg.$('.lienzo')).boundingBox()
+      for (let i = 0; i < 3; i++) { await rueda({ deltaY: -100, wheelDeltaY: 120, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 }); await esperar(30) }
+      await esperar(300)
+      const k1 = await zoom()
+      if (!(k1 > k0)) throw new Error(`no acercó (${k0}% → ${k1}%)`)
+    })
+    await s.paso('deslizar con el trackpad desplaza sin hacer zoom', async () => {
+      await esperar(500)
+      const k0 = await zoom(), t0 = await capa()
+      for (let i = 0; i < 6; i++) { await rueda({ deltaX: 3.5, deltaY: 7.25 }); await esperar(20) }
+      await esperar(500)
+      if (await zoom() !== k0) throw new Error('hizo zoom')
+      if (await capa() === t0) throw new Error('no desplazó')
+    })
+    await s.paso('botón central sobre una fuente mueve el lienzo sin mover la fuente', async () => {
+      await pg.click('.zoom .porc'); await esperar(400)
+      const nodo = await pg.$('g.nodo')
+      const antes = await nodo.evaluate(g => g.getAttribute('transform'))
+      const t0 = await capa()
+      const r = await nodo.boundingBox()
+      await pg.mouse.move(r.x + r.width / 2, r.y + r.height / 2)
+      await pg.mouse.down({ button: 'middle' })
+      await pg.mouse.move(r.x + r.width / 2 + 120, r.y + r.height / 2 + 60, { steps: 6 })
+      await pg.mouse.up({ button: 'middle' })
+      await esperar(400)
+      if (await nodo.evaluate(g => g.getAttribute('transform')) !== antes) throw new Error('movió la fuente')
+      if (await capa() === t0) throw new Error('no movió el lienzo')
+      if (await pg.$('dialog[open]')) throw new Error('abrió la fuente')
+    })
+    if (pg.errores.length) s.fallas.push(...pg.errores)
+    await pg.close()
+    return s
+  },
   // Tarjetas del lienzo: notas, listas, voz, fotos, conexiones, corcho, búsqueda, sub-lienzo.
   async lienzo(b) {
     const s = suite('Lienzo y tarjetas'), pg = await pagina(b)

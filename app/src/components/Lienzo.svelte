@@ -4,6 +4,8 @@
   // sin volver a dibujar el SVG) y todos los movimientos se aplican una sola vez por cuadro.
   import { setContext } from 'svelte'
   import Icono from './Icono.svelte'
+  import { crearDetectorRueda } from '../lib/gestos.js'
+  import { P } from '../lib/preferencias.svelte.js'
 
   let { limites, children, capa, alTocarFondo, cursor = '', corcho = false, simple = $bindable(false), ventana = $bindable(null), pesado = false } = $props()
   // Nivel de detalle: lejos (texto ilegible) las tarjetas se dibujan simplificadas. Con histéresis
@@ -107,20 +109,25 @@
     programar(true)
   }
 
-  // Trackpad: deslizar con dos dedos desplaza; pellizcar hace zoom (el navegador lo envía
-  // como rueda con ctrlKey). Con ratón: la rueda desplaza y Ctrl + rueda hace zoom.
+  // Mouse: la rueda hace zoom hacia el cursor (Shift + rueda desplaza) y el botón central mueve.
+  // Trackpad: dos dedos desplazan; pellizcar hace zoom (llega como rueda con ctrlKey).
+  // Se distingue con lib/gestos.js; en Configuración se puede volver a "la rueda desplaza".
+  const detector = crearDetectorRueda()
   $effect(() => {
     const rueda = e => {
       if (e.target.closest?.('.zoom')) return
       e.preventDefault()
       const r = cont.getBoundingClientRect()
-      if (e.ctrlKey || e.metaKey) {
-        zoomEn(Math.exp(-e.deltaY * (e.deltaMode ? 0.05 : 0.01)), e.clientX - r.left, e.clientY - r.top)
+      const pinza = e.ctrlKey || e.metaKey
+      if (pinza || (!e.shiftKey && P.ruedaMouse === 'zoom' && detector(e) === 'mouse')) {
+        // Una muesca de mouse (100) ≈ ×1.25, igual que los botones + / −.
+        zoomEn(Math.exp(-e.deltaY * (e.deltaMode ? 0.05 : pinza ? 0.01 : 0.0022)), e.clientX - r.left, e.clientY - r.top)
         return
       }
       const f = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? H : 1
-      tx -= e.deltaX * f
-      ty -= e.deltaY * f
+      const horizontal = e.shiftKey && !e.deltaX
+      tx -= (horizontal ? e.deltaY : e.deltaX) * f
+      ty -= (horizontal ? 0 : e.deltaY) * f
       programar()
     }
     // Safari (macOS) envía el pellizco del trackpad como gesture* en lugar de rueda con ctrlKey.
@@ -159,13 +166,14 @@
 
   function abajo(e) {
     if (e.button === 2 || e.target.closest?.('.zoom, button, a, input, textarea')) return
+    if (e.button === 1) e.preventDefault() // botón central: mover, sin el autodesplazamiento del navegador
     cont.setPointerCapture(e.pointerId)
     anotar(e)
   }
 
   function anotar(e) {
     punteros.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    if (punteros.size === 1) gesto = { tipo: 'mover', x0: e.clientX, y0: e.clientY, tx, ty, movido: false }
+    if (punteros.size === 1) gesto = { tipo: 'mover', x0: e.clientX, y0: e.clientY, tx, ty, movido: false, central: e.button === 1 }
     else if (punteros.size === 2) {
       arrastre?.cancelar() // el primer dedo estaba sobre una tarjeta: ahora es un pellizco
       const m = medio()
@@ -197,7 +205,7 @@
 
   function arriba(e) {
     if (!punteros.delete(e.pointerId)) return
-    if (gesto?.tipo === 'mover' && !gesto.movido && e.type === 'pointerup') alTocarFondo?.()
+    if (gesto?.tipo === 'mover' && !gesto.movido && !gesto.central && e.type === 'pointerup') alTocarFondo?.()
     if (punteros.size === 1 && gesto?.tipo === 'pellizco') {
       const [p] = punteros.values()
       gesto = { tipo: 'mover', x0: p.x, y0: p.y, tx, ty, movido: true }
@@ -208,6 +216,8 @@
   function arrastrar(e, { inicio, mover: alMover, fin } = {}) {
     if (e.button === 2) return
     e.stopPropagation()
+    // Botón central sobre un elemento: mueve el lienzo, no el elemento.
+    if (e.button === 1) { e.preventDefault(); cont.setPointerCapture(e.pointerId); return anotar(e) }
     // Ya hay un dedo en el lienzo: este es el segundo de un pellizco, no un arrastre.
     if (punteros.size) return anotar(e)
     const id = e.pointerId, x0 = e.clientX, y0 = e.clientY
@@ -266,6 +276,7 @@
   onpointermove={mover}
   onpointerup={arriba}
   onpointercancel={arriba}
+  onauxclick={e => e.button === 1 && e.preventDefault()}
 >
   <div class="capa" bind:this={capaEl}>
     <svg style="left:{caja.x}px;top:{caja.y}px;width:{caja.w}px;height:{caja.h}px" viewBox="{caja.x} {caja.y} {caja.w} {caja.h}">

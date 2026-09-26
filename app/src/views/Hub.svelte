@@ -452,7 +452,7 @@
     </div>
     <div class="separador"></div>
     <div class="suave ayuda">
-      Arrastra las tarjetas para acomodarlas (pasa a modo Libre). Desliza con dos dedos para mover el lienzo y pellizca para hacer zoom (con ratón: Ctrl + rueda). Toca una fuente para ver sus citas. Crea notas, listas de tareas, notas de voz y fotos desde la barra; también puedes pegar (Ctrl+V) o arrastrar texto, imágenes y audios al lienzo. El buscador también encuentra texto en notas, tareas y transcripciones. El botón del recuadro punteado crea un agrupador: reúne varios elementos bajo un nombre se ajusta solo a lo que tiene dentro; al arrastrar su nombre se mueve todo junto (suelta algo encima para agregarlo o arrástralo lejos para sacarlo). La chincheta cambia a tablero de corcho.
+      Arrastra las tarjetas para acomodarlas (pasa a modo Libre). Desliza con dos dedos para mover el lienzo y pellizca para hacer zoom (con mouse: la rueda hace zoom y apretando la rueda arrastras el lienzo). Toca una fuente para ver sus citas. Crea notas, listas de tareas, notas de voz y fotos desde la barra; también puedes pegar (Ctrl+V) o arrastrar texto, imágenes y audios al lienzo. El buscador también encuentra texto en notas, tareas y transcripciones. El botón del recuadro punteado crea un agrupador: reúne varios elementos bajo un nombre se ajusta solo a lo que tiene dentro; al arrastrar su nombre se mueve todo junto (suelta algo encima para agregarlo o arrástralo lejos para sacarlo). La chincheta cambia a tablero de corcho.
     </div>
   </aside>
 

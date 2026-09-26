@@ -1,5 +1,6 @@
 <script>
   import { S, cargar } from './lib/store.svelte.js'
+  import { cargarPreferencias } from './lib/preferencias.svelte.js'
   import Proyectos from './views/Proyectos.svelte'
   import Hub from './views/Hub.svelte'
   import General from './views/General.svelte'
@@ -88,6 +89,7 @@
     for (const t of textos) await lienzoAbierto.insertar([], t)
   }
 
+  cargarPreferencias()
   // La sincronización con la PC corre en todo aparato vinculado (celular, laptop…).
   if (esAndroid) {
     cargar().then(() => { iniciarSincroAutomatica(); revisarRecibidos() })

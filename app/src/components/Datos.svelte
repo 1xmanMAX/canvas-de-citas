@@ -9,6 +9,7 @@
   import { haceCuanto } from '../lib/citas.js'
   import Sincronizar from './Sincronizar.svelte'
   import { esAndroid } from '../lib/plataforma.js'
+  import { P, ponerPreferencia } from '../lib/preferencias.svelte.js'
 
   let { onclose, archivosIniciales = null } = $props()
   let previa = $state(null) // datos leídos pendientes de confirmar
@@ -107,6 +108,15 @@
           <button class="btn peligro" onclick={dejar}>Dejar de usar</button>
         </div>
       {/if}
+    </section>
+
+    <section>
+      <div class="rotulo">Rueda del mouse en el lienzo</div>
+      <div class="segmentado">
+        <button aria-pressed={P.ruedaMouse === 'zoom'} onclick={() => ponerPreferencia('ruedaMouse', 'zoom')}>Zoom</button>
+        <button aria-pressed={P.ruedaMouse === 'desplazar'} onclick={() => ponerPreferencia('ruedaMouse', 'desplazar')}>Desplazar</button>
+      </div>
+      <p class="suave nota">Con zoom, apretar la rueda y arrastrar mueve el lienzo. El trackpad y la pantalla táctil no cambian.</p>
     </section>
     {/if}
 
