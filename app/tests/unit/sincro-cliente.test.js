@@ -63,3 +63,30 @@ test('lo borrado en el celular se informa a la PC', async () => {
   assert.deepEqual(pc.eliminados.at(-1).fuentes, ['fuente_002'])
   assert.deepEqual(pc.datos.fuentes.map(x => x.id), ['fuente_001'])
 })
+
+// --- Originales de fotos (fotos/<id>.<ext>): solo con servidores que declaran la capacidad ---
+import { huella } from '../../src/lib/parche.js'
+
+function pcV2(datos, { capacidades } = {}) {
+  const pc = { datos, docs: {}, pedidos: [] }
+  return Object.assign(pc, {
+    leer2: async pedido => {
+      pc.pedidos.push(pedido)
+      return { modo: 'completo', datos: structuredClone(pc.datos), huella: await huella(pc.datos), etiqueta: 'e1', docs: [], ...(capacidades ? { capacidades } : {}) }
+    },
+    escribir2: async d => { pc.datos = d.datos || pc.datos; return { etiqueta: 'e2', grupo: [] } },
+    bajarDoc: async ruta => pc.docs[ruta],
+    subirDoc: async (ruta, b) => { if (!capacidades && ruta.startsWith('fotos/')) { const e = new Error('400'); e.codigo = 400; throw e } pc.docs[ruta] = b }
+  })
+}
+
+test('el cliente pide originales de fotos y los sube solo si el servidor los acepta', async () => {
+  const conFoto = () => almacenFalso({ proyectos: [], fuentes: [], citas: [] }, { 'fotos/foto_a.jpg': new Uint8Array([7]) })
+  const vieja = pcV2({ proyectos: [], fuentes: [], citas: [] })
+  await sincronizar({ conexion: vieja, almacen: conFoto(), aparato: { id: 'cel', nombre: 'Cel' } })
+  assert.deepEqual(vieja.pedidos[0].capacidades, ['fotos'])
+  assert.equal(vieja.docs['fotos/foto_a.jpg'], undefined, 'a un servidor viejo no se le sube')
+  const nueva = pcV2({ proyectos: [], fuentes: [], citas: [] }, { capacidades: ['fotos'] })
+  await sincronizar({ conexion: nueva, almacen: conFoto(), aparato: { id: 'cel', nombre: 'Cel' } })
+  assert.deepEqual([...nueva.docs['fotos/foto_a.jpg']], [7])
+})

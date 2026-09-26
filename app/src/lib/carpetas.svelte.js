@@ -10,11 +10,12 @@ import {
 import { serializarLista, leerArchivos, aplicar, normalizarElemento } from './io.svelte.js'
 import { generarClaudeMd } from './paraClaude.js'
 import { repartir, docsDe, renumerar } from './reparto.js'
-import { almacenDeHandle, almacenDeRegistro, registroDe, nombreSeguro } from './almacen-carpeta.js'
-import { esAndroid } from './plataforma.js'
+import { almacenDeHandle, almacenDeRegistro, registroDe, nombreSeguro, elegirCarpetaWindows } from './almacen-carpeta.js'
+import { esAndroid, esWindows, puente } from './plataforma.js'
 import { SvelteSet } from 'svelte/reactivity'
 
-export const soportaCarpetas = !esAndroid && typeof window !== 'undefined' && 'showDirectoryPicker' in window
+// En la app de Windows, por su puente (sin permisos); en Chrome/Edge/Comet de escritorio, con File System Access.
+export const soportaCarpetas = esWindows || (!esAndroid && typeof window !== 'undefined' && 'showDirectoryPicker' in window)
 
 class EstadoCarpetas {
   /** [{ clave, nombre, proyectos: [ids], biblioteca, estado: 'conectada'|'sin-permiso'|'error', error, guardado }] */
@@ -59,8 +60,13 @@ function fallo(c, e) {
 }
 
 async function persistir() {
-  const lista = CS.lista.map(c => ({ clave: c.clave, nombre: c.nombre, proyectos: [...c.proyectos], biblioteca: c.biblioteca, ...registros.get(c.clave) }))
+  const lista = CS.lista.map(c => ({ clave: c.clave, nombre: c.nombre, proyectos: [...c.proyectos], biblioteca: c.biblioteca, sincronizar: c.sincronizar !== false, ...registros.get(c.clave) }))
   await ponerMeta('carpetas', lista)
+  // En Windows el servidor de sincronización usa el mismo registro (qué carpetas y cuáles sincronizar).
+  if (esWindows) {
+    const reg = lista.filter(c => c.ruta).map(c => ({ clave: c.clave, nombre: c.nombre, carpeta: c.ruta, proyectos: c.proyectos, biblioteca: c.biblioteca, sincronizar: c.sincronizar }))
+    await puente('registro', { metodo: 'PUT', cuerpo: JSON.stringify(reg) }).catch(() => {})
+  }
 }
 
 /** `leidos`: archivos ya leídos de la carpeta (sus fechas cuentan como vistas: no se reimportan). */
@@ -69,7 +75,7 @@ async function registrar(almacen, { proyectos, biblioteca }, leidos = []) {
   escritos[clave] = Object.fromEntries(leidos.map(f => [f.name, f.lastModified]))
   almacenes.set(clave, almacen)
   registros.set(clave, await registroDe(almacen))
-  CS.lista.push({ clave, nombre: almacen.nombre, proyectos, biblioteca, estado: 'conectada', error: '', guardado: null })
+  CS.lista.push({ clave, nombre: almacen.nombre, proyectos, biblioteca, sincronizar: true, estado: 'conectada', error: '', guardado: null })
   leidas.add(clave) // recién elegida: lo que tenía ya se leyó (o está vacía)
   await persistir()
   escuchar()
@@ -314,6 +320,11 @@ async function ultimaModificacion(c) {
 export async function iniciarCarpetas() {
   if (!soportaCarpetas) return
   let lista = await leerMeta('carpetas')
+  if (esWindows) {
+    // El registro del servidor manda (ahí también aparecen los proyectos que crea el celular).
+    const srv = await puente('registro').then(r => (r.ok ? r.json() : [])).catch(() => [])
+    if (srv.length) lista = srv.map(e => ({ clave: e.clave, nombre: e.nombre, proyectos: e.proyectos || [], biblioteca: !!e.biblioteca, sincronizar: e.sincronizar !== false, ruta: e.carpeta }))
+  }
   if (!lista) lista = await migrar()
   if (!lista?.length) return
   escritos = (await leerMeta('carpetasEscritos')) || {}
@@ -321,9 +332,9 @@ export async function iniciarCarpetas() {
     const a = await almacenDeRegistro(r).catch(() => null)
     if (!a) continue
     almacenes.set(r.clave, a)
-    registros.set(r.clave, r.opfs ? { opfs: r.opfs } : { handle: r.handle })
+    registros.set(r.clave, r.ruta ? { ruta: r.ruta } : r.opfs ? { opfs: r.opfs } : { handle: r.handle })
     const permiso = await a.permiso().catch(() => 'prompt')
-    CS.lista.push({ clave: r.clave, nombre: r.nombre || a.nombre, proyectos: r.proyectos || [], biblioteca: !!r.biblioteca, estado: permiso === 'granted' ? 'conectada' : 'sin-permiso', error: '', guardado: null })
+    CS.lista.push({ clave: r.clave, nombre: r.nombre || a.nombre, proyectos: r.proyectos || [], biblioteca: !!r.biblioteca, sincronizar: r.sincronizar !== false, estado: permiso === 'granted' ? 'conectada' : 'sin-permiso', error: '', guardado: null })
   }
   escuchar()
   // Primero se leen todas (la más reciente al final: su copia de una fuente compartida es la que
@@ -358,14 +369,22 @@ async function migrar() {
 }
 
 // --- Acciones del usuario ---
-const elegir = id => window.showDirectoryPicker({ id, mode: 'readwrite' })
+/** Elegir una carpeta: diálogo nativo en la app de Windows; si no, el del navegador. Cancelar lanza AbortError. */
+async function elegirAlmacen(id, titulo) {
+  if (esWindows) {
+    const a = await elegirCarpetaWindows(titulo)
+    if (!a) throw new DOMException('Cancelado', 'AbortError')
+    return a
+  }
+  return almacenDeHandle(await window.showDirectoryPicker({ id, mode: 'readwrite' }))
+}
 
 /** Nuevo proyecto: se elige dónde crear su carpeta (se crea una subcarpeta con su título). */
 export async function crearCarpetaDeProyecto(pid) {
   const p = S.proyectoPorId.get(pid)
   if (!p) return false
   let madre
-  try { madre = almacenDeHandle(await elegir('canvas-madre')) } catch { return false } // cancelado
+  try { madre = await elegirAlmacen('canvas-madre', 'Dónde crear la carpeta del proyecto') } catch { return false } // cancelado
   const a = await madre.subcarpetaNueva(nombreSeguro(p.titulo))
   await registrar(a, { proyectos: [pid], biblioteca: false })
   await guardarAhora()
@@ -376,7 +395,7 @@ export async function crearCarpetaDeProyecto(pid) {
 /** Un proyecto sin carpeta: elegir una (se usa tal cual, sin crear subcarpeta). */
 export async function elegirCarpetaPara(pid) {
   let a
-  try { a = almacenDeHandle(await elegir('canvas-proyecto')) } catch { return false }
+  try { a = await elegirAlmacen('canvas-proyecto', 'Carpeta del proyecto') } catch { return false }
   const clave = await yaRegistrada(a)
   if (clave) { const c = entrada(clave); if (!c.proyectos.includes(pid)) c.proyectos.push(pid); await persistir() }
   else await registrar(a, { proyectos: [pid], biblioteca: false })
@@ -387,7 +406,7 @@ export async function elegirCarpetaPara(pid) {
 /** Carpeta para las fuentes que no cita ningún proyecto (la "biblioteca"). */
 export async function elegirBiblioteca() {
   let a
-  try { a = almacenDeHandle(await elegir('canvas-biblioteca')) } catch { return false }
+  try { a = await elegirAlmacen('canvas-biblioteca', 'Carpeta de la biblioteca') } catch { return false }
   const clave = await yaRegistrada(a)
   for (const c of CS.lista) c.biblioteca = c.clave === clave
   if (!clave) await registrar(a, { proyectos: [], biblioteca: true })
@@ -409,7 +428,7 @@ export async function usarComoBiblioteca(clave) {
  */
 export async function abrirCarpeta() {
   let a
-  try { a = almacenDeHandle(await elegir('canvas-proyecto')) } catch { return null }
+  try { a = await elegirAlmacen('canvas-proyecto', 'Abrir la carpeta de un proyecto') } catch { return null }
   if (await yaRegistrada(a)) { avisar(`"${a.nombre}" ya está abierta`); return null }
   const archivos = (await Promise.all(COLECCIONES.map(col => a.leer(`${col}.json`)))).filter(Boolean)
   const leidos = archivos.length ? await leerArchivos(archivos) : { avisos: [] }
@@ -491,4 +510,18 @@ export async function quitarCarpeta(clave) {
   CS.lista = CS.lista.filter(c => c.clave !== clave)
   almacenes.delete(clave); registros.delete(clave); textos.delete(clave); leidas.delete(clave); delete escritos[clave]
   await persistir()
+}
+
+/** App de Windows: sincronizar (o no) con el celular el proyecto y su carpeta. */
+export async function ponerSincronizar(pid, valor) {
+  const c = CS.lista.find(x => x.proyectos.includes(pid))
+  if (!c) return
+  c.sincronizar = valor
+  await persistir()
+}
+
+/** App de Windows: abrir la carpeta del proyecto en el Explorador. */
+export function mostrarCarpeta(pid) {
+  const r = registros.get(CS.lista.find(x => x.proyectos.includes(pid))?.clave)
+  if (esWindows && r?.ruta) puente('mostrar', { metodo: 'POST', params: { carpeta: r.ruta } })
 }

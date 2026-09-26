@@ -200,6 +200,8 @@ impl Sincro {
             "huella": parche::huella(&datos),
             "docs": actual["docs"],
             "grupo": self.carpeta.grupo(),
+            // Clientes nuevos: este servidor acepta originales de fotos (fotos/<id>.<ext>).
+            "capacidades": ["fotos"],
         });
         match self.carpeta.base_de(id).filter(|b| pedido["base"].as_str() == Some(parche::huella(b).as_str())) {
             Some(base) => {

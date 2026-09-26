@@ -1,3 +1,5 @@
+import { puente } from './plataforma.js'
+
 // Una carpeta del disco vista por la app: leer, escribir y borrar archivos por ruta ("a/b.json").
 // Hoy con File System Access (Chrome/Edge/Comet de escritorio); la app de Windows (etapa E) da la
 // misma interfaz con su puente local, sin permisos del navegador.
@@ -64,15 +66,55 @@ export function almacenDeHandle(dir) {
  * privado del navegador (OPFS) se guardan por su ruta: guardar su handle hace caer a Chrome al leerlo.
  */
 export async function registroDe(almacen) {
+  if (almacen.tipo === 'windows') return { ruta: almacen.ruta }
   const ruta = await navigator.storage?.getDirectory?.().then(r => r.resolve(almacen.handle)).catch(() => null)
   return ruta ? { opfs: ruta } : { handle: almacen.handle }
 }
 
 export async function almacenDeRegistro(r) {
+  if (r?.ruta) return almacenWindows(r.ruta, r.nombre)
   if (r?.opfs) {
     let d = await navigator.storage.getDirectory()
     for (const p of r.opfs) d = await d.getDirectoryHandle(p, { create: true })
     return almacenDeHandle(d)
   }
   return r?.handle ? almacenDeHandle(r.handle) : null
+}
+
+/** La misma interfaz sobre el puente de la app de Windows: sin permisos del navegador. */
+export function almacenWindows(ruta, nombre = ruta.split(/[\\/]/).filter(Boolean).pop()) {
+  const p = r => ({ carpeta: ruta, ruta: r })
+  return {
+    tipo: 'windows',
+    nombre,
+    ruta,
+    permiso: async () => 'granted',
+    pedirPermiso: async () => true,
+    async leer(r) {
+      const res = await puente('leer', { params: p(r) })
+      if (res.status === 404) return null
+      if (!res.ok) throw new Error(`No se pudo leer ${r} (${res.status})`)
+      return new File([await res.blob()], r.split('/').pop(), { lastModified: +res.headers.get('X-Modificado') || 0 })
+    },
+    async escribir(r, contenido) {
+      const res = await puente('escribir', { metodo: 'PUT', params: p(r), cuerpo: contenido })
+      if (!res.ok) throw new Error(`No se pudo escribir ${r} (${res.status})`)
+    },
+    async borrar(r) { await puente('borrar', { metodo: 'POST', params: p(r) }) },
+    async subcarpetaNueva(n) {
+      const res = await puente('crear-subcarpeta', { metodo: 'POST', params: { carpeta: ruta, nombre: n } })
+      if (!res.ok) throw new Error(`No se pudo crear la carpeta (${res.status})`)
+      const d = await res.json()
+      return almacenWindows(d.ruta, d.nombre)
+    },
+    mismo: async otro => !!otro?.ruta && otro.ruta.toLowerCase() === ruta.toLowerCase()
+  }
+}
+
+/** Diálogo nativo de Windows para elegir una carpeta; null si se cancela. */
+export async function elegirCarpetaWindows(titulo) {
+  const res = await puente('elegir-carpeta', { metodo: 'POST', params: { titulo } })
+  if (res.status === 204) return null
+  const d = await res.json()
+  return almacenWindows(d.ruta, d.nombre)
 }

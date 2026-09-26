@@ -3,13 +3,20 @@
   import { untrack } from 'svelte'
   import Modal from './Modal.svelte'
   import Icono from './Icono.svelte'
-  import { S, avisar } from '../lib/store.svelte.js'
+  import { S, avisar, copiar } from '../lib/store.svelte.js'
   import { descargarTodo, descargarBib, leerArchivos, aplicar } from '../lib/io.svelte.js'
   import { CS, guardarAhora, darPermiso, elegirBiblioteca, usarComoBiblioteca } from '../lib/carpetas.svelte.js'
   import { haceCuanto } from '../lib/citas.js'
   import Sincronizar from './Sincronizar.svelte'
   import { esAndroid } from '../lib/plataforma.js'
   import { P, ponerPreferencia } from '../lib/preferencias.svelte.js'
+  import { esWindows, puente } from '../lib/plataforma.js'
+  let vincular = $state(null) // { codigo, qr } del servidor de esta PC
+  let aparatos = $state([])
+  if (esWindows) {
+    puente('emparejar').then(r => r.json()).then(v => (vincular = v)).catch(() => {})
+    puente('grupo').then(r => r.json()).then(g => (aparatos = g)).catch(() => {})
+  }
 
   let { onclose, archivosIniciales = null } = $props()
   let previa = $state(null) // datos leídos pendientes de confirmar
@@ -129,7 +136,19 @@
       <p class="suave nota">Puedes elegir uno, dos o los tres archivos. También puedes arrastrarlos sobre la ventana.</p>
     </section>
 
-    {#if !esAndroid}<Sincronizar />{/if}
+    {#if esWindows}
+      <section>
+        <div class="rotulo">Vincular celular</div>
+        <p class="suave nota">En el celular: Configuración → Sincronizar con la PC → escanea este código (mismo Wi-Fi). Solo viajan los proyectos marcados con <b>sincronizar</b> en su tarjeta.</p>
+        {#if vincular}
+          <div class="vincular">
+            <div class="qr">{@html vincular.qr}</div>
+            <div class="codigo"><code>{vincular.codigo}</code><button class="btn chico" onclick={() => copiar(vincular.codigo)}>Copiar código</button></div>
+          </div>
+        {:else}<p class="suave nota">El servidor de sincronización no responde.</p>{/if}
+        {#if aparatos.length}<p class="suave nota">Aparatos vinculados: {aparatos.map(a => a.nombre || a.id).join(', ')}</p>{/if}
+      </section>
+    {:else if !esAndroid}<Sincronizar />{/if}
   {/if}
 </Modal>
 
@@ -145,4 +164,9 @@
   .carpeta-txt { display: flex; flex-direction: column; gap: 2px; font-size: 13px; min-width: 0; }
   .carpeta-txt b { color: var(--ink); font-size: 14px; overflow-wrap: anywhere; }
   .error { color: var(--unreviewed); font-size: 12px; }
+  .vincular { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .qr { width: 180px; height: 180px; background: #fff; border-radius: 8px; padding: 6px; }
+  .qr :global(svg) { width: 100%; height: 100%; }
+  .codigo { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1 1 200px; }
+  .codigo code { overflow-wrap: anywhere; font-size: 11px; }
 </style>

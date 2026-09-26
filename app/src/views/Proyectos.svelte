@@ -9,7 +9,8 @@
   import BotonSincro from '../components/BotonSincro.svelte'
   import { B } from '../lib/buscador.svelte.js'
   import { esAndroid } from '../lib/plataforma.js'
-  import { CS, crearCarpetaDeProyecto, abrirCarpeta, elegirCarpetaPara, cerrarProyecto, sePuedeCerrar } from '../lib/carpetas.svelte.js'
+  import { CS, crearCarpetaDeProyecto, abrirCarpeta, elegirCarpetaPara, cerrarProyecto, sePuedeCerrar, ponerSincronizar, mostrarCarpeta } from '../lib/carpetas.svelte.js'
+  import { esWindows } from '../lib/plataforma.js'
 
   let { abrirDatos, abrirCelular } = $props()
   let nuevo = $state(false)
@@ -79,6 +80,10 @@
           <Icono nombre="carpeta" tam={14} />
           {#if c}<span class="nombre-c" title={c.nombre}>{c.nombre}{c.estado === 'sin-permiso' ? ' · sin permiso' : c.estado === 'error' ? ' · no se encuentra' : ''}</span>
           {:else}<span class="nombre-c">Sin carpeta</span><button class="btn chico" onclick={() => elegirCarpetaPara(p.id)}>Elegir carpeta</button>{/if}
+          {#if esWindows && c}
+            <label class="sinc" title="Sincronizar este proyecto con el celular"><input type="checkbox" checked={c.sincronizar !== false} onchange={e => ponerSincronizar(p.id, e.currentTarget.checked)} aria-label="Sincronizar con el celular" /><Icono nombre="sincro" tam={13} /></label>
+            <button class="icono-btn mini" aria-label="Mostrar carpeta" title="Abrir la carpeta en el Explorador" onclick={() => mostrarCarpeta(p.id)}><Icono nombre="externo" tam={13} /></button>
+          {/if}
           {#if sePuedeCerrar(p.id)}<button class="icono-btn mini" aria-label="Cerrar proyecto" title="Cerrar proyecto (su carpeta queda igual)" onclick={() => cerrar(p)}><Icono nombre="cerrar" tam={14} /></button>{/if}
         </div>
       {/if}
@@ -124,6 +129,8 @@
   .carpeta-p.alerta { color: var(--reviewed); }
   .nombre-c { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mini { width: 26px; height: 26px; }
+  .sinc { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; }
+  .sinc input { width: 14px; height: 14px; accent-color: var(--using); }
   .titulo { font-size: 19px; line-height: 1.3; margin-top: 14px; min-height: 76px; }
   .area { font-size: 13px; margin-top: 4px; }
   .cuentas { display: flex; gap: 16px; margin-top: 18px; font-size: 13px; }

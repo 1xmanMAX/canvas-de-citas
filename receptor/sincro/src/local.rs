@@ -173,7 +173,8 @@ impl Puente {
                     vacia(409)
                 }
             },
-            ("POST", "/local/elegir-carpeta") => match elegir_carpeta(parametro(url, "titulo").as_deref()) {
+            // Pruebas: CANVAS_ELEGIR_CARPETA responde el diálogo (no se puede automatizar el nativo).
+            ("POST", "/local/elegir-carpeta") => match std::env::var_os("CANVAS_ELEGIR_CARPETA").map(PathBuf::from).or_else(|| elegir_carpeta(parametro(url, "titulo").as_deref())) {
                 Some(p) => {
                     self.anotar(&p);
                     let nombre = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();

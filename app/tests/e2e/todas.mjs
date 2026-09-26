@@ -13,6 +13,80 @@ fs.mkdirSync(SALIDA, { recursive: true })
 
 const filtro = process.argv.slice(2)
 const SUITES = {
+  // App de Windows: la página con window.canvasWindows usa el puente del servidor real (sin permisos del navegador).
+  async windows(b) {
+    const s = suite('App de Windows (puente local)')
+    const crate = path.resolve(APP, '../receptor/sincro')
+    if (spawnSync('cargo', ['build', '--release', '--quiet'], { cwd: crate, stdio: 'inherit' }).status !== 0) { s.fallas.push('cargo build'); return s }
+    const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'canvas-win-'))
+    const tesis = path.join(raiz, 'tesis'), madre = path.join(raiz, 'madre'), nuevos = path.join(raiz, 'Canvas de Citas')
+    fs.mkdirSync(tesis, { recursive: true }); fs.mkdirSync(madre, { recursive: true })
+    const lienzo = { modo: 'libre', posiciones: {}, notas: [], fotos: [], listas: [], audios: [], conexiones: [], objetivos: {} }
+    const json = (col, items) => JSON.stringify({ [col]: items }, null, 2) + '\n'
+    fs.writeFileSync(path.join(tesis, 'proyectos.json'), json('proyectos', [{ id: 'proyecto_001', tipo: 'tesis', titulo: 'Tesis en Windows', objetivos_especificos: [], indicadores: [], canvas: lienzo }]))
+    fs.writeFileSync(path.join(tesis, 'fuentes.json'), json('fuentes', []))
+    fs.writeFileSync(path.join(tesis, 'citas.json'), json('citas', []))
+    const registro = path.join(raiz, 'proyectos-abiertos.json')
+    fs.writeFileSync(registro, JSON.stringify([{ clave: 'a', nombre: 'tesis', carpeta: tesis, proyectos: ['proyecto_001'], biblioteca: true, sincronizar: true }]))
+    const bin = path.join(crate, 'target', 'release', process.platform === 'win32' ? 'canvas-sincro.exe' : 'canvas-sincro')
+    const srv = spawn(bin, ['--registro', registro, '--estado', path.join(raiz, 'estado'), '--nuevos', nuevos, '--token-archivo', path.join(raiz, 'token.txt'), '--puerto', '0'], { env: { ...process.env, CANVAS_ELEGIR_CARPETA: madre } })
+    const info = JSON.parse(await new Promise(res => srv.stdout.once('data', d => res(String(d).split('\n')[0]))))
+    const pg = await pagina(b)
+    await pg.evaluateOnNewDocument(w => { window.canvasWindows = w }, { puerto: info.puerto, token: info.token })
+    const cuerpo = () => pg.evaluate(() => document.body.textContent)
+    const esperarQue = async (fn, ms = 12000) => { for (let t = 0; t < ms; t += 250) { if (await fn()) return true; await esperar(250) } return false }
+    const leer = (...p) => { try { return fs.readFileSync(path.join(...p), 'utf8') } catch { return null } }
+    try {
+      await pg.goto(URL_APP, { waitUntil: 'load' }); await esperar(2500)
+      await s.paso('abre los proyectos de sus carpetas sin pedir permisos', async () => {
+        await pg.goto(URL_APP + '#/', { waitUntil: 'load' })
+        if (!(await esperarQue(async () => (await cuerpo()).includes('Tesis en Windows')))) throw new Error('no cargó el proyecto de la carpeta')
+        if ((await cuerpo()).includes('Dar permiso')) throw new Error('pidió permiso')
+      })
+      await s.paso('lo que se edita se guarda en la carpeta del disco', async () => {
+        await pg.evaluate(() => (location.hash = '#/p/proyecto_001')); await esperar(900)
+        await pg.click('button[aria-label="Añadir nota"]')
+        await pg.type('dialog[open] textarea', 'Nota escrita en la app de Windows')
+        await clicTexto(pg, 'Guardar')
+        if (!(await esperarQue(async () => leer(tesis, 'proyectos.json')?.includes('Nota escrita en la app de Windows')))) throw new Error('no llegó al disco')
+        if (!(await esperarQue(async () => leer(tesis, 'CLAUDE.md') !== null))) throw new Error('sin CLAUDE.md')
+      })
+      await s.paso('nuevo proyecto: diálogo de Windows, su carpeta y el registro del servidor', async () => {
+        await pg.goto(URL_APP + '#/', { waitUntil: 'load' }); await esperar(800)
+        await pg.click('button[aria-label="Nuevo proyecto"]')
+        await pg.type('dialog[open] input[type=text]', 'Puentes: diseño')
+        await clicTexto(pg, 'Crear proyecto')
+        if (!(await esperarQue(async () => leer(madre, 'Puentes diseño', 'proyectos.json')?.includes('Puentes: diseño')))) throw new Error('no se creó madre/Puentes diseño/proyectos.json')
+        const reg = JSON.parse(leer(registro))
+        if (!reg.some(e => e.carpeta.endsWith('Puentes diseño') && e.proyectos.length === 1)) throw new Error('el servidor no lo tiene registrado: ' + JSON.stringify(reg))
+      })
+      await s.paso('"Sincronizar con el celular" se puede desmarcar por proyecto', async () => {
+        await pg.goto(URL_APP + '#/', { waitUntil: 'load' }); await esperar(800)
+        const celda = await pg.evaluateHandle(() => [...document.querySelectorAll('.celda')].find(x => x.textContent.includes('Puentes: diseño')))
+        await (await celda.asElement().$('input[aria-label="Sincronizar con el celular"]')).click()
+        if (!(await esperarQue(async () => JSON.parse(leer(registro)).some(e => e.carpeta.endsWith('Puentes diseño') && e.sincronizar === false)))) throw new Error('no se guardó en el registro')
+      })
+      await s.paso('Configuración → Vincular celular muestra el código y el QR', async () => {
+        await pg.click('button[aria-label="Configuración"]').catch(() => clicTexto(pg, 'Configuración'))
+        await pg.waitForSelector('dialog[open] .qr svg', { timeout: 8000 })
+        const codigo = await pg.$eval('dialog[open] .codigo code', e => e.textContent)
+        if (!codigo.startsWith('canvas-sync://')) throw new Error('código: ' + codigo)
+        await pg.screenshot({ path: path.join(SALIDA, 'windows-vincular.png') })
+        await pg.keyboard.press('Escape'); await esperar(300)
+      })
+      await s.paso('un proyecto que el servidor registró (llegó del celular) aparece al abrir', async () => {
+        const dir = path.join(nuevos, 'Del celular'); fs.mkdirSync(dir, { recursive: true })
+        fs.writeFileSync(path.join(dir, 'proyectos.json'), json('proyectos', [{ id: 'proyecto_050', tipo: 'tesis', titulo: 'Proyecto del celular', objetivos_especificos: [], indicadores: [], canvas: lienzo }]))
+        const reg = JSON.parse(leer(registro)); reg.push({ clave: 's1', nombre: 'Del celular', carpeta: dir, proyectos: ['proyecto_050'], biblioteca: false, sincronizar: true })
+        fs.writeFileSync(registro, JSON.stringify(reg))
+        await pg.reload({ waitUntil: 'load' })
+        if (!(await esperarQue(async () => (await cuerpo()).includes('Proyecto del celular')))) throw new Error('no apareció')
+      })
+    } finally { srv.kill() }
+    if (pg.errores.length) s.fallas.push(...pg.errores)
+    await pg.browserContext().close().catch(() => {})
+    return s
+  },
   // Carpetas: casos de pérdida de datos encontrados en la revisión (C1–C5, I3–I6).
   async carpetas2(b) {
     const s = suite('Carpetas: sin perder datos'), pg = await pagina(b)

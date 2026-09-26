@@ -33,7 +33,8 @@ async function sincronizarV2({ conexion, almacen, alProgreso, aparato }) {
     alProgreso('Leyendo la PC…')
     const local = await almacen.leerLocal()
     const base = sinBase ? null : await almacen.leerBase()
-    const r = await conexion.leer2({ dispositivo: aparato.id, nombre: aparato.nombre, base: base ? await huella(base) : null })
+    // capacidades: este cliente sabe pasar los originales de fotos (fotos/<id>.<ext>).
+    const r = await conexion.leer2({ dispositivo: aparato.id, nombre: aparato.nombre, base: base ? await huella(base) : null, capacidades: ['fotos'] })
     let remoto
     try {
       remoto = r.modo === 'parche' ? aplicar(base, r.parche) : r.datos
@@ -58,7 +59,7 @@ async function sincronizarV2({ conexion, almacen, alProgreso, aparato }) {
     }
     const aqui = cambiadas(local, resultado)
     if (Object.keys(aqui).length) await almacen.escribirLocal(aqui)
-    const { bajados, subidos } = await pasarDocs({ conexion, almacen, alProgreso, docsPc: r.docs })
+    const { bajados, subidos } = await pasarDocs({ conexion, almacen, alProgreso, docsPc: r.docs, conFotos: !!r.capacidades?.includes('fotos') })
     await almacen.guardarBase(resultado)
     return {
       conflictos: conflictos.length, bajados, subidos, reintentos,
@@ -93,7 +94,7 @@ async function sincronizarV1({ conexion, almacen, alProgreso }) {
 }
 
 /** Documentos (PDF/HTML): baja los que faltan aquí y sube los que faltan en la PC. */
-async function pasarDocs({ conexion, almacen, alProgreso, docsPc = [] }) {
+async function pasarDocs({ conexion, almacen, alProgreso, docsPc = [], conFotos = false }) {
   let bajados = 0, subidos = 0
   for (const d of docsPc) {
     if (await almacen.tieneDoc(d.ruta)) continue
@@ -103,7 +104,8 @@ async function pasarDocs({ conexion, almacen, alProgreso, docsPc = [] }) {
   }
   const enPc = new Set(docsPc.map(d => d.ruta))
   for (const d of await almacen.docsLocales()) {
-    if (enPc.has(d.ruta)) continue
+    // Un servidor que no declara la capacidad "fotos" rechazaría esas rutas.
+    if (enPc.has(d.ruta) || (!conFotos && d.ruta.startsWith('fotos/'))) continue
     alProgreso(`Subiendo ${d.ruta.split('/')[1]}…`)
     await conexion.subirDoc(d.ruta, await almacen.leerDoc(d.ruta))
     subidos++

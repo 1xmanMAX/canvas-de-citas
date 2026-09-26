@@ -130,6 +130,7 @@ fn apk_viejo_sincroniza_con_el_servidor_multicarpeta() {
     assert_eq!(r.estado, 200);
     let v = s.clave.descifrar_json(std::str::from_utf8(&r.cuerpo).unwrap()).unwrap();
     assert_eq!(v["modo"], "completo");
+    assert_eq!(v["capacidades"], json!(["fotos"]), "el servidor declara que acepta fotos/");
     assert_eq!(ids(&v["datos"]["proyectos"]), ["proyecto_001", "proyecto_002"]);
     assert!(v["docs"].as_array().unwrap().iter().all(|d| !d["ruta"].as_str().unwrap().starts_with("fotos/")), "un APK viejo no ve fotos/");
     // Envía todo con un cambio en cada proyecto.
