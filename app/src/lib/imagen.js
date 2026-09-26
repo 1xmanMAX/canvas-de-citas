@@ -35,8 +35,9 @@ export async function prepararFoto(archivo) {
   if (t.reducir || !EXT[archivo.type]) {
     const tela = Object.assign(document.createElement('canvas'), { width: t.ancho, height: t.alto })
     tela.getContext('2d').drawImage(bmp, 0, 0, t.ancho, t.alto)
-    original = await new Promise(res => tela.toBlob(res, 'image/jpeg', 0.9))
-    extension = 'jpg'
+    // Sin memoria para el lienzo, toBlob da null: se guarda el archivo tal cual.
+    const reducido = await new Promise(res => tela.toBlob(res, 'image/jpeg', 0.9))
+    if (reducido) { original = reducido; extension = 'jpg' }
   }
   bmp.close?.()
   return { imagen, proporcion, original, extension }

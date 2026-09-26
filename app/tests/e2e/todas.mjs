@@ -13,6 +13,81 @@ fs.mkdirSync(SALIDA, { recursive: true })
 
 const filtro = process.argv.slice(2)
 const SUITES = {
+  // Visor de fotos: grosor del trazo con el zoom, pellizco al dibujar con los dedos, falla al guardar el original.
+  async trazos(b) {
+    const s = suite('Visor de fotos: trazos y fallas'), pg = await pagina(b)
+    await conEjemplo(pg)
+    const abrirNueva = async p => {
+      await (await p.$('input[type=file][accept="image/*"]')).uploadFile(IMG)
+      await p.waitForSelector('dialog.visor-foto[open] .capa img', { timeout: 8000 }); await esperar(400)
+    }
+    // Píxeles rojos (tinta roja) dentro del área del visor.
+    const rojos = async () => {
+      const area = await pg.$('dialog.visor-foto .area')
+      const png = await area.screenshot({ encoding: 'base64' })
+      return pg.evaluate(async src => {
+        const img = new Image(); img.src = 'data:image/png;base64,' + src; await img.decode()
+        const c = Object.assign(document.createElement('canvas'), { width: img.width, height: img.height })
+        const x = c.getContext('2d'); x.drawImage(img, 0, 0)
+        const d = x.getImageData(0, 0, c.width, c.height).data
+        let n = 0
+        for (let i = 0; i < d.length; i += 4) if (d[i] > 150 && d[i + 1] < 90 && d[i + 2] < 90) n++
+        return n
+      }, png)
+    }
+    await s.paso('el grosor del trazo crece con el zoom (como en la tarjeta)', async () => {
+      await abrirNueva(pg)
+      await pg.keyboard.press('d')
+      const r = await (await pg.$('dialog.visor-foto .area')).boundingBox()
+      const cx = r.x + r.width / 2, cy = r.y + r.height / 2
+      await pg.mouse.move(cx - 40, cy); await pg.mouse.down(); await pg.mouse.move(cx + 40, cy, { steps: 8 }); await pg.mouse.up()
+      const a1 = await rojos()
+      for (let i = 0; i < 4; i++) await pg.keyboard.press('+')
+      await esperar(300)
+      const a2 = await rojos()
+      if (!(a2 > a1 * 4)) throw new Error(`el trazo no engrosó con el zoom (${a1} → ${a2} píxeles)`)
+    })
+    await s.paso('pellizcar con dos dedos en modo dibujar hace zoom y no deja trazos', async () => {
+      await pg.keyboard.press('0'); await esperar(200)
+      const trazos0 = await pg.$eval('dialog.visor-foto .capa polyline', l => l.length)
+      const porc = () => pg.$eval('dialog.visor-foto .barra-zoom .porc', e => parseInt(e.textContent))
+      const k0 = await porc()
+      const cdp = await pg.createCDPSession()
+      const r = await (await pg.$('dialog.visor-foto .area')).boundingBox()
+      const a = { x: r.x + r.width / 2 - 30, y: r.y + r.height / 2 }, c = { x: r.x + r.width / 2 + 30, y: r.y + r.height / 2 }
+      const toque = (type, ps) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: ps.map((p, i) => ({ x: p.x, y: p.y, id: i })) })
+      await toque('touchStart', [a]); await esperar(30)
+      await toque('touchStart', [a, c]); await esperar(30)
+      for (let i = 1; i <= 8; i++) { await toque('touchMove', [{ x: a.x - 12 * i, y: a.y }, { x: c.x + 12 * i, y: c.y }]); await esperar(20) }
+      await toque('touchEnd', []); await esperar(300)
+      await cdp.detach()
+      const k1 = await porc(), trazos1 = await pg.$eval('dialog.visor-foto .capa polyline', l => l.length)
+      if (!(k1 > k0 * 1.3)) throw new Error(`no hizo zoom (${k0}% → ${k1}%)`)
+      if (trazos1 !== trazos0) throw new Error(`dejó trazos sueltos (${trazos0} → ${trazos1})`)
+      await pg.keyboard.press('Escape'); await esperar(300)
+    })
+    await s.paso('si no se puede guardar el original, la foto nueva igual se guarda', async () => {
+      const p2 = await pagina(b)
+      await p2.evaluateOnNewDocument(() => {
+        const put = IDBObjectStore.prototype.put
+        IDBObjectStore.prototype.put = function (v, k) {
+          if (this.name === 'documentos' && String(k).startsWith('foto_')) throw new DOMException('lleno', 'QuotaExceededError')
+          return put.call(this, v, k)
+        }
+      })
+      await conEjemplo(p2)
+      const antes = (await lienzoGuardado(p2)).fotos.length
+      await abrirNueva(p2)
+      await clicTexto(p2, 'Guardar'); await esperar(800)
+      if (await p2.$('dialog.visor-foto[open]')) throw new Error('el visor quedó abierto')
+      const despues = (await lienzoGuardado(p2)).fotos.length
+      await p2.browserContext().close().catch(() => {})
+      if (despues !== antes + 1) throw new Error(`no se guardó la foto (${antes} → ${despues})`)
+    })
+    if (pg.errores.length) s.fallas.push(...pg.errores)
+    await pg.browserContext().close().catch(() => {})
+    return s
+  },
   // Visor de fotos: abrir, hacer zoom con la rueda, dibujar un trazo y guardarlo; panel en celular.
   async fotos(b) {
     const s = suite('Visor de fotos'), pg = await pagina(b)
@@ -58,6 +133,7 @@ const SUITES = {
       if (await pg.$('dialog.visor-foto[open]')) throw new Error('Escape no cerró el visor')
     })
     if (pg.errores.length) s.fallas.push(...pg.errores)
+    await pg.browserContext().close().catch(() => {})
     return s
   },
   // Gestos del lienzo en PC: rueda del mouse = zoom; botón central = mover.
@@ -100,6 +176,7 @@ const SUITES = {
       if (await pg.$('dialog[open]')) throw new Error('abrió la fuente')
     })
     if (pg.errores.length) s.fallas.push(...pg.errores)
+    await pg.browserContext().close().catch(() => {})
     return s
   },
   // Tarjetas del lienzo: notas, listas, voz, fotos, conexiones, corcho, búsqueda, sub-lienzo.

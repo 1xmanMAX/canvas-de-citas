@@ -286,11 +286,22 @@ export function rutaDeDocumento(id) {
   return S.fuentePorId.get(id)?.documento_original || buscarFoto(id)?.foto.original || null
 }
 
-/** Guarda el original de una foto ya colocada en el lienzo (luego hay que guardar el proyecto). */
+/**
+ * Guarda el original de una foto (luego hay que guardar el proyecto). Si no se puede (memoria llena,
+ * imagen sin decodificar) la foto sigue con su miniatura: avisa y devuelve false, nunca lanza.
+ */
 export async function guardarOriginalFoto(foto, blob, extension) {
-  await db.poner('documentos', { nombre: `${foto.id}.${extension}`, tipo: blob.type, blob }, foto.id)
+  try {
+    if (!blob) throw new Error('la imagen no se pudo preparar')
+    await db.poner('documentos', { nombre: `${foto.id}.${extension}`, tipo: blob.type, blob }, foto.id)
+  } catch (e) {
+    console.warn(e)
+    avisar('No se guardó la foto en alta resolución: ' + (e?.message || e))
+    return false
+  }
   foto.original = `fotos/${foto.id}.${extension}`
   cambio(foto.id)
+  return true
 }
 
 /** Original de la foto; una duplicada comparte el de su foto de origen (misma ruta). */

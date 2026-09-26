@@ -89,12 +89,19 @@
     if (e.button === 2 || e.target.closest?.('button')) return
     area.setPointerCapture(e.pointerId)
     if (e.pointerType === 'pen') lapizVisto = true
+    // Segundo dedo mientras el primero dibujaba: era el comienzo de un pellizco. Si el trazo acaba de
+    // empezar se descarta, y el primer dedo pasa a formar parte del pellizco.
+    if (trazo?.tactil && e.pointerType === 'touch') {
+      if (performance.now() - trazo.t0 < 400) o.trazos = o.trazos.slice(0, -1)
+      punteros.set(trazo.id, trazo.pos)
+      trazo = null
+    }
     const dibuja = e.button === 0 && !punteros.size &&
       (e.pointerType === 'pen' || (modo === 'dibujar' && !(e.pointerType === 'touch' && lapizVisto)))
     const p = local(e)
     if (dibuja) {
       const [x, y] = aImagen(v, p.x, p.y, ANCHO, alto)
-      trazo = { id: e.pointerId, x, y }
+      trazo = { id: e.pointerId, x, y, pos: p, tactil: e.pointerType === 'touch', t0: performance.now() }
       o.trazos = [...o.trazos, { c: color, g: color === 'amarillo' ? 28 : grosor, p: [`${x},${y}`] }]
       return
     }
@@ -109,6 +116,7 @@
   function mover(e) {
     const p = local(e)
     if (trazo && e.pointerId === trazo.id) {
+      trazo.pos = p
       const [x, y] = aImagen(v, p.x, p.y, ANCHO, alto)
       if (Math.hypot(x - trazo.x, y - trazo.y) < 3) return
       trazo.x = x; trazo.y = y
