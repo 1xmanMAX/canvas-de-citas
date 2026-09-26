@@ -1,7 +1,8 @@
 // Tarjetas libres del lienzo (notas, listas de tareas, notas de voz y fotos): estilos, medidas
 // y búsqueda. Las comparten el lienzo del proyecto y los sub-lienzos de cada objetivo.
 import { S } from './store.svelte.js'
-import { F, envolver, limpiarCache } from './texto.js'
+import { F, envolver, limpiarCache, ancho } from './texto.js'
+import { etiquetasDe, colorEtiqueta, textosTarjeta } from './etiquetas.js'
 import { cajaFoto } from './medidas-foto.js'
 export { ANCHO_FOTO } from './medidas-foto.js'
 
@@ -94,12 +95,31 @@ const MEDIR = { notas: nota, listas: lista, audios: audio, fotos: foto }
 // Memo por tarjeta: mover una tarjeta no cambia su tamaño, así que no se vuelve a medir el texto.
 const memo = new WeakMap()
 const firma = (lista, o) => [lista, S.tipografias, o.texto, o.titulo, o.estilo, o.letra, o.creado ? 1 : 0, o.transcripcion,
-  o.anotacion, o.proporcion, o.ancho, o.items?.map(i => (i.hecho ? '1' : '0') + i.t).join('\u0001')].join('\u0002')
+  o.anotacion, o.proporcion, o.ancho, o.etiquetas?.join('|'), o.items?.map(i => (i.hecho ? '1' : '0') + i.t).join('\u0001')].join('\u0002')
+// Chips de etiquetas (#tema) y menciones (@Persona) bajo la tarjeta: hasta 3 y un "+n".
+const PALETA_CHIP = ['#E8E1F5', '#DDEBF7', '#DFF2E4', '#FBEBD3', '#F8DEDC', '#E3F1F1', '#F2EED9', '#ECE3DA']
+const FUENTE_CHIP = '600 10.5px "Work Sans", system-ui, sans-serif'
+function chipsDe(o, w) {
+  const { temas, personas } = etiquetasDe(textosTarjeta(o), o.etiquetas)
+  const todas = [...temas.map(t => ({ t: '#' + t, persona: false })), ...personas.map(t => ({ t, persona: true }))]
+  const out = []
+  let x = 8
+  for (const [i, c] of todas.entries()) {
+    const cw = Math.ceil(ancho(c.t, FUENTE_CHIP)) + 14
+    if (i === 3 || x + cw > w - 8) { out.push({ t: `+${todas.length - i}`, x, w: 28, color: '#ECE8DF', persona: false }); break }
+    out.push({ ...c, x, w: cw, color: c.persona ? '#FFFFFF' : PALETA_CHIP[colorEtiqueta(c.t)] })
+    x += cw + 4
+  }
+  return out
+}
+
 /** Medidas de una tarjeta; depende de S.tipografias para remedir cuando cargan las letras. */
 export function medir(lista, obj) {
   const f = firma(lista, obj), m = memo.get(obj)
   if (m?.f === f) return m.d
-  const d = MEDIR[lista](obj)
+  let d = MEDIR[lista](obj)
+  const chips = chipsDe(obj, d.w)
+  if (chips.length) d = { ...d, chips, chipsY: d.h - 4, h: d.h + 22 }
   memo.set(obj, { f, d })
   return d
 }

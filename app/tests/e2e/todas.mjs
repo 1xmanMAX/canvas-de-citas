@@ -13,6 +13,60 @@ fs.mkdirSync(SALIDA, { recursive: true })
 
 const filtro = process.argv.slice(2)
 const SUITES = {
+  // Etiquetas #/@ y buscador general (Ctrl+F).
+  async etiquetas(b) {
+    const s = suite('Etiquetas y buscador'), pg = await pagina(b)
+    await conEjemplo(pg)
+    const nota = async texto => {
+      await pg.click('button[aria-label="Añadir nota"]')
+      await pg.type('dialog[open] textarea', texto)
+      await clicTexto(pg, 'Guardar'); await esperar(400)
+    }
+    await s.paso('una nota con #tema y @persona muestra sus chips', async () => {
+      await nota('Revisar #vial con @Villarreal')
+      const chips = await pg.$$eval('g.tarjeta.notas .etq text', ts => Array.from(ts, t => t.textContent))
+      if (!chips.includes('#vial') || !chips.includes('@Villarreal')) throw new Error('chips: ' + chips)
+    })
+    await s.paso('autocompletar al escribir #', async () => {
+      await pg.click('button[aria-label="Añadir nota"]')
+      await pg.type('dialog[open] textarea', 'otra idea #vi')
+      await pg.waitForSelector('.autocompletar li', { timeout: 3000 })
+      await pg.keyboard.press('Enter')
+      const v = await pg.$eval('dialog[open] textarea', t => t.value)
+      if (!v.includes('#vial ')) throw new Error('quedó: ' + v)
+      await clicTexto(pg, 'Guardar'); await esperar(300)
+    })
+    await s.paso('el buscador del lienzo filtra por #tema', async () => {
+      await nota('sin etiqueta')
+      await pg.type('#buscar-fuente', '#vial'); await esperar(300)
+      const notas = await pg.$$eval('g.tarjeta.notas', gs => Array.from(gs, g => [g.textContent.includes('sin etiqueta'), g.textContent.includes('#vial'), g.classList.contains('atenuada')]))
+      if (!notas.some(([sin, , at]) => sin && at)) throw new Error('no atenuó la nota sin etiqueta')
+      if (notas.some(([, con, at]) => con && at)) throw new Error('atenuó una nota con #vial')
+      await pg.$eval('#buscar-fuente', i => { i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })) }); await esperar(200)
+    })
+    await s.paso('Ctrl+F abre el buscador general y encuentra por @persona', async () => {
+      await pg.keyboard.down('Control'); await pg.keyboard.press('f'); await pg.keyboard.up('Control')
+      await pg.waitForSelector('dialog[open] .buscador input', { timeout: 3000 })
+      await pg.type('dialog[open] .buscador input', '@villarreal')
+      await pg.waitForSelector('dialog[open] .resultado', { timeout: 3000 })
+      await pg.screenshot({ path: path.join(SALIDA, 'buscador.png') })
+    })
+    await s.paso('elegir un resultado centra y resalta la tarjeta', async () => {
+      await pg.click('dialog[open] .resultado'); await esperar(900)
+      if (await pg.$('dialog[open]')) throw new Error('no cerró el buscador')
+      if (!(await pg.$('g.tarjeta.notas rect.marca'))) throw new Error('no resaltó la tarjeta')
+    })
+    await s.paso('pestaña Etiquetas y personas cuenta cada una', async () => {
+      await pg.click('button[aria-label="Buscar en todo"]')
+      await clicTexto(pg, 'Etiquetas y personas')
+      const txt = await pg.$eval('dialog[open] .buscador', d => d.textContent)
+      if (!/#vial\s*2/.test(txt)) throw new Error('no cuenta #vial: ' + txt.slice(0, 200))
+      await pg.keyboard.press('Escape')
+    })
+    if (pg.errores.length) s.fallas.push(...pg.errores)
+    await pg.browserContext().close().catch(() => {})
+    return s
+  },
   // Visor de fotos: grosor del trazo con el zoom, pellizco al dibujar con los dedos, falla al guardar el original.
   async trazos(b) {
     const s = suite('Visor de fotos: trazos y fallas'), pg = await pagina(b)
@@ -49,7 +103,7 @@ const SUITES = {
     })
     await s.paso('pellizcar con dos dedos en modo dibujar hace zoom y no deja trazos', async () => {
       await pg.keyboard.press('0'); await esperar(200)
-      const trazos0 = await pg.$eval('dialog.visor-foto .capa polyline', l => l.length)
+      const trazos0 = await pg.$$eval('dialog.visor-foto .capa polyline', l => l.length)
       const porc = () => pg.$eval('dialog.visor-foto .barra-zoom .porc', e => parseInt(e.textContent))
       const k0 = await porc()
       const cdp = await pg.createCDPSession()
@@ -61,7 +115,7 @@ const SUITES = {
       for (let i = 1; i <= 8; i++) { await toque('touchMove', [{ x: a.x - 12 * i, y: a.y }, { x: c.x + 12 * i, y: c.y }]); await esperar(20) }
       await toque('touchEnd', []); await esperar(300)
       await cdp.detach()
-      const k1 = await porc(), trazos1 = await pg.$eval('dialog.visor-foto .capa polyline', l => l.length)
+      const k1 = await porc(), trazos1 = await pg.$$eval('dialog.visor-foto .capa polyline', l => l.length)
       if (!(k1 > k0 * 1.3)) throw new Error(`no hizo zoom (${k0}% → ${k1}%)`)
       if (trazos1 !== trazos0) throw new Error(`dejó trazos sueltos (${trazos0} → ${trazos1})`)
       await pg.keyboard.press('Escape'); await esperar(300)

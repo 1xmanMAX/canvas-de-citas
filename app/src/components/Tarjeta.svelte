@@ -113,6 +113,15 @@
     {/if}
   {/if}
 
+  {#if !simple && d.chips}
+    {#each d.chips as c}
+      <g transform="translate({c.x} {d.chipsY})" class="etq" class:persona={c.persona}>
+        <rect width={c.w} height="17" rx="8.5" fill={c.color} />
+        <text x={c.w / 2} y="12" text-anchor="middle">{c.t}</text>
+      </g>
+    {/each}
+  {/if}
+
   {#if origen || resaltado}<rect x="-4" y="-4" width={d.w + 8} height={d.h + 8} rx="10" class="marca" />{/if}
   {#if o.origen && alVinculo}
     <!-- Vínculo: abre el documento en el punto exacto de donde salió esta cita -->
@@ -128,6 +137,9 @@
 
 <style>
   :global(.tarjeta) { cursor: grab; }
+  .etq text { font: 600 10.5px 'Work Sans', system-ui, sans-serif; fill: #3A372F; }
+  .etq.persona rect { stroke: #2F4FB5; stroke-width: 1; }
+  .etq.persona text { fill: #2F4FB5; }
   .esquina { fill: var(--ink); opacity: 0; cursor: nwse-resize; }
   :global(.tarjeta:hover) .esquina { opacity: .3; }
   :global(.tarjeta.atenuada) { opacity: .28; }
