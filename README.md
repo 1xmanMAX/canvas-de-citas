@@ -79,6 +79,12 @@ citas y exportar a `.bib` están igual en los dos. Lo que cambia es solo **cómo
 
 ---
 
+## Descargar
+
+En **[Releases](https://github.com/1xmanMAX/canvas-de-citas/releases)** está la última versión:
+el instalador de Windows (`Instalar.cmd`: accesos directos + sincronización) y la app para
+Android (`.apk`).
+
 ## Empezar
 
 1. Abre la [app](https://1xmanmax.github.io/canvas-de-citas/). La primera vez puedes tocar
