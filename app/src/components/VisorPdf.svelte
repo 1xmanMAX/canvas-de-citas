@@ -228,6 +228,52 @@
     return () => { cont.removeEventListener('touchstart', bloquear); cont.removeEventListener('touchmove', bloquear) }
   })
 
+  // --- Seleccionar texto con el dedo (celular) ---
+  // En Android la selección nativa sobre la capa de texto marca una palabra y al arrastrar desplaza
+  // la página. En este modo, arrastrar el dedo selecciona desde donde se tocó hasta donde se llega.
+  let seleccionando = $state(false)
+  let inicioSel = null
+  /** El punto de texto (nodo y carácter) más cercano a (x, y) de la pantalla. */
+  function puntoDeTexto(x, y) {
+    let mejor = null, dist = Infinity
+    for (const el of cont.querySelectorAll('.capa-texto text')) {
+      const r = el.getBoundingClientRect()
+      if (!r.width) continue
+      const dy = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0
+      const dx = x < r.left ? r.left - x : x > r.right ? x - r.right : 0
+      const d = dy * 4 + dx // misma línea antes que otra línea cercana
+      if (d < dist) { dist = d; mejor = { el, r } }
+    }
+    if (!mejor) return null
+    const nodo = mejor.el.firstChild
+    if (!nodo) return null
+    const largo = nodo.textContent.length
+    const off = Math.max(0, Math.min(largo, Math.round(((x - mejor.r.left) / mejor.r.width) * largo)))
+    return { nodo, off }
+  }
+  function seleccionar(a, b) {
+    const r = document.createRange()
+    const antes = a.nodo === b.nodo ? a.off <= b.off : !!(a.nodo.compareDocumentPosition(b.nodo) & Node.DOCUMENT_POSITION_FOLLOWING)
+    const [p, q] = antes ? [a, b] : [b, a]
+    r.setStart(p.nodo, p.off)
+    r.setEnd(q.nodo, q.off)
+    const s = document.getSelection()
+    s.removeAllRanges()
+    s.addRange(r)
+  }
+  function selAbajo(e) {
+    if (!seleccionando || e.button > 0) return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    inicioSel = puntoDeTexto(e.clientX, e.clientY)
+  }
+  function selMueve(e) {
+    if (!seleccionando || !inicioSel) return
+    const fin = puntoDeTexto(e.clientX, e.clientY)
+    if (fin) seleccionar(inicioSel, fin)
+  }
+  const selArriba = () => (inicioSel = null)
+
   function irAPagina(n) {
     n = Math.min(tamanos.length, Math.max(1, n)) - 1
     cont.scrollTop = tops[n] - MARGEN
@@ -372,6 +418,8 @@
     title="Recortar un área (gráfico, tabla o texto escaneado) y citarla en el lienzo">
     <Icono nombre="recorte" tam={14} />{V.recortando ? 'Arrastra sobre la página…' : 'Recortar'}
   </button>
+  <button class="icono-btn mini" class:activo={seleccionando} aria-pressed={seleccionando} aria-label="Seleccionar texto" title="Seleccionar texto con el dedo (arrastra desde la primera palabra hasta la última)"
+    onclick={() => (seleccionando = !seleccionando)}><Icono nombre="lista" tam={15} /></button>
   <span class="zoom-pdf">
     <button class="icono-btn mini" aria-label="Alejar" onclick={() => zoom(1 / 1.2)}>−</button>
     <button class="porc" title="Ajustar al ancho" onclick={ajustarAncho}>{Math.round(escala * 100)}%</button>
@@ -379,8 +427,9 @@
   </span>
 </div>
 
-<div class="pdf" class:recortando={V.recortando} bind:this={cont} bind:clientWidth={W} bind:clientHeight={H} onscroll={alDesplazar}
-  onpointerdown={dedoAbajo} onpointermove={dedoMueve} onpointerup={dedoArriba} onpointercancel={dedoArriba} role="document">
+<div class="pdf" class:recortando={V.recortando} class:seleccionando bind:this={cont} bind:clientWidth={W} bind:clientHeight={H} onscroll={alDesplazar}
+  onpointerdown={e => { selAbajo(e); dedoAbajo(e) }} onpointermove={e => { selMueve(e); dedoMueve(e) }} onpointerup={e => { selArriba(); dedoArriba(e) }} onpointercancel={e => { selArriba(); dedoArriba(e) }}
+  oncontextmenu={e => seleccionando && e.preventDefault()} role="document">
   {#if cargando}<p class="estado">Abriendo PDF…</p>{/if}
   {#if error}<p class="estado error">{error}</p>{/if}
   <div class="lamina" bind:this={lamina} style="height:{alto}px;width:{ancho}px">
@@ -429,6 +478,8 @@
   .capa-texto text { fill: transparent; font-family: sans-serif; white-space: pre; cursor: text; }
   .recortando .pag-pdf { cursor: crosshair; touch-action: none; }
   .recortando .capa-texto { pointer-events: none; }
+  .seleccionando .pag-pdf { touch-action: none; cursor: text; }
+  .activo { background: var(--accent-soft); color: var(--accent); }
   .marco-recorte { position: absolute; border: 2px dashed #C0392B; background: rgba(192, 57, 43, .12); pointer-events: none; }
   .btn.activo { background: var(--accent); color: var(--paper); border-color: var(--accent); }
   .barra-pdf .btn { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }

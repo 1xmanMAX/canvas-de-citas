@@ -90,6 +90,24 @@ const SUITES = {
       if (!(t[0].g > t[1].g * 1.8)) throw new Error(`el grosor no siguió al zoom: ${t[0].g} vs ${t[1].g}`)
       if (!t[2].r) throw new Error('el último trazo no es de resaltador')
     })
+    await s.paso('PDF: en modo "Seleccionar texto", arrastrar el dedo selecciona varias palabras sin desplazar', async () => {
+      await pg.keyboard.press('Escape').catch(() => {}); await pg.evaluate(() => (location.hash = '#/p/proyecto_001')); await esperar(600)
+      await adjuntar(pg, 'fuente_003', PDF)
+      await clicTexto(pg, 'Abrir')
+      await pg.waitForFunction(() => document.querySelectorAll('.capa-texto text').length > 20, { timeout: 30000 }); await esperar(500)
+      await pg.click('button[aria-label="Seleccionar texto"]'); await esperar(200)
+      const runs = await pg.$$eval('.capa-texto text', ts => Array.from(ts).slice(0, 40).map(t => { const r = t.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height, t: t.textContent } }).filter(r => r.w > 30 && r.y > 80))
+      const a = runs[0], z = runs.find(r => r.y > a.y + a.h * 1.5) || runs.at(-1)
+      const top0 = await pg.$eval('.pdf', c => c.scrollTop)
+      const p0 = { x: a.x + 2, y: a.y + a.h / 2 }, p1 = { x: z.x + z.w - 2, y: z.y + z.h / 2 }
+      await toque('touchStart', [p0]); await esperar(30)
+      for (let i = 1; i <= 8; i++) { await toque('touchMove', [{ x: p0.x + (p1.x - p0.x) * i / 8, y: p0.y + (p1.y - p0.y) * i / 8 }]); await esperar(25) }
+      await toque('touchEnd', []); await esperar(400)
+      const sel = await pg.evaluate(() => document.getSelection().toString().replace(/\s+/g, ' ').trim())
+      if (sel.split(' ').length < 4) throw new Error('seleccionó muy poco: "' + sel + '"')
+      if (Math.abs((await pg.$eval('.pdf', c => c.scrollTop)) - top0) > 5) throw new Error('se desplazó la página al seleccionar')
+      await pg.waitForSelector('::-p-xpath(//button[contains(., "Nota con la cita")])', { timeout: 3000 })
+    })
     if (pg.errores.length) s.fallas.push(...pg.errores)
     await pg.browserContext().close().catch(() => {})
     return s
