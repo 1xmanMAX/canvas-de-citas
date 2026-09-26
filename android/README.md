@@ -39,6 +39,12 @@ se instala a mano; no va al repo). Si Gradle no encuentra el SDK, crea
 `android/android/local.properties` con `sdk.dir=C\:\\Users\\<tú>\\AppData\\Local\\Android\\Sdk` (o define `ANDROID_HOME`).
 
 `npm run apk` compila `app/`, copia `app/dist` al proyecto (`cap sync`) y ejecuta Gradle.
+
+**Versión oficial** (`npm run apk:oficial` → `app-release.apk`): se firma con la llave oficial
+`canvas-de-citas.jks`, que con sus contraseñas va en `android/android/firma.properties`
+(ambos **fuera de git**; Max los guarda aparte). Todas las versiones que se instalen encima
+deben firmarse con esa misma llave: si se pierde, hay que desinstalar la app para instalar otra.
+`scripts/empaquetar-release.sh v1.2.3` arma todos los archivos de una versión.
 Tras cambiar el ícono: `npm run iconos`.
 
 **En la nube** (sin Android Studio): instalar las *command-line tools* en `~/android-sdk` y

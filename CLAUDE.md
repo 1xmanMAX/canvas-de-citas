@@ -68,6 +68,15 @@ Actions: el token de Max no tiene permiso `workflow`). Desde la nube el push sue
 la rama de trabajo: deja el cambio en una rama/PR y la publicación se hace desde la PC de Max
 (o pídele que la autorice). Commits con el email 139194352+1xmanMAX@users.noreply.github.com.
 
+## Versiones oficiales (Releases)
+
+`scripts/empaquetar-release.sh vX.Y.Z` arma en `dist-release/` el instalador de Windows
+(`instalador-windows/` + `canvas-sincro.exe` compilado con mingw), el APK firmado (llave oficial
+en `android/android/firma.properties` + `.jks`, **nunca en git**) y el zip web. Desde la nube no
+se pueden crear releases: se publican en la PC de Max con `scripts/publicar-release.ps1`
+(GitHub CLI), con notas en `docs/releases/vX.Y.Z.md`. Sube `versionName`/`versionCode` en
+`android/android/app/build.gradle` en cada versión.
+
 ## Estado y siguiente paso
 
 Hecho (sep. 2026): lienzo con tarjetas y tablero de corcho, rendimiento con tableros grandes,

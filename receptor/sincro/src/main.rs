@@ -12,11 +12,20 @@ fn arg(nombre: &str) -> Option<String> {
 }
 
 fn main() {
-    let carpeta = arg("--carpeta").expect("Uso: canvas-sincro --carpeta <ruta> [--puerto 47481] [--clave <base64>]");
+    let carpeta = arg("--carpeta").expect("Uso: canvas-sincro --carpeta <ruta> [--puerto 47481] [--clave <base64> | --clave-archivo <ruta>]");
     let puerto: u16 = arg("--puerto").and_then(|p| p.parse().ok()).unwrap_or(47481);
-    let (clave, clave_b64) = match arg("--clave") {
-        Some(k) => (Clave::desde_base64(&k).expect("clave inválida (base64 de 32 bytes)"), k),
-        None => Clave::nueva(),
+    let (clave, clave_b64) = match (arg("--clave"), arg("--clave-archivo")) {
+        (Some(k), _) => (Clave::desde_base64(&k).expect("clave inválida (base64 de 32 bytes)"), k),
+        // La clave vive en un archivo: se crea la primera vez y se reutiliza (el celular sigue vinculado).
+        (None, Some(ruta)) => match std::fs::read_to_string(&ruta).ok().and_then(|k| Clave::desde_base64(&k).ok().map(|c| (c, k.trim().to_string()))) {
+            Some(x) => x,
+            None => {
+                let (c, k) = Clave::nueva();
+                std::fs::write(&ruta, &k).expect("no se pudo guardar la clave");
+                (c, k)
+            }
+        },
+        (None, None) => Clave::nueva(),
     };
     let server = tiny_http::Server::http(("0.0.0.0", puerto)).expect("no se pudo abrir el puerto");
     let puerto = server.server_addr().to_ip().map(|a| a.port()).unwrap_or(puerto);

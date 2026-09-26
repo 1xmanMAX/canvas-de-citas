@@ -1,5 +1,11 @@
 apply plugin: 'com.android.application'
 
+// Firma de la versión oficial: la llave y sus contraseñas están en firma.properties (fuera de git,
+// ver android/README.md). Sin ese archivo, el APK de release sale sin firmar.
+def firmaArchivo = rootProject.file('firma.properties')
+def firma = new Properties()
+if (firmaArchivo.exists()) firmaArchivo.withInputStream { firma.load(it) }
+
 android {
     namespace = "pe.canvasdecitas.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -8,7 +14,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +22,19 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (firma.getProperty('storeFile')) {
+            oficial {
+                storeFile rootProject.file(firma.getProperty('storeFile'))
+                storePassword firma.getProperty('storePassword')
+                keyAlias firma.getProperty('keyAlias')
+                keyPassword firma.getProperty('keyPassword')
+            }
+        }
+    }
     buildTypes {
         release {
+            if (firma.getProperty('storeFile')) signingConfig signingConfigs.oficial
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

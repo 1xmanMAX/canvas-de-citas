@@ -5,7 +5,9 @@
   "scripts": {
     "sincronizar": "npm --prefix ../app run build && cap sync android",
     "apk": "npm run sincronizar && cd android && ./gradlew assembleDebug",
+    "apk:oficial": "npm run sincronizar && cd android && ./gradlew assembleRelease",
     "apk:windows": "npm run sincronizar && cd android && gradlew.bat assembleDebug",
+    "apk:oficial:windows": "npm run sincronizar && cd android && gradlew.bat assembleRelease",
     "iconos": "node scripts/iconos.mjs"
   },
   "dependencies": {
