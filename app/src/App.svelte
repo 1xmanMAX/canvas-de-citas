@@ -13,7 +13,9 @@
   import { iniciarSincroAutomatica } from './lib/sincro-app.svelte.js'
   import { recibidosAndroid, lienzoAbierto } from './lib/archivos.js'
   import { avisar } from './lib/store.svelte.js'
-  import { abrirArchivo, ACEPTADOS } from './lib/visor.svelte.js'
+  import { abrirArchivo, ACEPTADOS, V } from './lib/visor.svelte.js'
+  import { B } from './lib/buscador.svelte.js'
+  import Buscador from './components/Buscador.svelte'
 
   // Rutas por hash: #/  ·  #/p/<id>  ·  #/p/<id>/f/<fuente>  ·  #/p/<id>/o/<objetivo>[/f/<fuente>]
   //                 #/citas  ·  #/citas/<id>
@@ -59,6 +61,8 @@
 
   function teclas(e) {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') { e.preventDefault(); abrirArchivos() }
+    // Ctrl+F: buscador general (con un documento abierto, el visor busca dentro de él).
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'f' && !V.archivo) { e.preventDefault(); B.abierto = true }
   }
 
   // En Android no hay carpeta de almacenamiento ni receptor local: se sincroniza con la PC.
@@ -126,6 +130,8 @@
 {/if}
 
 <Visor />
+
+{#if B.abierto}<Buscador />{/if}
 
 {#if celular}
   <Celular onclose={() => (celular = false)} importarArchivos={archivos => { celular = false; datos = { archivos } }} />

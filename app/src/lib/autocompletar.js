@@ -1,5 +1,7 @@
 // Acción `use:autocompletar={{ sugerir }}` para inputs y textareas: al escribir "#algo" o "@algo"
 // muestra sugerencias bajo el campo; ↑/↓ elige, Enter o Tab inserta, Esc cierra.
+import { normalizar } from './etiquetas.js'
+
 const PALABRA = /(^|[^\p{L}\p{N}/.@&])([#@])(\p{L}[\p{L}\p{N}_.-]*)?$/u
 
 export function autocompletar(nodo, opciones) {
@@ -44,7 +46,7 @@ export function autocompletar(nodo, opciones) {
     rango = palabra()
     lista = rango ? sugerir(rango.prefijo, rango.parcial) : []
     // Nada que sugerir, o ya está escrita completa: no estorbar.
-    if (!lista.length || (lista.length === 1 && mostrarTexto(lista[0]) === rango.prefijo + rango.parcial)) return cerrar()
+    if (!lista.length || (lista.length === 1 && normalizar(mostrarTexto(lista[0])) === normalizar(rango.prefijo + rango.parcial))) return cerrar()
     activa = 0
     pintar()
   }

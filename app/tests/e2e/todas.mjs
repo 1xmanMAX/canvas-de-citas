@@ -355,6 +355,12 @@ const SUITES = {
     await s.paso('abre el PDF y dibuja páginas nítidas', async () => {
       await pg.waitForFunction(() => [...document.querySelectorAll('.pag-pdf canvas')].some(c => c.width > 0 && c.width >= c.getBoundingClientRect().width * .95), { timeout: 30000 })
     })
+    await s.paso('Ctrl+F con el PDF abierto busca en el documento, no abre el buscador general', async () => {
+      await pg.click('.pag-pdf canvas')
+      await pg.keyboard.down('Control'); await pg.keyboard.press('f'); await pg.keyboard.up('Control'); await esperar(300)
+      if (await pg.$('.buscador')) throw new Error('abrió el buscador general')
+      if (await pg.evaluate(() => document.activeElement?.id) !== 'pdf-buscar') throw new Error('el foco no fue a la búsqueda del PDF')
+    })
     await s.paso('búsqueda con resaltado', async () => {
       await pg.type('#pdf-buscar', 'rework'); await pg.keyboard.press('Enter')
       await pg.waitForFunction(() => /\d+\/\d+/.test(document.querySelector('.cuenta')?.textContent || ''), { timeout: 15000 })
