@@ -111,6 +111,13 @@ Las fotos se ven completas y se agrandan desde su esquina (`lib/medidas-foto.js`
 inferior en celular, anotaciones). Prueba: `npm run test:e2e -- gestos fotos`. Plan en curso de proyectos en carpetas,
 app de Windows y etiquetas: `docs/superpowers/specs/2026-09-25-proyectos-en-carpetas-windows-design.md`.
 
+**Etiquetas y buscador** (sep. 2026): `#tema` y `@Persona` en cualquier texto o como chips (campo opcional
+`etiquetas`: temas sin `#`, personas con `@`, como ya usaban las fuentes); núcleo puro `lib/etiquetas.js`
+(copia en `claude-skill/.../scripts/etiquetas.mjs`: mantener iguales), autocompletar (`lib/autocompletar.js`),
+chips en las tarjetas y buscador general **Ctrl+F** (`Buscador.svelte`, `lib/buscador.svelte.js`; con un PDF abierto
+Ctrl+F busca en el documento). Prueba: `npm run test:e2e -- etiquetas`. Ojo: clases globales `.chip` y `.panel`
+en `app.css` chocan con nombres locales; y al insertar texto con `String.replace`, `$$` se vuelve `$`.
+
 **Siguiente:** probar el APK en el celular de Max y hacer la **Tarea 8 del Plan 1** en su PC
 (receptor de Windows + "Vincular celular" con QR). Mientras tanto sirve `canvas-sincro.exe`
 (ver `android/README.md`).
