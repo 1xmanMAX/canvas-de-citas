@@ -12,7 +12,7 @@
   import { transcribirAudio } from '../lib/voz.js'
 
   /** `o` es una copia editable; `vinculos` los nombres de lo que está conectado a la tarjeta. */
-  let { lista, o = $bindable(), nueva = false, vinculos = [], onguardar, oneliminar, onduplicar, onvinculo = null, onclose } = $props()
+  let { lista, o = $bindable(), nueva = false, vinculos = [], onguardar, oneliminar, onduplicar, onvinculo = null, ontranscripcion = null, onclose } = $props()
 
   const TITULOS = { notas: ['Nueva nota', 'Nota'], listas: ['Nueva lista de tareas', 'Lista de tareas'], audios: ['Nueva nota de voz', 'Nota de voz'], fotos: ['Nueva foto', 'Foto'] }
   const titulo = $derived(TITULOS[lista][nueva ? 0 : 1])
@@ -42,6 +42,7 @@
   // En Android la transcripción se hace al terminar de grabar (ver lib/voz.js).
   let transcribiendo = $state(false)
   let errorVoz = $state('')
+  let guardado = false // se guardó mientras se transcribía: el texto va a la tarjeta guardada
   function grabado(r) {
     Object.assign(o, r)
     if (esAndroid && !o.transcripcion?.trim()) transcribir()
@@ -51,8 +52,10 @@
     transcribiendo = true
     errorVoz = ''
     try {
+      const id = o.id // al guardar se cierra el editor y o deja de existir
       const texto = await transcribirAudio(o.audio)
-      if (texto) o.transcripcion = texto
+      if (texto && guardado) ontranscripcion?.(id, texto)
+      else if (texto) o.transcripcion = texto
       else errorVoz = 'No se entendió nada en el audio.'
     } catch (e) {
       errorVoz = e?.message || String(e)
@@ -65,6 +68,7 @@
   function guardar() {
     if (lista === 'listas' && nuevaTarea.trim()) agregarTarea()
     if (!o.etiquetas?.length) delete o.etiquetas
+    guardado = true
     onguardar(o)
   }
 </script>

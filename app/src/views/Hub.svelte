@@ -263,6 +263,13 @@
     guardar()
     modal = null
   }
+  // La transcripción del celular llegó después de guardar la nota de voz.
+  function transcripcionTardia(id, texto) {
+    const t = cv.audios?.find(x => x.id === id)
+    if (!t || t.transcripcion?.trim()) return
+    t.transcripcion = texto
+    guardar()
+  }
   function eliminarModal() {
     eliminarTarjeta(cv, modal.lista, modal.o.id)
     guardar()
@@ -618,7 +625,7 @@
         onguardar={guardarModal} oneliminar={eliminarModal} onduplicar={duplicarModal} onclose={() => (modal = null)} />
     {:else}
       <EditorTarjeta lista={modal.lista} bind:o={modal.o} nueva={modal.nueva} vinculos={modal.nueva ? [] : vinculosDe(cv, modal.o.id, nombreDe)} onvinculo={() => { const t = modal.o; modal = null; abrirOrigen(t.origen, p.id, t.id) }}
-        onguardar={guardarModal} oneliminar={eliminarModal} onduplicar={duplicarModal} onclose={() => (modal = null)} />
+        onguardar={guardarModal} oneliminar={eliminarModal} onduplicar={duplicarModal} ontranscripcion={transcripcionTardia} onclose={() => (modal = null)} />
     {/if}
   {/key}
 {:else if modal?.grupo}

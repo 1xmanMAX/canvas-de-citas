@@ -1074,11 +1074,13 @@ const SUITES = {
           if (plugin === 'Archivos' && metodo === 'recibidos') { const a = window.__recibir || []; window.__recibir = []; return { archivos: a } }
           if (plugin === 'Voz' && metodo === 'transcribir') {
             window.__voz = { bytes: atob(opciones.pcm).length, frecuencia: opciones.frecuencia, idioma: opciones.idioma }
+            await new Promise(r => setTimeout(r, window.__demoraVoz || 0)) // el reconocedor real tarda
             return { texto: '  hola   desde Android ', idioma: 'es-US' }
           }
           throw new Error(`plugin no simulado: ${plugin}.${metodo}`)
         }
       }
+      window.SpeechRecognition = window.webkitSpeechRecognition = function () { (window.__reconocedorWeb ||= []).push('creado'); this.start = () => window.__reconocedorWeb.push('start'); this.stop = () => {}; this.abort = () => {} }
     }, codigo)
     const enPc = () => fs.readFileSync(path.join(carpeta, 'proyectos.json'), 'utf8')
     try {
@@ -1129,7 +1131,19 @@ const SUITES = {
         const v = await pg.evaluate(() => window.__voz)
         // ~1,5 s de audio a 16 kHz, 16 bits: unos 48 000 bytes.
         if (v.frecuencia !== 16000 || v.bytes < 32000 || v.bytes > 128000) throw new Error('audio mal convertido: ' + JSON.stringify(v))
+        if (await pg.evaluate(() => window.__reconocedorWeb?.length)) throw new Error('usó el reconocimiento de voz del WebView (no funciona en Android y ocupa el micrófono)')
         await clicTexto(pg, 'Guardar'); await esperar(300)
+      })
+      await s.paso('nota de voz: si se guarda antes de que termine la transcripción, igual queda guardada', async () => {
+        await pg.evaluate(() => { window.__demoraVoz = 2500 })
+        await pg.click('button[aria-label="Grabar nota de voz"]')
+        await pg.click('dialog[open] button[aria-label="Empezar a grabar"]')
+        await pg.waitForSelector('dialog[open] button[aria-label="Detener grabación"]', { timeout: 10000 }); await esperar(1200)
+        await pg.click('dialog[open] button[aria-label="Detener grabación"]'); await esperar(600)
+        await clicTexto(pg, 'Guardar'); await esperar(3500)
+        const audios = await pg.evaluate(() => new Promise(res => { const r = indexedDB.open('canvas-de-citas'); r.onsuccess = () => { const q = r.result.transaction('proyectos').objectStore('proyectos').get('proyecto_001'); q.onsuccess = () => res(q.result.canvas.audios.map(a => a.transcripcion)) } }))
+        if (audios.filter(x => x === 'hola desde Android').length < 2) throw new Error('la transcripción que llegó después de guardar se perdió: ' + JSON.stringify(audios))
+        await pg.evaluate(() => { window.__demoraVoz = 0 })
       })
       await s.paso('exportar los JSON y el .bib abre "Compartir" (el WebView no descarga)', async () => {
         await pg.evaluate(() => (location.hash = '#/')); await esperar(500)

@@ -1,10 +1,13 @@
 // Notas de voz: grabación con MediaRecorder (Opus a baja tasa: ~1,5 MB por 10 min),
 // forma de onda para la tarjeta y transcripción en vivo con el reconocimiento de voz del
 // navegador (Chrome/Edge; necesita internet). Sin librerías.
+import { esAndroid } from './plataforma.js'
+
 export const BARRAS = 48
 export const MAX_SEG = 600
 
-const Reconocedor = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
+// En Android el WebView trae el reconocedor pero no funciona: allí se transcribe al terminar (lib/voz.js).
+const Reconocedor = typeof window !== 'undefined' && !esAndroid && (window.SpeechRecognition || window.webkitSpeechRecognition)
 export const puedeTranscribir = !!Reconocedor
 export const puedeGrabar = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== 'undefined'
 
