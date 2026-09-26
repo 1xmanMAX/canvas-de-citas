@@ -8,3 +8,5 @@ pub mod parche;
 pub mod reparto;
 pub mod almacen;
 pub mod carpetas;
+pub mod local;
+pub mod arranque;

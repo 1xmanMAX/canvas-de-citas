@@ -122,7 +122,7 @@ fn documentos_a_las_carpetas_que_les_tocan() {
 fn apk_viejo_sincroniza_con_el_servidor_multicarpeta() {
     let (t, c) = escenario();
     let (clave, clave_b64) = Clave::nueva();
-    let s = Sincro { carpeta: Box::new(c), clave, clave_b64, puerto: 47481, tope: 1 << 24 };
+    let s = Sincro { carpeta: Box::new(c), clave, clave_b64, puerto: 47481, tope: 1 << 24, puente: None };
     let prueba = |url: &str| s.clave.cifrar_json(&json!({ "ruta": url }));
     // v2 sin "capacidades": igual que el APK de hoy.
     let pedido = s.clave.cifrar_json(&json!({"dispositivo": "cel1", "nombre": "Celular", "base": null}));

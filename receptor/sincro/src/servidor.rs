@@ -24,23 +24,27 @@ pub struct Sincro {
     pub puerto: u16,
     /// Tamaño máximo de un cuerpo (TOPE_CUERPO en producción; menor en pruebas).
     pub tope: usize,
+    /// Puente de archivos de la app de Windows (`/local/*`); `None` en el servidor de una carpeta.
+    pub puente: Option<crate::local::Puente>,
 }
 
 pub struct Respuesta {
     pub estado: u16,
     pub tipo: &'static str,
     pub cuerpo: Vec<u8>,
+    /// Cabeceras extra (p. ej. X-Modificado en /local/leer).
+    pub cabeceras: Vec<(&'static str, String)>,
 }
 
 impl Respuesta {
     fn texto(estado: u16, s: String) -> Self {
-        Respuesta { estado, tipo: "text/plain; charset=utf-8", cuerpo: s.into_bytes() }
+        Respuesta { estado, tipo: "text/plain; charset=utf-8", cuerpo: s.into_bytes(), cabeceras: vec![] }
     }
     fn binario(b: Vec<u8>) -> Self {
-        Respuesta { estado: 200, tipo: "application/octet-stream", cuerpo: b }
+        Respuesta { estado: 200, tipo: "application/octet-stream", cuerpo: b, cabeceras: vec![] }
     }
     fn vacia(estado: u16) -> Self {
-        Respuesta { estado, tipo: "text/plain; charset=utf-8", cuerpo: vec![] }
+        Respuesta { estado, tipo: "text/plain; charset=utf-8", cuerpo: vec![], cabeceras: vec![] }
     }
 }
 
@@ -269,19 +273,27 @@ fn atender_http(s: &Sincro, mut rq: Request) {
     let metodo = rq.method().to_string().to_uppercase();
     let url = rq.url().to_string();
     let prueba = rq.headers().iter().find(|h| h.field.equiv("X-Canvas-Prueba")).map(|h| h.value.as_str().to_string());
+    let token = rq.headers().iter().find(|h| h.field.equiv("X-Canvas-Local")).map(|h| h.value.as_str().to_string());
     let mut cuerpo = Vec::new();
     if rq.as_reader().take(s.tope as u64 + 1).read_to_end(&mut cuerpo).is_err() {
         return;
     }
-    let r = s.atender(&metodo, &url, prueba.as_deref(), &cuerpo, local);
-    let resp = Response::from_data(r.cuerpo)
+    let r = match (&s.puente, url.starts_with("/local/") && metodo != "OPTIONS") {
+        (Some(p), true) => p.atender(&metodo, &url, token.as_deref(), &cuerpo, local),
+        _ => s.atender(&metodo, &url, prueba.as_deref(), &cuerpo, local),
+    };
+    let mut resp = Response::from_data(r.cuerpo)
         .with_status_code(r.estado)
         .with_header(cabecera("Content-Type", r.tipo))
         .with_header(cabecera("Cache-Control", "no-store"))
         .with_header(cabecera("Access-Control-Allow-Origin", "*"))
         .with_header(cabecera("Access-Control-Allow-Methods", "GET, PUT, POST, OPTIONS"))
-        .with_header(cabecera("Access-Control-Allow-Headers", "content-type, x-canvas-prueba"))
+        .with_header(cabecera("Access-Control-Allow-Headers", "content-type, x-canvas-prueba, x-canvas-local"))
+        .with_header(cabecera("Access-Control-Expose-Headers", "x-modificado"))
         .with_header(cabecera("Access-Control-Allow-Private-Network", "true"));
+    for (k, v) in r.cabeceras {
+        resp = resp.with_header(cabecera(k, &v));
+    }
     let _ = rq.respond(resp);
 }
 
