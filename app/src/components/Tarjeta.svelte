@@ -5,7 +5,7 @@
   import { medir, COLORES, TINTAS, fechaCorta, duracionTexto } from '../lib/tarjetas.js'
   import { sonando, reproducir } from '../lib/audio.svelte.js'
 
-  let { lista, o, origen = false, resaltado = false, atenuado = false, alTocar, alternar, alVinculo = null, inicio, mover, fin } = $props()
+  let { lista, o, origen = false, resaltado = false, atenuado = false, alTocar, alternar, alVinculo = null, inicio, mover, fin, redimensionar = null } = $props()
 
   const d = $derived(medir(lista, o))
   const giro = $derived(lista === 'notas' ? (o.estilo === 'rayada' ? 1 : o.estilo === 'tarjeta' ? 0 : -2) : lista === 'fotos' ? 1.5 : 0)
@@ -92,7 +92,7 @@
     <rect width={d.w} height={d.h} rx="4" class="f-marco" />
     <clipPath id="clip-{o.id}"><rect x="8" y="8" width={d.iw} height={d.ih} rx="2" /></clipPath>
     <rect x="8" y="8" width={d.iw} height={d.ih} fill="#E4E0D4" />
-    <image href={o.imagen} x="8" y="8" width={d.iw} height={d.ih} preserveAspectRatio="xMidYMid slice" clip-path="url(#clip-{o.id})" />
+    <image href={o.imagen} x="8" y="8" width={d.iw} height={d.ih} preserveAspectRatio="xMidYMid meet" clip-path="url(#clip-{o.id})" />
     {#if simple}
       {#each barras as b}<rect x={b.x} y={b.y} width={b.w} height={b.h} rx="3" class="s-barra" />{/each}
     {:else}
@@ -106,6 +106,10 @@
     {#each d.titulo as l, i}<text x="8" y={d.tituloY[i]} class="f-titulo">{l}</text>{/each}
     {#each d.texto as l, i}<text x="8" y={d.textoY[i]} class="f-texto">{l}</text>{/each}
     {#each d.anotacion as l, i}<text x="8" y={d.anotacionY[i]} class="f-mano">{l}</text>{/each}
+    {#if redimensionar}
+      <rect x={d.w - 18} y={d.h - 18} width="20" height="20" rx="4" class="esquina" role="button" tabindex="-1" aria-label="Cambiar tamaño de la foto"
+        onpointerdown={e => L.arrastrar(e, redimensionar)} />
+    {/if}
     {/if}
   {/if}
 
@@ -124,6 +128,8 @@
 
 <style>
   :global(.tarjeta) { cursor: grab; }
+  .esquina { fill: var(--ink); opacity: 0; cursor: nwse-resize; }
+  :global(.tarjeta:hover) .esquina { opacity: .3; }
   :global(.tarjeta.atenuada) { opacity: .28; }
   text { user-select: none; pointer-events: none; }
   .sombra { fill: rgba(33, 31, 26, .12); }

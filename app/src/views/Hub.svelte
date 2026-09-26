@@ -16,7 +16,7 @@
   import EditorAgrupador from '../components/EditorAgrupador.svelte'
   import { accionesAgrupadores } from '../lib/agrupadores.js'
   import { LISTAS, TIPO, cajas, coincideTarjeta, nombreTarjeta } from '../lib/tarjetas.js'
-  import { lugarLibre, nuevaTarjeta, guardarTarjeta, eliminarTarjeta, duplicarTarjeta, alternarTarea, vinculosDe, ancla, rutaHilo } from '../lib/tablero.js'
+  import { redimensionarFoto, lugarLibre, nuevaTarjeta, guardarTarjeta, eliminarTarjeta, duplicarTarjeta, alternarTarea, vinculosDe, ancla, rutaHilo } from '../lib/tablero.js'
   import { analizar, aDataURL } from '../lib/audio.svelte.js'
   import { listaObjetivos, objetivosPorIndicador } from '../lib/objetivos.js'
   import { S, guardarProyecto, avisar } from '../lib/store.svelte.js'
@@ -517,7 +517,7 @@
       {#each tarjVista[l] as o (o.id)}
         {@const coin = !!q && coincideTarjeta(o, q)}
         <Tarjeta lista={l} {o} origen={conectando?.desde === o.id} resaltado={coin} atenuado={!!q && !coin} alVinculo={() => abrirOrigen(o.origen, p.id, o.id)}
-          alTocar={() => tocar(o.id, () => abrirTarjeta(l, o))} alternar={i => alternar(o, i)} {...arrastreLibre(o)} />
+          alTocar={() => tocar(o.id, () => abrirTarjeta(l, o))} alternar={i => alternar(o, i)} {...arrastreLibre(o)} redimensionar={l === 'fotos' ? redimensionarFoto(o, () => guardarProyecto(p)) : null} />
       {/each}
     {/each}
 

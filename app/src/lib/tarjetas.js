@@ -2,6 +2,8 @@
 // y búsqueda. Las comparten el lienzo del proyecto y los sub-lienzos de cada objetivo.
 import { S } from './store.svelte.js'
 import { F, envolver, limpiarCache } from './texto.js'
+import { cajaFoto } from './medidas-foto.js'
+export { ANCHO_FOTO } from './medidas-foto.js'
 
 // La letra manuscrita solo se descarga cuando se usa: al llegar, se vuelve a medir el texto.
 document.fonts?.load('500 18px Caveat').then(() => { limpiarCache(); S.tipografias++ }).catch(() => {})
@@ -76,8 +78,7 @@ function audio(a) {
 }
 
 function foto(f) {
-  const w = 200, iw = w - 16
-  const ih = Math.round(Math.min(240, Math.max(90, iw / (f.proporcion || 4 / 3))))
+  const { w, iw, ih } = cajaFoto(f)
   let y = 8 + ih + 8
   const titulo = f.titulo?.trim() ? envolver(f.titulo.trim(), '600 11.5px "Work Sans", system-ui, sans-serif', iw, 2) : []
   const tituloY = titulo.map(() => (y += 15))
@@ -93,7 +94,7 @@ const MEDIR = { notas: nota, listas: lista, audios: audio, fotos: foto }
 // Memo por tarjeta: mover una tarjeta no cambia su tamaño, así que no se vuelve a medir el texto.
 const memo = new WeakMap()
 const firma = (lista, o) => [lista, S.tipografias, o.texto, o.titulo, o.estilo, o.letra, o.creado ? 1 : 0, o.transcripcion,
-  o.anotacion, o.proporcion, o.items?.map(i => (i.hecho ? '1' : '0') + i.t).join('\u0001')].join('\u0002')
+  o.anotacion, o.proporcion, o.ancho, o.items?.map(i => (i.hecho ? '1' : '0') + i.t).join('\u0001')].join('\u0002')
 /** Medidas de una tarjeta; depende de S.tipografias para remedir cuando cargan las letras. */
 export function medir(lista, obj) {
   const f = firma(lista, obj), m = memo.get(obj)

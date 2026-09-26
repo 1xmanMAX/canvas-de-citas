@@ -1,5 +1,5 @@
 // Operaciones sobre las tarjetas libres de un lienzo `c` (p.canvas o un sub-lienzo de objetivo).
-import { medir, asegurarTablero, idLocal, ahoraISO, TIPO } from './tarjetas.js'
+import { medir, asegurarTablero, idLocal, ahoraISO, TIPO, ANCHO_FOTO } from './tarjetas.js'
 
 const copia = o => JSON.parse(JSON.stringify(o))
 
@@ -83,4 +83,14 @@ export function rutaHilo(a, b) {
   const cae = Math.min(90, Math.hypot(b.x - a.x, b.y - a.y) * 0.12)
   const c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 + cae }
   return { d: `M${a.x} ${a.y}Q${c.x} ${c.y} ${b.x} ${b.y}`, x: (a.x + 2 * c.x + b.x) / 4, y: (a.y + 2 * c.y + b.y) / 4 }
+}
+
+/** Esquina de una foto: arrastrarla cambia su ancho (la proporción se conserva). */
+export function redimensionarFoto(obj, guardar) {
+  let w0
+  return {
+    inicio: () => { w0 = medir('fotos', obj).w },
+    mover: dx => { obj.ancho = Math.min(ANCHO_FOTO.max, Math.max(ANCHO_FOTO.min, Math.round(w0 + dx))) },
+    fin: () => guardar()
+  }
 }

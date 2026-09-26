@@ -18,7 +18,7 @@
   import EditorAgrupador from './EditorAgrupador.svelte'
   import { accionesAgrupadores } from '../lib/agrupadores.js'
   import { LISTAS, TIPO, cajas, nombreTarjeta, asegurarTablero } from '../lib/tarjetas.js'
-  import { lugarLibre, nuevaTarjeta, guardarTarjeta, eliminarTarjeta, duplicarTarjeta, alternarTarea, vinculosDe, ancla, rutaHilo } from '../lib/tablero.js'
+  import { redimensionarFoto, lugarLibre, nuevaTarjeta, guardarTarjeta, eliminarTarjeta, duplicarTarjeta, alternarTarea, vinculosDe, ancla, rutaHilo } from '../lib/tablero.js'
   import { comprimirFoto } from '../lib/imagen.js'
   import { abrirOrigen } from '../lib/visor.svelte.js'
 
@@ -362,7 +362,7 @@
         {#each tarjVista[l] as t (t.id)}
           <Tarjeta lista={l} o={t} origen={conectando?.desde === t.id} alVinculo={() => abrirOrigen(t.origen, p.id, t.id)}
             alTocar={() => tocar(t.id, () => (modal = { lista: l, o: copia(t) }))}
-            alternar={i => { alternarTarea(t, i); guardar() }} {...arrastre(t)} />
+            alternar={i => { alternarTarea(t, i); guardar() }} {...arrastre(t)} redimensionar={l === 'fotos' ? redimensionarFoto(t, guardar) : null} />
         {/each}
       {/each}
 
