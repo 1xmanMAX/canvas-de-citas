@@ -173,6 +173,10 @@ fn main() {
         })
         // Micrófono (notas de voz), portapapeles…: solo la app corre en esta ventana (ver arriba).
         .with_permission_handler(|_| PermissionResponse::Allow)
+        // Pellizco del trackpad: wry lo apaga por defecto y entonces WebView2 no manda a la página la
+        // rueda con Ctrl que lo representa. La app evita el zoom de la página (Ctrl+rueda, Ctrl + / − / 0)
+        // y usa el gesto para acercar el lienzo, el PDF o la foto (lib/gestos.js).
+        .with_hotkeys_zoom(true)
         .with_devtools(false);
     // La página (de internet) habla con el puente de esta misma PC: que Chromium no lo bloquee como
     // "acceso a la red local". Se mantienen las opciones que wry pone por defecto.

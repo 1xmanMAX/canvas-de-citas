@@ -6,6 +6,7 @@
   import { rangoDeCita, resaltar, ESTILO_RESALTADO } from '../lib/resaltar.js'
   import { S, avisar } from '../lib/store.svelte.js'
   import { esAndroid } from '../lib/plataforma.js'
+  import { bloquearZoomDelNavegador } from '../lib/gestos.js'
   import { guardarArchivo } from '../lib/archivos.js'
   import { autorCorto, anio } from '../lib/citas.js'
 
@@ -73,6 +74,7 @@
     docHtml = doc
     doc.addEventListener('selectionchange', () => (seleccion = doc.getSelection()?.toString().trim() || ''))
     doc.addEventListener('keydown', teclas)
+    if (doc.defaultView) bloquearZoomDelNavegador(doc.defaultView, { teclas: !!window.canvasWindows })
   }
 
   // Markdown mínimo (títulos, listas, negrita, cursiva, enlaces, código) sobre texto escapado.

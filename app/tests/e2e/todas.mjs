@@ -666,6 +666,21 @@ const SUITES = {
       const k1 = await zoom()
       if (!(k1 > k0)) throw new Error(`no acercó (${k0}% → ${k1}%)`)
     })
+    await s.paso('pellizco del trackpad (gesto real) acerca el lienzo y nunca la página', async () => {
+      const cdp = await pg.createCDPSession()
+      const pellizco = (x, y, scaleFactor) => cdp.send('Input.synthesizePinchGesture', { x, y, scaleFactor, gestureSourceType: 'mouse' })
+      const r = await (await pg.$('.lienzo')).boundingBox()
+      const k0 = await zoom()
+      await pellizco(r.x + r.width / 2, r.y + r.height / 2, 1.6); await esperar(400)
+      const k1 = await zoom()
+      if (!(k1 > k0)) throw new Error(`no acercó (${k0}% → ${k1}%)`)
+      await pellizco(r.x + r.width / 2, r.y + r.height / 2, 0.6); await esperar(400)
+      if (!(await zoom() < k1)) throw new Error('no alejó')
+      // Fuera del lienzo (barra superior) no se agranda la página.
+      await pellizco(r.x + r.width / 2, 8, 1.8); await esperar(400)
+      const escala = await pg.evaluate(() => visualViewport.scale)
+      if (escala !== 1) throw new Error(`se agrandó la página (×${escala})`)
+    })
     await s.paso('deslizar con el trackpad desplaza sin hacer zoom', async () => {
       await esperar(500)
       const k0 = await zoom(), t0 = await capa()

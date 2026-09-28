@@ -32,3 +32,17 @@ test('el detector no cambia de opinión a mitad de un gesto', () => {
   t = 700
   assert.equal(det({ deltaMode: 0, deltaX: 0, deltaY: 120, wheelDeltaY: -120 }), 'mouse')
 })
+
+test('pellizco universal: bloquea el zoom de la página, no el desplazamiento normal', async () => {
+  const { bloquearZoomDelNavegador } = await import('../../src/lib/gestos.js')
+  const oyentes = {}
+  const win = { addEventListener: (t, f) => (oyentes[t] = f), removeEventListener: t => delete oyentes[t] }
+  const quitar = bloquearZoomDelNavegador(win, { teclas: true })
+  const evento = o => { const e = { ...o, prevenido: false, preventDefault() { this.prevenido = true } }; return e }
+  const pinza = evento({ ctrlKey: true, deltaY: 3 }); oyentes.wheel(pinza); assert.ok(pinza.prevenido)
+  const normal = evento({ ctrlKey: false, deltaY: 3 }); oyentes.wheel(normal); assert.ok(!normal.prevenido)
+  const mas = evento({ ctrlKey: true, key: '=' }); oyentes.keydown(mas); assert.ok(mas.prevenido)
+  const copiar = evento({ ctrlKey: true, key: 'c' }); oyentes.keydown(copiar); assert.ok(!copiar.prevenido)
+  const g = evento({}); oyentes.gesturestart(g); assert.ok(g.prevenido)
+  quitar(); assert.deepEqual(Object.keys(oyentes), [])
+})

@@ -22,3 +22,25 @@ export function crearDetectorRueda(ahora = () => performance.now()) {
     return tipo
   }
 }
+
+// Pellizco universal: en toda la app pellizcar el trackpad (rueda con ctrlKey) o Ctrl + rueda hace zoom
+// solo en lo que se puede acercar (lienzo, PDF, fotos: cada uno lo atiende en su propio manejador);
+// en el resto no hace nada. Nunca se agranda la página entera (dejaría la interfaz descuadrada).
+// `teclas`: también Ctrl + / − / 0 (en la app de Windows, donde WebView2 permite ya el pellizco).
+const TECLAS_ZOOM = new Set(['+', '=', '-', '_', '0'])
+
+export function bloquearZoomDelNavegador(win, { teclas = false } = {}) {
+  const rueda = e => { if (e.ctrlKey || e.metaKey) e.preventDefault() }
+  const gesto = e => e.preventDefault() // Safari: el pellizco llega como gesture*
+  const tecla = e => { if ((e.ctrlKey || e.metaKey) && !e.altKey && TECLAS_ZOOM.has(e.key)) e.preventDefault() }
+  win.addEventListener('wheel', rueda, { passive: false })
+  win.addEventListener('gesturestart', gesto)
+  win.addEventListener('gesturechange', gesto)
+  if (teclas) win.addEventListener('keydown', tecla)
+  return () => {
+    win.removeEventListener('wheel', rueda)
+    win.removeEventListener('gesturestart', gesto)
+    win.removeEventListener('gesturechange', gesto)
+    win.removeEventListener('keydown', tecla)
+  }
+}
