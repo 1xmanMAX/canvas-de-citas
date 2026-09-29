@@ -54,9 +54,11 @@ pub fn repartir(datos: &Value, carpetas: &[CarpetaReg]) -> Vec<Value> {
 
 fn fotos_de(p: &Value) -> Vec<Value> {
     let mut out = lista(&p["canvas"]["fotos"]);
-    if let Some(objs) = p["canvas"]["objetivos"].as_object() {
-        for o in objs.values() {
-            out.extend(lista(&o["fotos"]));
+    for sub in ["objetivos", "lecturas"] {
+        if let Some(objs) = p["canvas"][sub].as_object() {
+            for o in objs.values() {
+                out.extend(lista(&o["fotos"]));
+            }
         }
     }
     out

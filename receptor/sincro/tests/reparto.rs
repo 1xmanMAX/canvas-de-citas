@@ -38,11 +38,12 @@ fn vectores_compartidos_con_la_app() {
 fn documentos_de_fuentes_y_originales_de_fotos() {
     let parte = json!({
         "proyectos": [{"id": "p", "canvas": {"fotos": [{"id": "foto_a", "original": "fotos/foto_a.jpg"}, {"id": "foto_b"}],
-            "objetivos": {"oe1": {"fotos": [{"id": "foto_c", "original": "fotos/foto_c.png"}]}}}}],
+            "objetivos": {"oe1": {"fotos": [{"id": "foto_c", "original": "fotos/foto_c.png"}]}},
+            "lecturas": {"fuente_001": {"fotos": [{"id": "foto_d", "original": "fotos/foto_d.png"}]}}}}],
         "fuentes": [{"id": "fuente_001", "documento_original": "fuentes/fuente_001/documento.pdf"}, {"id": "fuente_002", "documento_original": null}],
         "citas": []
     });
     let mut d = docs_de(&parte);
     d.sort();
-    assert_eq!(d, vec!["fotos/foto_a.jpg", "fotos/foto_c.png", "fuentes/fuente_001/documento.pdf"]);
+    assert_eq!(d, vec!["fotos/foto_a.jpg", "fotos/foto_c.png", "fotos/foto_d.png", "fuentes/fuente_001/documento.pdf"]);
 }

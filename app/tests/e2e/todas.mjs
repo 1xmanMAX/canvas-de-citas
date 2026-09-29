@@ -827,7 +827,7 @@ const SUITES = {
       await pg.waitForFunction(() => document.querySelectorAll('.pag-pdf[data-n="0"] .capa-texto text').length > 5, { timeout: 15000 })
       await pg.evaluate(() => { const t = [...document.querySelectorAll('.pag-pdf[data-n="0"] .capa-texto text')].find(x => x.textContent.length > 40); const r = document.createRange(); r.selectNodeContents(t); getSelection().removeAllRanges(); getSelection().addRange(r) })
       await esperar(300); await clicTexto(pg, 'Nota con la cita'); await esperar(500)
-      const n = (await lienzoGuardado(pg)).notas.at(-1)
+      const n = (await lienzoGuardado(pg)).lecturas.fuente_003.notas.at(-1)
       if (!/pág\. 1$/.test(n.titulo) || !n.origen?.rects?.length) throw new Error(JSON.stringify(n.origen))
     })
     await s.paso('recortar un área → tarjeta de imagen con texto', async () => {
@@ -835,7 +835,7 @@ const SUITES = {
       const c = await (await pg.$('.pag-pdf[data-n="0"]')).boundingBox()
       await pg.mouse.move(c.x + c.width * .08, c.y + c.height * .05); await pg.mouse.down()
       await pg.mouse.move(c.x + c.width * .9, c.y + c.height * .3, { steps: 6 }); await pg.mouse.up(); await esperar(1500)
-      const f = (await lienzoGuardado(pg)).fotos.at(-1)
+      const f = (await lienzoGuardado(pg)).lecturas.fuente_003.fotos.at(-1)
       if (!f?.origen?.area || !/rework/i.test(f.texto)) throw new Error('recorte incompleto')
     })
     await s.paso('Esc cancela el recorte sin cerrar el visor', async () => {
@@ -844,8 +844,9 @@ const SUITES = {
     })
     await pg.keyboard.press('Escape'); await esperar(400)
     await s.paso('Vínculo en la tarjeta vuelve a la cita y la marca', async () => {
-      await pg.click('button[aria-label="Encuadrar todo"]'); await esperar(500)
-      await (await pg.$('g.tarjeta.notas g.vinculo')).click()
+      // Cerrado el visor, queda a la vista el lienzo de lectura de la fuente con sus citas.
+      await pg.click('.lectura-panel button[aria-label="Encuadrar todo"]'); await esperar(500)
+      await (await pg.$('.lectura-panel g.tarjeta.notas g.vinculo')).click()
       await pg.waitForSelector('.capa-marcas .destello', { timeout: 20000 })
       if (!(await pg.$('.capa-marcas .area'))) throw new Error('sin cuadro punteado del recorte')
       await esperar(1200); await pg.screenshot({ path: path.join(SALIDA, 'vinculo-pdf.png') })
@@ -859,7 +860,7 @@ const SUITES = {
       await fr.evaluate(() => { const p = [...document.querySelectorAll('p')].filter(x => x.textContent.length > 150)[1]; const r = document.createRange(); r.selectNodeContents(p); getSelection().removeAllRanges(); getSelection().addRange(r) })
       await esperar(300); await clicTexto(pg, 'Nota con la cita'); await esperar(400)
       await pg.keyboard.press('Escape'); await esperar(400)
-      const v = await pg.$$('g.tarjeta.notas g.vinculo'); await v.at(-1).click(); await esperar(2000)
+      const v = await pg.$$('.lectura-panel g.tarjeta.notas g.vinculo'); await v.at(-1).click(); await esperar(2000)
       const h = await pg.evaluate(() => { const w = document.querySelector('.visor iframe')?.contentWindow; return { cita: w?.CSS.highlights.has('cita'), activa: w?.CSS.highlights.has('cita-activa') } })
       if (!h.cita || !h.activa) throw new Error(JSON.stringify(h))
     })
@@ -870,6 +871,72 @@ const SUITES = {
       const [ch] = await Promise.all([pg.waitForFileChooser(), pg.keyboard.down('Control').then(() => pg.keyboard.press('o')).then(() => pg.keyboard.up('Control'))])
       await ch.accept([md]); await esperar(700)
       if (!/<h1>Resumen<\/h1>/.test(await pg.$eval('.lectura', e => e.innerHTML))) throw new Error('markdown')
+    })
+    if (pg.errores.length) s.fallas.push(...pg.errores)
+    return s
+  },
+
+  // Lienzo de lectura de cada fuente: las citas del PDF van a su propio tablero y la chincheta
+  // las clava también en el lienzo general del proyecto.
+  async lectura(b) {
+    const s = suite('Lienzo de lectura por fuente'), pg = await pagina(b)
+    await conEjemplo(pg)
+    const lectura = async () => (await lienzoGuardado(pg)).lecturas?.fuente_003
+    await s.paso('abrir el documento abre también el lienzo de lectura, al lado', async () => {
+      await adjuntar(pg, 'fuente_003', PDF)
+      await clicTexto(pg, 'Abrir')
+      await pg.waitForSelector('.lectura-panel', { timeout: 10000 })
+      if (!/\/l\/fuente_003$/.test(await pg.evaluate(() => location.hash))) throw new Error('ruta ' + await pg.evaluate(() => location.hash))
+      const [l, v] = await Promise.all([pg.$eval('.lectura-panel', e => e.getBoundingClientRect()), pg.$eval('.visor', e => e.getBoundingClientRect())])
+      if (l.right > v.left + 1) throw new Error(`el visor tapa la lectura (${l.right} > ${v.left})`)
+    })
+    await s.paso('la nota con la cita va a la lectura de la fuente, no al lienzo general', async () => {
+      await pg.waitForFunction(() => document.querySelectorAll('.pag-pdf[data-n="0"] .capa-texto text').length > 5, { timeout: 30000 })
+      const antes = (await lienzoGuardado(pg)).notas.length
+      await pg.evaluate(() => { const t = [...document.querySelectorAll('.pag-pdf[data-n="0"] .capa-texto text')].find(x => x.textContent.length > 40); const r = document.createRange(); r.selectNodeContents(t); getSelection().removeAllRanges(); getSelection().addRange(r) })
+      await esperar(300); await clicTexto(pg, 'Nota con la cita'); await esperar(600)
+      const cv = await lienzoGuardado(pg), l = cv.lecturas?.fuente_003
+      if (l?.notas?.length !== 1 || cv.notas.length !== antes) throw new Error('no quedó en la lectura')
+      if (!l.conexiones.some(k => k.desde === 'fuente_003' && k.hasta === l.notas[0].id)) throw new Error('sin hilo a la fuente')
+      if (!(await pg.$('.lectura-panel g.tarjeta.notas'))) throw new Error('no se ve en el lienzo de lectura')
+    })
+    await pg.keyboard.press('Escape'); await esperar(400) // cierra el visor; la lectura sigue abierta
+    await s.paso('la chincheta la clava en el lienzo general', async () => {
+      if (!(await pg.$('.lectura-panel'))) throw new Error('Esc cerró también la lectura')
+      await (await pg.$('.lectura-panel g.tarjeta g.clavar')).click(); await esperar(500)
+      const n = (await lectura()).notas[0]
+      if (!n.en_general || typeof n.en_general.x !== 'number') throw new Error('sin en_general')
+      if ((await pg.$eval('.lectura-panel g.clavar', g => g.getAttribute('aria-checked'))) !== 'true') throw new Error('chincheta sin marcar')
+    })
+    await s.paso('en el general se ve con su procedencia y se mueve sin tocar su lugar en la lectura', async () => {
+      await pg.keyboard.press('Escape'); await esperar(500)
+      if (await pg.$('.lectura-panel')) throw new Error('no se cerró la lectura')
+      await pg.click('button[aria-label="Encuadrar todo"]'); await esperar(500)
+      const g = await pg.waitForSelector('g.tarjeta:has(g.procedencia)', { timeout: 5000 })
+      const antes = (await lectura()).notas[0]
+      const r = await g.boundingBox()
+      await pg.mouse.move(r.x + r.width / 2, r.y + r.height * .7); await pg.mouse.down()
+      await pg.mouse.move(r.x + r.width / 2 + 120, r.y + r.height * .7 + 60, { steps: 8 }); await pg.mouse.up(); await esperar(600)
+      const despues = (await lectura()).notas[0]
+      if (despues.en_general.x === antes.en_general.x) throw new Error('no se movió en el general')
+      if (despues.x !== antes.x || despues.y !== antes.y) throw new Error('se movió también en la lectura')
+      await pg.screenshot({ path: path.join(SALIDA, 'lectura-general.png') })
+    })
+    await s.paso('la procedencia abre el lienzo de lectura; quitar la chincheta la saca del general', async () => {
+      await (await pg.$('g.tarjeta g.procedencia')).click()
+      await pg.waitForSelector('.lectura-panel', { timeout: 5000 })
+      await pg.screenshot({ path: path.join(SALIDA, 'lectura.png') })
+      await (await pg.$('.lectura-panel g.tarjeta g.clavar')).click(); await esperar(500)
+      if ((await lectura()).notas[0].en_general) throw new Error('sigue clavada')
+      await pg.keyboard.press('Escape'); await esperar(500)
+      if (await pg.$('g.tarjeta:has(g.procedencia)')) throw new Error('sigue en el general')
+    })
+    await s.paso('el buscador general encuentra la cita y lleva a su lectura', async () => {
+      const texto = (await lectura()).notas[0].texto.replace(/[“”]/g, '').split(' ').slice(0, 3).join(' ')
+      await pg.keyboard.down('Control'); await pg.keyboard.press('f'); await pg.keyboard.up('Control'); await esperar(300)
+      await pg.type('.buscador input[type=search]', texto); await esperar(500)
+      await (await pg.waitForSelector('::-p-xpath(//button[contains(@class, "resultado")][.//span[contains(., "Lectura de")]])', { timeout: 5000 })).click()
+      await pg.waitForSelector('.lectura-panel', { timeout: 5000 })
     })
     if (pg.errores.length) s.fallas.push(...pg.errores)
     return s

@@ -135,6 +135,12 @@ function verProyecto(d, p) {
     ]
     if (extra.length) L.push('', `## Sub-lienzo ${clave.toUpperCase()}`, ...extra)
   }
+  // Lienzo de lectura de cada fuente: sus tarjetas; las marcadas «clavada» también se ven en el lienzo general.
+  for (const [fid, o] of Object.entries(p.canvas.lecturas || {})) {
+    const f = d.fuentes.find(y => y.id === fid)
+    const extra = [...tarjetasMd(o), ...conexionesMd(d, p, o)]
+    if (extra.length) L.push('', `## Lienzo de lectura de \`${fid}\` ${f ? refF(f) : ''}`, ...extra)
+  }
   return L.join('\n')
 }
 
@@ -158,7 +164,7 @@ C.resumen = () => {
   ok(fs.existsSync(md) ? `CLAUDE.md de la app: ${fs.statSync(md).mtime.toLocaleString('es-PE')}` : 'Sin CLAUDE.md (la app aún no guardó en esta carpeta con la versión nueva)')
   ok(`${d.proyectos.length} proyectos · ${d.fuentes.length} fuentes · ${d.citas.length} citas`)
   for (const p of d.proyectos) {
-    const c = p.canvas, n = l => c[l].length + Object.values(c.objetivos).reduce((s, o) => s + (o[l]?.length || 0), 0)
+    const c = p.canvas, n = l => c[l].length + [...Object.values(c.objetivos), ...Object.values(c.lecturas || {})].reduce((s, o) => s + (o[l]?.length || 0), 0)
     ok(`- ${p.id} «${una(p.titulo)}»: ${new Set(d.citas.filter(x => x.proyecto_id === p.id).map(x => x.fuente_id)).size} fuentes, ${n('notas')} notas, ${n('listas')} listas, ${n('audios')} audios, ${n('fotos')} imágenes · objetivos: ${clavesObjetivo(p).join(', ') || '—'}`)
   }
 }

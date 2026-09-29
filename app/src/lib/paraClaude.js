@@ -95,6 +95,16 @@ function proyecto(p) {
   }
   const libres = tarjetas(p.canvas)
   if (libres.length) L.push('### Notas, tareas, audios y fotos del lienzo', '', ...libres, '')
+  // Lienzos de lectura: las tarjetas de cada fuente (las clavadas también están en el lienzo general).
+  const lecturas = Object.entries(p.canvas.lecturas || {}).map(([fid, t]) => [fid, t, tarjetas(t, '  ')]).filter(([, , l]) => l.length)
+  if (lecturas.length) {
+    L.push('### Lienzos de lectura (uno por fuente)', '')
+    for (const [fid, t, l] of lecturas) {
+      const n = ['notas', 'listas', 'audios', 'fotos'].reduce((s, k) => s + (t[k] || []).filter(x => x.en_general).length, 0)
+      L.push(`- ${S.fuentePorId.has(fid) ? ref(S.fuentePorId.get(fid)) : `\`${fid}\` (fuente borrada)`}${n ? ` · ${n} clavada${n === 1 ? '' : 's'} en el lienzo general` : ''}`, ...l)
+    }
+    L.push('')
+  }
   if (p.canvas.conexiones.length) L.push('### Conexiones', '', ...conexiones(p.canvas.conexiones, p).map(x => x.slice(2)), '')
   const grupos = agrupadores(p.canvas, p)
   if (grupos.length) L.push('### Agrupadores (recuadros que reúnen elementos del lienzo)', '', ...grupos, '')
@@ -147,6 +157,10 @@ que la app no lo restaure. Lo de abajo describe el formato por si hay que editar
   \`{ "id": "lista_<algo único>", "titulo": "…", "items": [{ "t": "tarea", "hecho": false }], "creado": "<ISO>", "x": 0, "y": 0 }\`.
   Las notas de voz (\`canvas.audios\`) y fotos (\`canvas.fotos\`) llevan el archivo incrustado: no las crees, solo
   puedes corregir su \`transcripcion\`, \`titulo\`, \`texto\` o \`anotacion\`.
+- **Lienzo de lectura de cada fuente:** \`canvas.lecturas.<fuente_id>\` es un tablero propio de esa fuente
+  (\`notas\`, \`listas\`, \`audios\`, \`fotos\`, \`conexiones\`, \`agrupadores\`, con la fuente al centro en (0, 0)).
+  Ahí van las citas y recortes tomados del documento. Una tarjeta con \`"en_general": { "x": 0, "y": 0 }\`
+  está "clavada": también se ve en el lienzo general del proyecto, en esa posición (sin ese campo, solo en su lectura).
 - **Agrupadores** (recuadros punteados con nombre): \`canvas.agrupadores\` (o en \`canvas.objetivos.<clave>\`)
   con \`{ "id": "grupo_<algo único>", "titulo": "…", "color": "azul", "miembros": ["fuente_001", "nota_…"], "x": 0, "y": 0, "w": 600, "h": 400 }\`
   (color: azul | verde | rojo | ocre | lila | gris). \`miembros\` son los ids de lo que agrupa (cada

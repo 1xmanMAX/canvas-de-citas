@@ -103,10 +103,14 @@ export const ahoraISO = () => new Date().toISOString()
 // --- Búsqueda de cualquier elemento por id ---
 export const LISTAS_TARJETA = ['notas', 'listas', 'audios', 'fotos']
 
-/** Lienzo donde vive una tarjeta/conexión: p.canvas o p.canvas.objetivos[clave]. */
+/**
+ * Lienzo donde vive una tarjeta/conexión: p.canvas, p.canvas.objetivos[clave] o el lienzo de lectura
+ * de una fuente p.canvas.lecturas[fuente_id] (clave 'l:<fuente_id>').
+ */
 export function lienzos(p) {
   const l = [{ clave: null, c: p.canvas }]
   for (const [clave, o] of Object.entries(p.canvas.objetivos || {})) l.push({ clave, c: o })
+  for (const [fid, o] of Object.entries(p.canvas.lecturas || {})) l.push({ clave: `l:${fid}`, c: o })
   return l
 }
 

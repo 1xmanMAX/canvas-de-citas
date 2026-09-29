@@ -5,7 +5,11 @@
   import { medir, COLORES, TINTAS, colorTrazo, esResaltado, fechaCorta, duracionTexto } from '../lib/tarjetas.js'
   import { sonando, reproducir } from '../lib/audio.svelte.js'
 
-  let { lista, o, origen = false, resaltado = false, atenuado = false, alTocar, alternar, alVinculo = null, inicio, mover, fin, redimensionar = null } = $props()
+  let { lista, o, origen = false, resaltado = false, atenuado = false, alTocar, alternar, alVinculo = null, inicio, mover, fin, redimensionar = null,
+    clavar = null, procedencia = null, pos = null } = $props()
+  // clavar: en el lienzo de lectura de una fuente, la chincheta que la muestra también en el general.
+  // procedencia: { texto, alTocar } en el general, la fuente de la que viene una tarjeta clavada.
+  // pos: lugar donde se dibuja si no es el suyo (la tarjeta clavada, en el general).
 
   const d = $derived(medir(lista, o))
   const giro = $derived(lista === 'notas' ? (o.estilo === 'rayada' ? 1 : o.estilo === 'tarjeta' ? 0 : -2) : lista === 'fotos' ? 1.5 : 0)
@@ -38,7 +42,7 @@
   const fondoSimple = $derived(lista === 'notas' ? papel : lista === 'audios' ? '#2F4FB5' : '#FFFDF8')
 </script>
 
-<Arrastrable transform="translate({o.x} {o.y}) rotate({giro} {d.w / 2} {d.h / 2})" clase={clase} etiqueta={etiqueta[lista]} {alTocar} {inicio} {mover} {fin}>
+<Arrastrable transform="translate({pos?.x ?? o.x} {pos?.y ?? o.y}) rotate({giro} {d.w / 2} {d.h / 2})" clase={clase} etiqueta={etiqueta[lista]} {alTocar} {inicio} {mover} {fin}>
   <rect x="2" y="5" width={d.w} height={d.h} rx="5" class="sombra" />
 
   {#if simple && lista !== 'fotos'}
@@ -132,6 +136,30 @@
       <text x="33" y="14" text-anchor="middle">↗ Vínculo</text>
     </g>
   {/if}
+  {#if clavar}
+    <!-- Chincheta: clavada (roja), la tarjeta también se ve en el lienzo general del proyecto -->
+    {@const puesta = !!o.en_general}
+    <g class="clavar" class:puesta transform="translate(-8 -8)" role="switch" tabindex="0" aria-checked={puesta}
+      aria-label={puesta ? 'Quitar del lienzo general' : 'Clavar en el lienzo general'}
+      onpointerdown={parar} onclick={e => { parar(e); clavar() }} onkeydown={e => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), clavar())}>
+      <title>{puesta ? 'Clavada en el lienzo general (toca para quitarla)' : 'Clavar en el lienzo general'}</title>
+      <circle cx="10" cy="10" r="13" class="clavar-area" />
+      {#if puesta}<circle cx="11.6" cy="12.5" r="8" class="clavar-sombra" />{/if}
+      <circle cx="10" cy="10" r="8" class="clavar-cabeza" />
+      <circle cx="7.6" cy="7.6" r="2.3" class="clavar-brillo" />
+    </g>
+  {/if}
+  {#if procedencia && !simple}
+    <!-- En el general: de qué fuente viene la tarjeta clavada (abre su lienzo de lectura) -->
+    {@const w = Math.min(d.w - 8, procedencia.texto.length * 6.2 + 26)}
+    <g class="procedencia" transform="translate(4 {d.h + 5})" role="button" tabindex="0" aria-label="Abrir el lienzo de lectura de {procedencia.texto}"
+      onpointerdown={parar} onclick={e => { parar(e); procedencia.alTocar() }} onkeydown={e => e.key === 'Enter' && procedencia.alTocar()}>
+      <title>Clavada desde el lienzo de lectura de {procedencia.texto}</title>
+      <rect width={w} height="18" rx="4" />
+      <circle cx="10" cy="9" r="3.6" class="procedencia-pin" />
+      <text x="19" y="12.6">{procedencia.texto}</text>
+    </g>
+  {/if}
 
 </Arrastrable>
 
@@ -151,6 +179,21 @@
   .vinculo:hover rect, .vinculo:focus-visible rect { fill: #C0392B; }
   .vinculo:focus { outline: none; }
   .vinculo text { font: 600 10.5px var(--sans); fill: #fff; }
+  .clavar { cursor: pointer; }
+  .clavar:focus { outline: none; }
+  .clavar-area { fill: transparent; }
+  .clavar-cabeza { fill: var(--paper); stroke: var(--ink-soft); stroke-width: 1.6; stroke-dasharray: 3 2.4; }
+  .clavar-brillo { fill: none; }
+  .clavar:hover .clavar-cabeza, .clavar:focus-visible .clavar-cabeza { stroke: #C0392B; stroke-dasharray: none; }
+  .clavar.puesta .clavar-cabeza { fill: #C0392B; stroke: #8E1B14; stroke-dasharray: none; }
+  .clavar.puesta .clavar-brillo { fill: rgba(255, 255, 255, .6); }
+  .clavar-sombra { fill: rgba(0, 0, 0, .25); }
+  .procedencia { cursor: pointer; }
+  .procedencia:focus { outline: none; }
+  .procedencia rect { fill: var(--paper); stroke: var(--line); }
+  .procedencia:hover rect, .procedencia:focus-visible rect { stroke: var(--accent); }
+  .procedencia-pin { fill: #C0392B; }
+  .procedencia text { font: 600 10px var(--sans); fill: var(--ink-soft); }
   .s-barra.clara { fill: #fff; opacity: .6; }
   .borde { stroke: var(--line); }
   .marca { fill: none; stroke: var(--accent); stroke-width: 2.5; }

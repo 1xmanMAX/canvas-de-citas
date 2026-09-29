@@ -3,6 +3,7 @@
 import { S, leerDocumento, avisar, adjuntarDocumento, guardarProyecto } from './store.svelte.js'
 import { nuevaTarjeta, guardarTarjeta } from './tablero.js'
 import { asegurarTablero, idLocal, cajas } from './tarjetas.js'
+import { asegurarLectura } from './lecturas.js'
 import { autorCorto, anio } from './citas.js'
 
 export const ACEPTADOS = /\.(pdf|html?|md|markdown|txt)$/i
@@ -75,21 +76,39 @@ function referencia(pagina) {
   return pagina ? `${base}, pág. ${pagina}` : base
 }
 
+/** Ruta del lienzo de lectura de la fuente abierta en el visor (o null si no es de un proyecto). */
+export const rutaLectura = () => (V.proyectoId && V.fuenteId ? `#/p/${V.proyectoId}/l/${V.fuenteId}` : null)
+
+/** Abre el lienzo de lectura de la fuente del visor (a la izquierda del documento). */
+export function abrirLecturaDelVisor() {
+  const r = rutaLectura()
+  if (!r || location.hash === r) return
+  if (location.hash.startsWith(`#/p/${V.proyectoId}`)) location.replace(r)
+  else location.hash = r
+}
+
 /**
- * Agrega una tarjeta de cita al lienzo del proyecto, junto a la fuente (en un hueco libre) y
- * conectada a ella con un hilo "cita".
+ * Agrega una tarjeta de cita. Si el documento es de una fuente, va a su lienzo de lectura
+ * (p.canvas.lecturas[fuente], lib/lecturas.js), junto a la fuente del centro y conectada a ella con
+ * un hilo "cita"; desde allí se puede clavar en el lienzo general. Un archivo suelto va al general.
  */
 function tarjetaCita(lista, datos, aviso) {
   const p = S.proyectoPorId.get(V.proyectoId)
   if (!p) return avisar('Abre el documento desde un proyecto para citar en el lienzo')
-  const c = asegurarTablero(p.canvas)
   const f = V.fuenteId ? S.fuentePorId.get(V.fuenteId) : null
-  const pos = (f && c.posiciones?.[f.id]) || { x: 420, y: -120 }
+  if (f) {
+    const c = asegurarLectura(p.canvas, f.id)
+    const ocupadas = [{ x: -180, y: -90, w: 360, h: 180 }, ...[...cajas(c).values()].map(({ x, y, w, h }) => ({ x, y, w, h }))]
+    const t = nuevaTarjeta(lista, 300, -60, datos, ocupadas)
+    guardarTarjeta(c, lista, t, true)
+    c.conexiones.push({ id: idLocal('con'), desde: f.id, hasta: t.id, etiqueta: 'cita' })
+    guardarProyecto(p)
+    abrirLecturaDelVisor()
+    return avisar(`${aviso} de ${autorCorto(f)} (${anio(f)})`)
+  }
+  const c = asegurarTablero(p.canvas)
   const ocupadas = [...cajas(c).values()].map(({ x, y, w, h }) => ({ x, y, w, h }))
-  if (f) ocupadas.push({ x: pos.x, y: pos.y, w: 150, h: 80 })
-  const t = nuevaTarjeta(lista, pos.x + 330, pos.y + 40, datos, ocupadas)
-  guardarTarjeta(c, lista, t, true)
-  if (f) c.conexiones.push({ id: idLocal('con'), desde: f.id, hasta: t.id, etiqueta: 'cita' })
+  guardarTarjeta(c, lista, nuevaTarjeta(lista, 750, -80, datos, ocupadas), true)
   guardarProyecto(p)
   avisar(aviso)
 }
@@ -107,7 +126,7 @@ function origen(extra) {
 export function notaDesdeSeleccion(texto, pagina = null, rects = null) {
   const cita = texto.replace(/\s+/g, ' ').trim().slice(0, 1200)
   const o = origen({ pagina, rects: rects?.slice(0, 80) || null, cita: cita.slice(0, 400) })
-  tarjetaCita('notas', { titulo: referencia(pagina), texto: `“${cita}”`, estilo: 'rayada', letra: 'serif', ...(o ? { origen: o } : {}) }, 'Nota creada en el lienzo')
+  tarjetaCita('notas', { titulo: referencia(pagina), texto: `“${cita}”`, estilo: 'rayada', letra: 'serif', ...(o ? { origen: o } : {}) }, 'Nota creada en el lienzo de lectura')
 }
 
 /** Tarjeta de imagen con el área recortada de un PDF (gráfico, tabla, escaneo…). */
@@ -116,7 +135,7 @@ export function fotoDesdeRecorte({ imagen, proporcion, texto, pagina, rect }) {
   tarjetaCita('fotos', {
     titulo: referencia(pagina), imagen, proporcion, trazos: [],
     texto: texto ? `“${texto.slice(0, 1500)}”` : '', ...(o ? { origen: o } : {})
-  }, 'Recorte citado en el lienzo')
+  }, 'Recorte citado en el lienzo de lectura')
 }
 
 /** Vínculo: abre el documento de la cita y la señala. */
@@ -131,7 +150,7 @@ export async function abrirOrigen(o, proyectoId, tarjetaId = null) {
 export function marcasDeFuente(proyectoId, fuenteId) {
   const p = S.proyectoPorId.get(proyectoId)
   if (!p || !fuenteId) return []
-  const lienzos = [p.canvas, ...Object.values(p.canvas.objetivos || {})]
+  const lienzos = [p.canvas, ...Object.values(p.canvas.objetivos || {}), ...Object.values(p.canvas.lecturas || {})]
   return lienzos.flatMap(c => [...(c.notas || []), ...(c.fotos || [])])
     .filter(t => t.origen?.fuente === fuenteId)
     .map(t => ({ id: t.id, titulo: t.titulo, ...t.origen }))
