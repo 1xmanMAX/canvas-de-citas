@@ -136,6 +136,8 @@ tras cambiar la app hay que publicar `gh-pages` para que la app de Windows la te
 (`canvas.lecturas.<fuente_id>`, `lib/lecturas.js`, `LecturaLienzo.svelte`, ruta `#/p/<id>/l/<fuente>`). Abrir el documento
 desde la ficha abre también su lectura a la izquierda del visor, y las notas con cita y recortes van ahí (no al general).
 La **chincheta** de cada tarjeta la clava también en el lienzo general (campo opcional `en_general: { x, y }`: es la misma
-tarjeta, con otro lugar); en el general muestra de qué fuente viene y un hilo a ella. Prueba: `npm run test:e2e -- lectura`.
+tarjeta, con otro lugar); en el general muestra de qué fuente viene y un hilo a ella. Cada fuente del general lleva un
+contador de su lectura que la abre. Al abrir un proyecto, las citas con `origen` que aún estén en el general pasan solas a su
+lectura, clavadas en el mismo lugar (`migrarALecturas`; los sub-lienzos de objetivo no se tocan). Prueba: `npm run test:e2e -- lectura`.
 
 **Siguiente:** probar el APK en el celular de Max (sin compilar APK salvo que lo pida) contra la app de Windows.

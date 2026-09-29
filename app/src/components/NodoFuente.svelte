@@ -7,8 +7,11 @@
 
   let {
     x, y, anio, autor, linea2 = '', chips = [], estado, seleccionado = false, resaltado = false,
-    atenuado = false, pista = '', alAbrir, inicio, mover, fin
+    atenuado = false, pista = '', alAbrir, inicio, mover, fin,
+    lectura = null, alLectura = null // { total, clavadas } de su lienzo de lectura: contador que lo abre
   } = $props()
+  const nLectura = $derived(lectura?.total || 0)
+  const wLectura = $derived(String(nLectura).length * 7 + 30)
 
   const L = getContext('lienzo')
   const COLOR = { usando: 'var(--using)', verificado: 'var(--using)', revisado_no_usado: 'var(--reviewed)', dudoso: 'var(--reviewed)', no_revisado: 'var(--unreviewed)', no_verificado: 'var(--unreviewed)' }
@@ -64,9 +67,27 @@
       </g>
     {/each}
   {/if}
+  {#if nLectura && alLectura}
+    <!-- Contador del lienzo de lectura de la fuente (sus citas, recortes y notas): lo abre -->
+    <g class="contador-lectura" transform="translate({NODO_W - wLectura + 8} -9)" role="button" tabindex="0"
+      aria-label="Lienzo de lectura: {nLectura} {nLectura === 1 ? 'tarjeta' : 'tarjetas'}"
+      onpointerdown={e => e.stopPropagation()} onclick={e => { e.stopPropagation(); alLectura() }}
+      onkeydown={e => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), e.stopPropagation(), alLectura())}>
+      <title>Lienzo de lectura: {nLectura} {nLectura === 1 ? 'tarjeta' : 'tarjetas'}{lectura.clavadas ? `, ${lectura.clavadas} en el lienzo general` : ''}</title>
+      <rect width={wLectura} height="18" rx="9" />
+      <path d="M8 5h5l3 3v6H8z" class="lectura-doc" />
+      <text x="21" y="13">{nLectura}</text>
+    </g>
+  {/if}
 </g>
 
 <style>
+  .contador-lectura { cursor: pointer; }
+  .contador-lectura:focus { outline: none; }
+  .contador-lectura rect { fill: var(--accent); stroke: var(--paper); stroke-width: 1.5; }
+  .contador-lectura:hover rect, .contador-lectura:focus-visible rect { fill: #C0392B; }
+  .lectura-doc { fill: none; stroke: #fff; stroke-width: 1.2; stroke-linejoin: round; pointer-events: none; }
+  .contador-lectura text { font: 600 10.5px var(--sans); fill: #fff; }
   .nodo { cursor: pointer; }
   .nodo:focus { outline: none; }
   .nodo:focus-visible rect:first-child { stroke: var(--accent); stroke-width: 2; }

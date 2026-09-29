@@ -938,6 +938,33 @@ const SUITES = {
       await (await pg.waitForSelector('::-p-xpath(//button[contains(@class, "resultado")][.//span[contains(., "Lectura de")]])', { timeout: 5000 })).click()
       await pg.waitForSelector('.lectura-panel', { timeout: 5000 })
     })
+    await s.paso('una cita antigua del general pasa sola a su lectura, clavada; el contador de la fuente la abre', async () => {
+      await pg.evaluate(() => new Promise(res => {
+        const r = indexedDB.open('canvas-de-citas')
+        r.onsuccess = () => {
+          const st = r.result.transaction('proyectos', 'readwrite').objectStore('proyectos'), q = st.get('proyecto_001')
+          q.onsuccess = () => {
+            const p = q.result
+            p.canvas.notas.push({ id: 'nota_antigua', titulo: 'Cita vieja', texto: '“texto citado”', x: 700, y: -300, origen: { fuente: 'fuente_005', tipo: 'html', cita: 'texto citado' } })
+            p.canvas.conexiones.push({ id: 'con_vieja', desde: 'fuente_005', hasta: 'nota_antigua', etiqueta: 'cita' })
+            st.put(p).onsuccess = res
+          }
+        }
+      }))
+      await pg.evaluate(() => (location.hash = '#/p/proyecto_001')); await pg.reload({ waitUntil: 'networkidle0' }); await esperar(1200)
+      const cv = await lienzoGuardado(pg)
+      if (cv.notas.some(n => n.id === 'nota_antigua')) throw new Error('sigue en el general')
+      const n = cv.lecturas?.fuente_005?.notas?.find(x => x.id === 'nota_antigua')
+      if (!n || n.en_general?.x !== 700 || n.en_general?.y !== -300) throw new Error('no pasó clavada a la lectura: ' + JSON.stringify(n))
+      if (!cv.lecturas.fuente_005.conexiones.some(k => k.id === 'con_vieja') || cv.conexiones.some(k => k.id === 'con_vieja')) throw new Error('el hilo cita no pasó a la lectura')
+      await pg.click('button[aria-label="Encuadrar todo"]'); await esperar(500)
+      const contador = await pg.waitForSelector('g.nodo g.contador-lectura', { timeout: 5000 })
+      await pg.screenshot({ path: path.join(SALIDA, 'lectura-contador.png') })
+      const antes = pg.evaluate(() => location.hash)
+      await contador.click(); await esperar(600)
+      if (!/\/l\/fuente_0\d\d$/.test(await pg.evaluate(() => location.hash))) throw new Error('no abrió la lectura desde el contador (' + await antes + ')')
+      if (await pg.$('dialog[open]')) throw new Error('abrió también la ficha de la fuente')
+    })
     if (pg.errores.length) s.fallas.push(...pg.errores)
     return s
   },

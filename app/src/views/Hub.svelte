@@ -18,7 +18,7 @@
   import EditorAgrupador from '../components/EditorAgrupador.svelte'
   import { accionesAgrupadores } from '../lib/agrupadores.js'
   import { LISTAS, TIPO, cajas, medir, coincideTarjeta, nombreTarjeta } from '../lib/tarjetas.js'
-  import { cajasClavadas, asegurarLectura, cuentaLectura } from '../lib/lecturas.js'
+  import { cajasClavadas, asegurarLectura, cuentaLectura, migrarALecturas } from '../lib/lecturas.js'
   import { redimensionarFoto, lugarLibre, nuevaTarjeta, guardarTarjeta, eliminarTarjeta, duplicarTarjeta, alternarTarea, vinculosDe, ancla, rutaHilo } from '../lib/tablero.js'
   import { analizar, aDataURL } from '../lib/audio.svelte.js'
   import { listaObjetivos, objetivosPorIndicador } from '../lib/objetivos.js'
@@ -354,6 +354,12 @@
     avisar(n === 1 ? 'Tarjeta agregada' : `${n} tarjetas agregadas`)
   }
 
+  // Las citas y recortes que ya estaban en el general (de antes de las lecturas) pasan al lienzo de
+  // lectura de su fuente; quedan clavadas en el mismo lugar, así que aquí no se mueve nada.
+  onMount(() => {
+    if (migrarALecturas(cv, id => S.fuentePorId.has(id), medir)) guardarProyecto(p)
+  })
+
   // Lo compartido desde otras apps del celular llega aquí (App.svelte → lib/archivos.js).
   onMount(() => {
     lienzoAbierto.insertar = (archivos, texto) => { const c = lienzo.centro(); return insertar(archivos, texto, c.x, c.y) }
@@ -585,6 +591,7 @@
         resaltado={coin || conectando?.desde === it.id || destacado === it.id}
         atenuado={!!q && !coin}
         pista={coin ? 'Ver citas →' : ''}
+        lectura={cuentaLectura(cv, it.id)} alLectura={() => abrirLectura(it.id)}
         alAbrir={() => tocar(it.id, () => abrirFuente(it.id))}
         {...arrastreFuente(it.id)}
       />

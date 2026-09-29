@@ -1,7 +1,7 @@
 // Lienzo de lectura de cada fuente: tarjetas propias y las "clavadas" en el lienzo general.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { asegurarLectura, clavadasDe, cajasClavadas, cuentaLectura, alternarClavada, buscarEnLecturas } from '../../src/lib/lecturas.js'
+import { asegurarLectura, clavadasDe, cajasClavadas, cuentaLectura, alternarClavada, buscarEnLecturas, migrarALecturas } from '../../src/lib/lecturas.js'
 import { renumerar, docsDe } from '../../src/lib/reparto.js'
 import { indexar } from '../../src/lib/etiquetas.js'
 
@@ -69,4 +69,46 @@ test('el buscador indexa las tarjetas de las lecturas con la clave l:<fuente>', 
   const n = i.find(x => x.id === 'n1')
   assert.equal(n.clave, 'l:fuente_003')
   assert.deepEqual(n.temas, ['costos'])
+})
+
+test('migrarALecturas: las citas del general pasan a la lectura de su fuente, clavadas en el mismo lugar', () => {
+  const cv = {
+    notas: [
+      { id: 'n1', x: 500, y: 100, origen: { fuente: 'fuente_001' } },
+      { id: 'n2', x: 520, y: 300, origen: { fuente: 'fuente_001' } },
+      { id: 'n3', x: 0, y: 0 }, // nota propia: se queda
+      { id: 'n4', x: 9, y: 9, origen: { fuente: 'fuente_borrada' } } // su fuente ya no existe: se queda
+    ],
+    fotos: [{ id: 'f1', x: -50, y: 40, origen: { fuente: 'fuente_002' } }],
+    listas: [], audios: [],
+    conexiones: [
+      { id: 'c1', desde: 'fuente_001', hasta: 'n1', etiqueta: 'cita' },
+      { id: 'c2', desde: 'n1', hasta: 'n3' }, // entre tarjetas: sigue en el general
+      { desde: 'fuente_009', hasta: 'n3' } // sin id: no se toca
+    ],
+    objetivos: { oe1: { notas: [{ id: 'o1', origen: { fuente: 'fuente_001' } }] } }
+  }
+  const existe = id => id !== 'fuente_borrada'
+  assert.equal(migrarALecturas(cv, existe, medir), 3)
+  assert.deepEqual(cv.notas.map(o => o.id), ['n3', 'n4'])
+  assert.equal(cv.fotos.length, 0)
+  const l1 = cv.lecturas.fuente_001
+  assert.deepEqual(l1.notas.map(o => [o.id, o.x, o.y, o.en_general]), [
+    ['n1', 280, -120, { x: 500, y: 100 }],
+    ['n2', 300, 80, { x: 520, y: 300 }]
+  ])
+  assert.deepEqual(l1.conexiones.map(k => k.id), ['c1'])
+  assert.deepEqual(cv.conexiones.map(k => k.id), ['c2', undefined])
+  assert.deepEqual(cv.lecturas.fuente_002.fotos[0].en_general, { x: -50, y: 40 })
+  assert.equal(cv.objetivos.oe1.notas.length, 1, 'los sub-lienzos de objetivo no se tocan')
+  assert.equal(clavadasDe(cv).length, 3)
+  // Una segunda vez no hay nada que mover.
+  assert.equal(migrarALecturas(cv, existe, medir), 0)
+})
+
+test('migrarALecturas: lo movido va debajo de lo que ya tenía la lectura', () => {
+  const cv = { notas: [{ id: 'n9', x: 10, y: 10, origen: { fuente: 'fuente_001' } }], conexiones: [] }
+  asegurarLectura(cv, 'fuente_001').notas.push({ id: 'ya', x: 280, y: 0 })
+  migrarALecturas(cv, () => true, medir)
+  assert.deepEqual(cv.lecturas.fuente_001.notas.map(o => [o.id, o.y]), [['ya', 0], ['n9', 140]])
 })
