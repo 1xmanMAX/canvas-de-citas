@@ -1,6 +1,6 @@
 [package]
 name = "canvas-de-citas"
-version = "1.1.0"
+version = "1.2.0"
 edition = "2021"
 description = "Canvas de Citas para Windows: la app en su propia ventana (WebView2), con sus carpetas y la sincronización por Wi-Fi"
 publish = false

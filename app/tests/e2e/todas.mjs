@@ -1154,6 +1154,30 @@ const SUITES = {
         const ultima = await cel.evaluate(() => new Promise(res => { const r = indexedDB.open('canvas-de-citas'); r.onsuccess = () => { const q = r.result.transaction('meta').objectStore('meta').get('sincroUltima'); q.onsuccess = () => res(q.result) } }))
         if (!(ultima?.bytes < 4000)) throw new Error(`viajaron ${ultima?.bytes} bytes (se esperaba solo lo cambiado)`)
       })
+      await s.paso('lienzo de lectura con una tarjeta clavada: igual en la PC, el celular y la laptop', async () => {
+        await cel.keyboard.press('Escape').catch(() => {}); await esperar(300)
+        // La lectura se crea en la PC (como la app de Windows); llega a los dos aparatos.
+        const d = JSON.parse(enPc())
+        d.proyectos[0].canvas.lecturas = { fuente_001: { notas: [{ id: 'nota_lectura', texto: 'Cita del paper', x: 280, y: -100, en_general: { x: 600, y: 200 } }], listas: [], audios: [], fotos: [], conexiones: [], agrupadores: [] } }
+        fs.writeFileSync(path.join(carpeta, 'proyectos.json'), JSON.stringify(d, null, 2) + '\n'); await esperar(1500)
+        await sincronizarEn(cel); await sincronizarEn(lap)
+        const clavada = async pg => {
+          await pg.evaluate(() => (location.hash = '#/p/proyecto_001')); await esperar(600)
+          await pg.click('button[aria-label="Encuadrar todo"]'); await esperar(500)
+          return pg.waitForSelector('g.tarjeta:has(g.procedencia)', { timeout: 5000 })
+        }
+        await clavada(lap)
+        // El celular la mueve en el general: el cambio viaja a la PC y a la laptop.
+        const r = await (await clavada(cel)).boundingBox()
+        await cel.mouse.move(r.x + r.width / 2, r.y + r.height * .6); await cel.mouse.down()
+        await cel.mouse.move(r.x + r.width / 2 + 100, r.y + r.height * .6 + 40, { steps: 6 }); await cel.mouse.up(); await esperar(500)
+        await sincronizarEn(cel); await sincronizarEn(lap)
+        const enPcAhora = JSON.parse(enPc()).proyectos[0].canvas.lecturas.fuente_001.notas[0]
+        if (enPcAhora.en_general.x === 600) throw new Error('el movimiento no llegó a la PC')
+        if (enPcAhora.x !== 280) throw new Error('cambió su lugar en la lectura')
+        const enLap = await lap.evaluate(() => new Promise(res => { const r = indexedDB.open('canvas-de-citas'); r.onsuccess = () => { const q = r.result.transaction('proyectos').objectStore('proyectos').get('proyecto_001'); q.onsuccess = () => res(q.result.canvas.lecturas?.fuente_001?.notas?.[0]) } }))
+        if (JSON.stringify(enLap?.en_general) !== JSON.stringify(enPcAhora.en_general)) throw new Error(`laptop ${JSON.stringify(enLap?.en_general)} ≠ PC ${JSON.stringify(enPcAhora.en_general)}`)
+      })
     } finally { srv.kill() }
     for (const pg of [cel, lap]) if (pg.errores.length) s.fallas.push(...pg.errores)
     return s
