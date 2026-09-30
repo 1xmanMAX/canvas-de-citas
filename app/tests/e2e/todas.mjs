@@ -1098,6 +1098,23 @@ const SUITES = {
 
   // Grupo de sincronización: un "celular" (Android simulado) y una "laptop" editan a la vez y
   // todos (con la PC) terminan con la misma versión, enviando solo lo que cambió.
+  // Tras publicar, una versión vieja abierta que no encuentra una parte (p. ej. el visor PDF) pasa sola a la nueva.
+  async version(b) {
+    const s = suite('Versión nueva tras publicar'), pg = await pagina(b)
+    await pg.goto(URL_APP, { waitUntil: 'networkidle0' }); await esperar(800)
+    const fallo = () => pg.evaluate(() => { const e = new Event('vite:preloadError', { cancelable: true }); dispatchEvent(e); return e.defaultPrevented })
+    await s.paso('si falta una parte cargada bajo demanda, recarga la app', async () => {
+      const nav = pg.waitForNavigation({ timeout: 8000 })
+      if (!(await fallo())) throw new Error('no atendió el error')
+      await nav
+    })
+    await s.paso('no recarga en bucle si vuelve a fallar enseguida', async () => {
+      await esperar(800)
+      if (await fallo()) throw new Error('volvió a recargar')
+    })
+    await pg.browserContext().close().catch(() => {})
+    return s
+  },
   async grupo(b) {
     const s = suite('Grupo de sincronización')
     const crate = path.resolve(APP, '../receptor/sincro')
