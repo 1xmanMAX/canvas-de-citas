@@ -5,6 +5,7 @@
   import Modal from './Modal.svelte'
   import Icono from './Icono.svelte'
   import { S } from '../lib/store.svelte.js'
+  import { autorCorto, anio } from '../lib/citas.js'
   import { B, sugerir, enfocar } from '../lib/buscador.svelte.js'
   import { parsearConsulta, coincideConsulta, resumen, normalizar, colorEtiqueta } from '../lib/etiquetas.js'
   import { autocompletar } from '../lib/autocompletar.js'
@@ -36,7 +37,9 @@
   }
   const donde = i => {
     const p = i.pid && S.proyectoPorId.get(i.pid)
-    return p ? p.titulo + (i.clave ? ` · ${i.clave.toUpperCase()}` : '') : ''
+    if (!p) return ''
+    if (i.clave?.startsWith('l:')) { const f = S.fuentePorId.get(i.clave.slice(2)); return `${p.titulo} · Lectura de ${f ? `${autorCorto(f)} (${anio(f)})` : 'una fuente'}` }
+    return p.titulo + (i.clave ? ` · ${i.clave.toUpperCase()}` : '')
   }
   function elegirEtiqueta(t) {
     B.q = t.startsWith('@') ? t : '#' + t

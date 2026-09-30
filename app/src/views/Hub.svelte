@@ -9,6 +9,7 @@
   import AgregarFuente from '../components/AgregarFuente.svelte'
   import ProyectoForm from '../components/ProyectoForm.svelte'
   import ObjetivoLienzo from '../components/ObjetivoLienzo.svelte'
+  import LecturaLienzo from '../components/LecturaLienzo.svelte'
   import Tarjeta from '../components/Tarjeta.svelte'
   import Chinchetas from '../components/Chinchetas.svelte'
   import EditorTarjeta from '../components/EditorTarjeta.svelte'
@@ -16,7 +17,8 @@
   import Agrupador from '../components/Agrupador.svelte'
   import EditorAgrupador from '../components/EditorAgrupador.svelte'
   import { accionesAgrupadores } from '../lib/agrupadores.js'
-  import { LISTAS, TIPO, cajas, coincideTarjeta, nombreTarjeta } from '../lib/tarjetas.js'
+  import { LISTAS, TIPO, cajas, medir, coincideTarjeta, nombreTarjeta } from '../lib/tarjetas.js'
+  import { cajasClavadas, asegurarLectura, cuentaLectura, migrarALecturas } from '../lib/lecturas.js'
   import { redimensionarFoto, lugarLibre, nuevaTarjeta, guardarTarjeta, eliminarTarjeta, duplicarTarjeta, alternarTarea, vinculosDe, ancla, rutaHilo } from '../lib/tablero.js'
   import { analizar, aDataURL } from '../lib/audio.svelte.js'
   import { listaObjetivos, objetivosPorIndicador } from '../lib/objetivos.js'
@@ -34,7 +36,7 @@
   import { onMount, untrack } from 'svelte'
   import { B } from '../lib/buscador.svelte.js'
 
-  let { p, fid = null, oid = null, abrirDatos, abrirCelular, abrirArchivos, atras } = $props()
+  let { p, fid = null, oid = null, lid = null, abrirDatos, abrirCelular, abrirArchivos, atras } = $props()
 
   const cv = $derived(p.canvas)
   const citas = $derived(S.citasPorProyecto.get(p.id) || [])
@@ -83,13 +85,16 @@
   // Tarjetas libres (notas, listas, notas de voz, fotos) y sus cajas.
   const tarj = $derived(cajas(cv))
   const corcho = $derived(!!cv.corcho)
-  const hayTarjetas = $derived(LISTAS.some(l => cv[l]?.length))
+  const hayTarjetas = $derived(LISTAS.some(l => cv[l]?.length) || clav.size > 0)
+  // Tarjetas de los lienzos de lectura clavadas en el general (lib/lecturas.js): viven en su lectura
+  // y aquí se dibujan en su lugar `en_general`.
+  const clav = $derived(cajasClavadas(cv, medir))
 
   function cajaDe(id) {
     if (id === 'hub') return { x: -HUB_W / 2, y: -hubH / 2, w: HUB_W, h: hubH }
     const it = itemPorId.get(id)
     if (it) { const q = posDe(id); return q && { x: q.x, y: q.y, w: NODO_W, h: it.h } }
-    return tarj.get(id) || null
+    return tarj.get(id) || clav.get(id) || null
   }
   const centroDe = id => (id === 'hub' ? { x: 0, y: 0 } : ancla(cajaDe(id), false))
   const puntoDe = id => ancla(cajaDe(id), corcho)
@@ -106,23 +111,27 @@
   const itemsVista = $derived(e1(items.filter(it => cruza(cajaDe(it.id)))))
   const aristasVista = $derived(e2(items.filter(it => { const c = centroDe(it.id); return c && cruza(entre({ x: 0, y: 0 }, c)) })))
   const tarjVista = $derived(Object.fromEntries(LISTAS.map(l => [l, eT[l]((cv[l] || []).filter(o => cruza(tarj.get(o.id))))])))
+  const e4 = estable()
+  const clavVista = $derived(e4([...clav.values()].filter(c => cruza(c))))
   /** Muchos elementos a la vista: el Lienzo puede simplificar el dibujo al alejarse. */
-  const pesado = $derived(itemsVista.length + LISTAS.reduce((s, l) => s + tarjVista[l].length, 0) > 150)
+  const pesado = $derived(itemsVista.length + clavVista.length + LISTAS.reduce((s, l) => s + tarjVista[l].length, 0) > 150)
   const conexionesVista = $derived(e3(cv.conexiones.filter(k => { const a = puntoDe(k.desde), b = puntoDe(k.hasta); return a && b && cruza(entre(a, b)) })))
-  const chinchetas = $derived(corcho ? ['hub', ...itemsVista.map(it => it.id), ...LISTAS.flatMap(l => tarjVista[l].map(o => o.id))].map(id => { const c = cajaDe(id); return c && { id, ...c } }).filter(Boolean) : [])
+  const chinchetas = $derived(corcho ? ['hub', ...itemsVista.map(it => it.id), ...LISTAS.flatMap(l => tarjVista[l].map(o => o.id)), ...clavVista.map(c => c.obj.id)].map(id => { const c = cajaDe(id); return c && { id, ...c } }).filter(Boolean) : [])
 
   function nombreDe(id) {
     if (id === 'hub') return `Proyecto: ${p.titulo}`
     const f = S.fuentePorId.get(id)
     if (f) return `${autorCorto(f)} (${anio(f)})`
-    const t = tarj.get(id)
+    const t = tarj.get(id) || clav.get(id)
     return t ? nombreTarjeta(t.lista, t.obj) : id
   }
+  const refCorta = fid => { const f = S.fuentePorId.get(fid); if (!f) return 'Fuente'; const t = `${autorCorto(f)} (${anio(f)})`; return t.length > 30 ? t.slice(0, 29) + '…' : t }
 
   const ocupadas = $derived([
     { x: -HUB_W / 2, y: -hubH / 2, w: HUB_W, h: hubH },
     ...items.map(it => { const q = posDe(it.id); return { x: q.x, y: q.y, w: NODO_W, h: it.h } }),
     ...[...tarj.values()].map(({ x, y, w, h }) => ({ x, y, w, h })),
+    ...[...clav.values()].map(({ x, y, w, h }) => ({ x, y, w, h })),
     ...[...cajasGrupos.values()]
   ])
   const limites = $derived(limitesDe(ocupadas, 40))
@@ -132,6 +141,7 @@
   function elementos() {
     const out = items.map(it => ({ id: it.id, get nombre() { return nombreDe(it.id) }, tipo: 'fuente', caja: cajaDe(it.id), poner: (x, y) => (cv.posiciones[it.id] = { x, y }) }))
     for (const [id, t] of tarj) out.push({ id, get nombre() { return nombreDe(id) }, tipo: TIPO[t.lista], caja: t, poner: (x, y) => { t.obj.x = x; t.obj.y = y } })
+    for (const [id, t] of clav) out.push({ id, get nombre() { return nombreDe(id) }, tipo: TIPO[t.lista], caja: t, poner: (x, y) => { t.obj.en_general.x = x; t.obj.en_general.y = y } })
     return out
   }
   const grupos = accionesAgrupadores({ lienzo: () => cv, elementos, cajaPorId: id => (id === 'hub' ? null : cajaDe(id)), antes: () => fijarLibre(), guardar: () => guardarProyecto(p) })
@@ -216,6 +226,23 @@
     }
   }
 
+  /** Tarjeta clavada desde una lectura: en el general se mueve su lugar `en_general`. */
+  function arrastreClavada(obj) {
+    let x0, y0
+    return {
+      inicio: () => { grupos.fijar(); x0 = obj.en_general.x; y0 = obj.en_general.y },
+      mover: (dx, dy) => { if (obj.en_general) obj.en_general = { x: Math.round(x0 + dx), y: Math.round(y0 + dy) } },
+      fin: () => { grupos.soltado(obj.id); guardarProyecto(p) }
+    }
+  }
+
+  /** Lugar libre en el general para una tarjeta que se clava desde la lectura de `f`: junto a su fuente. */
+  function lugarEnGeneral(f, w, h) {
+    const q0 = itemPorId.has(f) ? posDe(f) : null
+    const c = q0 ? { x: q0.x + NODO_W + 60 + w / 2, y: q0.y + h / 2 } : { x: HUB_W / 2 + 120 + w / 2, y: 0 }
+    return lugarLibre(ocupadas, w, h, c.x, c.y, 24)
+  }
+
   function tocar(id, abrir) {
     if (!conectando) return abrir()
     if (!conectando.desde) conectando = { desde: id }
@@ -225,7 +252,13 @@
     }
   }
 
-  const rutaObjetivo = $derived(oid ? `#/p/${p.id}/o/${oid}` : `#/p/${p.id}`)
+  const rutaObjetivo = $derived(oid ? `#/p/${p.id}/o/${oid}` : lid ? `#/p/${p.id}/l/${lid}` : `#/p/${p.id}`)
+  const abrirLectura = f => {
+    if (f === lid) return
+    if (lid || oid || fid) location.replace(`#/p/${p.id}/l/${f}`)
+    else location.hash = `#/p/${p.id}/l/${f}`
+  }
+  const cerrarLectura = () => atras(`#/p/${p.id}`)
   const abrirFuente = id => (location.hash = `${rutaObjetivo}/f/${id}`)
   const cerrarFuente = () => atras(rutaObjetivo)
   const abrirObjetivo = clave => {
@@ -242,7 +275,9 @@
     const c = lienzo.centro()
     modal = { lista, o: nuevaTarjeta(lista, c.x, c.y, datos, ocupadas), nueva: true }
   }
-  const abrirTarjeta = (lista, o) => (modal = { lista, o: copia(o) })
+  const abrirTarjeta = (lista, o, lectura = null) => (modal = { lista, o: copia(o), lectura })
+  /** Tablero donde vive la tarjeta del editor: el general o la lectura de su fuente. */
+  const tableroModal = () => (modal.lectura ? asegurarLectura(cv, modal.lectura) : cv)
 
   async function nuevaFoto(e) {
     const input = e.currentTarget
@@ -259,7 +294,7 @@
   async function guardarModal() {
     // Foto nueva: su original en alta se guarda con la tarjeta (fotos/<id>.<ext> en la carpeta).
     if (modal.nueva && modal.original) await guardarOriginalFoto(modal.o, modal.original.blob, modal.original.extension)
-    guardarTarjeta(cv, modal.lista, modal.o, modal.nueva, ocupadas)
+    guardarTarjeta(tableroModal(), modal.lista, modal.o, modal.nueva, ocupadas)
     guardar()
     modal = null
   }
@@ -271,15 +306,19 @@
     guardar()
   }
   function eliminarModal() {
-    eliminarTarjeta(cv, modal.lista, modal.o.id)
+    if (modal.lectura && !confirm('Esta tarjeta viene de un lienzo de lectura: se eliminará también de allí. ¿Eliminarla?')) return
+    eliminarTarjeta(tableroModal(), modal.lista, modal.o.id)
+    cv.conexiones = cv.conexiones.filter(k => k.desde !== modal.o.id && k.hasta !== modal.o.id)
     guardar()
     modal = null
   }
   function duplicarModal() {
-    guardarTarjeta(cv, modal.lista, modal.o, false)
-    const d = duplicarTarjeta(cv, modal.lista, modal.o)
+    const t = tableroModal()
+    guardarTarjeta(t, modal.lista, modal.o, false)
+    const d = duplicarTarjeta(t, modal.lista, modal.o)
+    if (d.en_general) d.en_general = { x: d.en_general.x + 36, y: d.en_general.y + 36 }
     guardar()
-    modal = { lista: modal.lista, o: copia(d) }
+    modal = { lista: modal.lista, o: copia(d), lectura: modal.lectura }
     avisar('Tarjeta duplicada')
   }
   function alternar(o, i) {
@@ -315,6 +354,12 @@
     avisar(n === 1 ? 'Tarjeta agregada' : `${n} tarjetas agregadas`)
   }
 
+  // Las citas y recortes que ya estaban en el general (de antes de las lecturas) pasan al lienzo de
+  // lectura de su fuente; quedan clavadas en el mismo lugar, así que aquí no se mueve nada.
+  onMount(() => {
+    if (migrarALecturas(cv, id => S.fuentePorId.has(id), medir)) guardarProyecto(p)
+  })
+
   // Lo compartido desde otras apps del celular llega aquí (App.svelte → lib/archivos.js).
   onMount(() => {
     lienzoAbierto.insertar = (archivos, texto) => { const c = lienzo.centro(); return insertar(archivos, texto, c.x, c.y) }
@@ -322,7 +367,7 @@
   })
 
   function pegar(e) {
-    if (modal || fuenteAbierta || oid || document.querySelector('dialog[open]')) return
+    if (modal || fuenteAbierta || oid || lid || document.querySelector('dialog[open]')) return
     if (e.target.closest?.('input, textarea, [contenteditable]')) return
     const dt = e.clipboardData
     if (!dt) return
@@ -353,7 +398,7 @@
 
   function soltarEnLienzo(e) {
     soltando = false
-    if (oid) return
+    if (oid || lid) return
     const r = recibible(e.dataTransfer)
     if (!r) return
     e.preventDefault()
@@ -507,6 +552,12 @@
       <line x1="0" y1="0" x2={c.x} y2={c.y} class="arista" />
     {/each}
 
+    <!-- Hilo fino de cada tarjeta clavada a su fuente -->
+    {#each clavVista as c (c.obj.id)}
+      {@const a = itemPorId.has(c.fid) ? centroDe(c.fid) : null}
+      {#if a}{@const b = ancla(c, false)}<line x1={a.x} y1={a.y} x2={b.x} y2={b.y} class="hilo-lectura" />{/if}
+    {/each}
+
     <!-- Conexiones manuales: debajo de las tarjetas (en corcho, encima: ver más abajo) -->
     {#if !corcho}{@render conexionesSvg()}{/if}
 
@@ -540,6 +591,7 @@
         resaltado={coin || conectando?.desde === it.id || destacado === it.id}
         atenuado={!!q && !coin}
         pista={coin ? 'Ver citas →' : ''}
+        lectura={cuentaLectura(cv, it.id)} alLectura={() => abrirLectura(it.id)}
         alAbrir={() => tocar(it.id, () => abrirFuente(it.id))}
         {...arrastreFuente(it.id)}
       />
@@ -552,6 +604,14 @@
         <Tarjeta lista={l} {o} origen={conectando?.desde === o.id} resaltado={coin || destacado === o.id} atenuado={!!q && !coin} alVinculo={() => abrirOrigen(o.origen, p.id, o.id)}
           alTocar={() => tocar(o.id, () => abrirTarjeta(l, o))} alternar={i => alternar(o, i)} {...arrastreLibre(o)} redimensionar={l === 'fotos' ? redimensionarFoto(o, () => guardarProyecto(p)) : null} />
       {/each}
+    {/each}
+
+    <!-- Tarjetas clavadas desde los lienzos de lectura de cada fuente -->
+    {#each clavVista as c (c.obj.id)}
+      {@const coin = !!q && coincideTarjeta(c.obj, q)}
+      <Tarjeta lista={c.lista} o={c.obj} pos={c.obj.en_general} origen={conectando?.desde === c.obj.id} resaltado={coin || destacado === c.obj.id} atenuado={!!q && !coin}
+        alVinculo={() => abrirOrigen(c.obj.origen, p.id, c.obj.id)} procedencia={{ texto: refCorta(c.fid), alTocar: () => abrirLectura(c.fid) }}
+        alTocar={() => tocar(c.obj.id, () => abrirTarjeta(c.lista, c.obj, c.fid))} alternar={i => alternar(c.obj, i)} {...arrastreClavada(c.obj)} />
     {/each}
 
     <!-- Nombre y esquina de los agrupadores: encima, para que ninguna tarjeta los tape -->
@@ -605,13 +665,18 @@
     </div>
   {/if}
 
+  {#if lid}
+    {#key lid}<LecturaLienzo {p} fid={lid} abrirFicha={() => abrirFuente(lid)} cerrar={cerrarLectura} {lugarEnGeneral} />{/key}
+  {/if}
+
   {#if oid}
     {#key oid}<ObjetivoLienzo {p} clave={oid} {abrirFuente} cerrar={cerrarObjetivo} />{/key}
   {/if}
 </div>
 
 {#if fuenteAbierta}
-  {#key fuenteAbierta.id}<FuenteModal fuente={fuenteAbierta} proyectoId={p.id} onclose={cerrarFuente} />{/key}
+  {#key fuenteAbierta.id}<FuenteModal fuente={fuenteAbierta} proyectoId={p.id} onclose={cerrarFuente}
+    lectura={cuentaLectura(cv, fuenteAbierta.id)} abrirLectura={lid === fuenteAbierta.id ? cerrarFuente : () => abrirLectura(fuenteAbierta.id)} />{/key}
 {/if}
 
 {#if modal === 'agregar'}
@@ -698,6 +763,7 @@
     border: 2px dashed var(--accent); border-radius: 14px; background: rgba(227, 233, 236, .45);
   }
   .arista { stroke: var(--ink-soft); stroke-opacity: .3; stroke-width: 1; }
+  .hilo-lectura { stroke: #C0392B; stroke-opacity: .35; stroke-width: 1.2; stroke-dasharray: 2 4; pointer-events: none; }
   /* Los hilos no capturan clics: se puede tocar la tarjeta que queda debajo. */
   .conexion { fill: none; stroke: var(--accent); stroke-opacity: .55; stroke-width: 1.5; stroke-dasharray: 5 4; pointer-events: none; }
   .conexion.hilo { stroke: #B3261E; stroke-opacity: 1; stroke-width: 2.2; stroke-dasharray: none; stroke-linecap: round; }

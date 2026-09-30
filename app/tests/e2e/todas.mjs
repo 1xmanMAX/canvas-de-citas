@@ -827,7 +827,7 @@ const SUITES = {
       await pg.waitForFunction(() => document.querySelectorAll('.pag-pdf[data-n="0"] .capa-texto text').length > 5, { timeout: 15000 })
       await pg.evaluate(() => { const t = [...document.querySelectorAll('.pag-pdf[data-n="0"] .capa-texto text')].find(x => x.textContent.length > 40); const r = document.createRange(); r.selectNodeContents(t); getSelection().removeAllRanges(); getSelection().addRange(r) })
       await esperar(300); await clicTexto(pg, 'Nota con la cita'); await esperar(500)
-      const n = (await lienzoGuardado(pg)).notas.at(-1)
+      const n = (await lienzoGuardado(pg)).lecturas.fuente_003.notas.at(-1)
       if (!/pág\. 1$/.test(n.titulo) || !n.origen?.rects?.length) throw new Error(JSON.stringify(n.origen))
     })
     await s.paso('recortar un área → tarjeta de imagen con texto', async () => {
@@ -835,7 +835,7 @@ const SUITES = {
       const c = await (await pg.$('.pag-pdf[data-n="0"]')).boundingBox()
       await pg.mouse.move(c.x + c.width * .08, c.y + c.height * .05); await pg.mouse.down()
       await pg.mouse.move(c.x + c.width * .9, c.y + c.height * .3, { steps: 6 }); await pg.mouse.up(); await esperar(1500)
-      const f = (await lienzoGuardado(pg)).fotos.at(-1)
+      const f = (await lienzoGuardado(pg)).lecturas.fuente_003.fotos.at(-1)
       if (!f?.origen?.area || !/rework/i.test(f.texto)) throw new Error('recorte incompleto')
     })
     await s.paso('Esc cancela el recorte sin cerrar el visor', async () => {
@@ -844,8 +844,9 @@ const SUITES = {
     })
     await pg.keyboard.press('Escape'); await esperar(400)
     await s.paso('Vínculo en la tarjeta vuelve a la cita y la marca', async () => {
-      await pg.click('button[aria-label="Encuadrar todo"]'); await esperar(500)
-      await (await pg.$('g.tarjeta.notas g.vinculo')).click()
+      // Cerrado el visor, queda a la vista el lienzo de lectura de la fuente con sus citas.
+      await pg.click('.lectura-panel button[aria-label="Encuadrar todo"]'); await esperar(500)
+      await (await pg.$('.lectura-panel g.tarjeta.notas g.vinculo')).click()
       await pg.waitForSelector('.capa-marcas .destello', { timeout: 20000 })
       if (!(await pg.$('.capa-marcas .area'))) throw new Error('sin cuadro punteado del recorte')
       await esperar(1200); await pg.screenshot({ path: path.join(SALIDA, 'vinculo-pdf.png') })
@@ -859,7 +860,7 @@ const SUITES = {
       await fr.evaluate(() => { const p = [...document.querySelectorAll('p')].filter(x => x.textContent.length > 150)[1]; const r = document.createRange(); r.selectNodeContents(p); getSelection().removeAllRanges(); getSelection().addRange(r) })
       await esperar(300); await clicTexto(pg, 'Nota con la cita'); await esperar(400)
       await pg.keyboard.press('Escape'); await esperar(400)
-      const v = await pg.$$('g.tarjeta.notas g.vinculo'); await v.at(-1).click(); await esperar(2000)
+      const v = await pg.$$('.lectura-panel g.tarjeta.notas g.vinculo'); await v.at(-1).click(); await esperar(2000)
       const h = await pg.evaluate(() => { const w = document.querySelector('.visor iframe')?.contentWindow; return { cita: w?.CSS.highlights.has('cita'), activa: w?.CSS.highlights.has('cita-activa') } })
       if (!h.cita || !h.activa) throw new Error(JSON.stringify(h))
     })
@@ -870,6 +871,99 @@ const SUITES = {
       const [ch] = await Promise.all([pg.waitForFileChooser(), pg.keyboard.down('Control').then(() => pg.keyboard.press('o')).then(() => pg.keyboard.up('Control'))])
       await ch.accept([md]); await esperar(700)
       if (!/<h1>Resumen<\/h1>/.test(await pg.$eval('.lectura', e => e.innerHTML))) throw new Error('markdown')
+    })
+    if (pg.errores.length) s.fallas.push(...pg.errores)
+    return s
+  },
+
+  // Lienzo de lectura de cada fuente: las citas del PDF van a su propio tablero y la chincheta
+  // las clava también en el lienzo general del proyecto.
+  async lectura(b) {
+    const s = suite('Lienzo de lectura por fuente'), pg = await pagina(b)
+    await conEjemplo(pg)
+    const lectura = async () => (await lienzoGuardado(pg)).lecturas?.fuente_003
+    await s.paso('abrir el documento abre también el lienzo de lectura, al lado', async () => {
+      await adjuntar(pg, 'fuente_003', PDF)
+      await clicTexto(pg, 'Abrir')
+      await pg.waitForSelector('.lectura-panel', { timeout: 10000 })
+      if (!/\/l\/fuente_003$/.test(await pg.evaluate(() => location.hash))) throw new Error('ruta ' + await pg.evaluate(() => location.hash))
+      const [l, v] = await Promise.all([pg.$eval('.lectura-panel', e => e.getBoundingClientRect()), pg.$eval('.visor', e => e.getBoundingClientRect())])
+      if (l.right > v.left + 1) throw new Error(`el visor tapa la lectura (${l.right} > ${v.left})`)
+    })
+    await s.paso('la nota con la cita va a la lectura de la fuente, no al lienzo general', async () => {
+      await pg.waitForFunction(() => document.querySelectorAll('.pag-pdf[data-n="0"] .capa-texto text').length > 5, { timeout: 30000 })
+      const antes = (await lienzoGuardado(pg)).notas.length
+      await pg.evaluate(() => { const t = [...document.querySelectorAll('.pag-pdf[data-n="0"] .capa-texto text')].find(x => x.textContent.length > 40); const r = document.createRange(); r.selectNodeContents(t); getSelection().removeAllRanges(); getSelection().addRange(r) })
+      await esperar(300); await clicTexto(pg, 'Nota con la cita'); await esperar(600)
+      const cv = await lienzoGuardado(pg), l = cv.lecturas?.fuente_003
+      if (l?.notas?.length !== 1 || cv.notas.length !== antes) throw new Error('no quedó en la lectura')
+      if (!l.conexiones.some(k => k.desde === 'fuente_003' && k.hasta === l.notas[0].id)) throw new Error('sin hilo a la fuente')
+      if (!(await pg.$('.lectura-panel g.tarjeta.notas'))) throw new Error('no se ve en el lienzo de lectura')
+    })
+    await pg.keyboard.press('Escape'); await esperar(400) // cierra el visor; la lectura sigue abierta
+    await s.paso('la chincheta la clava en el lienzo general', async () => {
+      if (!(await pg.$('.lectura-panel'))) throw new Error('Esc cerró también la lectura')
+      await (await pg.$('.lectura-panel g.tarjeta g.clavar')).click(); await esperar(500)
+      const n = (await lectura()).notas[0]
+      if (!n.en_general || typeof n.en_general.x !== 'number') throw new Error('sin en_general')
+      if ((await pg.$eval('.lectura-panel g.clavar', g => g.getAttribute('aria-checked'))) !== 'true') throw new Error('chincheta sin marcar')
+    })
+    await s.paso('en el general se ve con su procedencia y se mueve sin tocar su lugar en la lectura', async () => {
+      await pg.keyboard.press('Escape'); await esperar(500)
+      if (await pg.$('.lectura-panel')) throw new Error('no se cerró la lectura')
+      await pg.click('button[aria-label="Encuadrar todo"]'); await esperar(500)
+      const g = await pg.waitForSelector('g.tarjeta:has(g.procedencia)', { timeout: 5000 })
+      const antes = (await lectura()).notas[0]
+      const r = await g.boundingBox()
+      await pg.mouse.move(r.x + r.width / 2, r.y + r.height * .7); await pg.mouse.down()
+      await pg.mouse.move(r.x + r.width / 2 + 120, r.y + r.height * .7 + 60, { steps: 8 }); await pg.mouse.up(); await esperar(600)
+      const despues = (await lectura()).notas[0]
+      if (despues.en_general.x === antes.en_general.x) throw new Error('no se movió en el general')
+      if (despues.x !== antes.x || despues.y !== antes.y) throw new Error('se movió también en la lectura')
+      await pg.screenshot({ path: path.join(SALIDA, 'lectura-general.png') })
+    })
+    await s.paso('la procedencia abre el lienzo de lectura; quitar la chincheta la saca del general', async () => {
+      await (await pg.$('g.tarjeta g.procedencia')).click()
+      await pg.waitForSelector('.lectura-panel', { timeout: 5000 })
+      await pg.screenshot({ path: path.join(SALIDA, 'lectura.png') })
+      await (await pg.$('.lectura-panel g.tarjeta g.clavar')).click(); await esperar(500)
+      if ((await lectura()).notas[0].en_general) throw new Error('sigue clavada')
+      await pg.keyboard.press('Escape'); await esperar(500)
+      if (await pg.$('g.tarjeta:has(g.procedencia)')) throw new Error('sigue en el general')
+    })
+    await s.paso('el buscador general encuentra la cita y lleva a su lectura', async () => {
+      const texto = (await lectura()).notas[0].texto.replace(/[“”]/g, '').split(' ').slice(0, 3).join(' ')
+      await pg.keyboard.down('Control'); await pg.keyboard.press('f'); await pg.keyboard.up('Control'); await esperar(300)
+      await pg.type('.buscador input[type=search]', texto); await esperar(500)
+      await (await pg.waitForSelector('::-p-xpath(//button[contains(@class, "resultado")][.//span[contains(., "Lectura de")]])', { timeout: 5000 })).click()
+      await pg.waitForSelector('.lectura-panel', { timeout: 5000 })
+    })
+    await s.paso('una cita antigua del general pasa sola a su lectura, clavada; el contador de la fuente la abre', async () => {
+      await pg.evaluate(() => new Promise(res => {
+        const r = indexedDB.open('canvas-de-citas')
+        r.onsuccess = () => {
+          const st = r.result.transaction('proyectos', 'readwrite').objectStore('proyectos'), q = st.get('proyecto_001')
+          q.onsuccess = () => {
+            const p = q.result
+            p.canvas.notas.push({ id: 'nota_antigua', titulo: 'Cita vieja', texto: '“texto citado”', x: 700, y: -300, origen: { fuente: 'fuente_005', tipo: 'html', cita: 'texto citado' } })
+            p.canvas.conexiones.push({ id: 'con_vieja', desde: 'fuente_005', hasta: 'nota_antigua', etiqueta: 'cita' })
+            st.put(p).onsuccess = res
+          }
+        }
+      }))
+      await pg.evaluate(() => (location.hash = '#/p/proyecto_001')); await pg.reload({ waitUntil: 'networkidle0' }); await esperar(1200)
+      const cv = await lienzoGuardado(pg)
+      if (cv.notas.some(n => n.id === 'nota_antigua')) throw new Error('sigue en el general')
+      const n = cv.lecturas?.fuente_005?.notas?.find(x => x.id === 'nota_antigua')
+      if (!n || n.en_general?.x !== 700 || n.en_general?.y !== -300) throw new Error('no pasó clavada a la lectura: ' + JSON.stringify(n))
+      if (!cv.lecturas.fuente_005.conexiones.some(k => k.id === 'con_vieja') || cv.conexiones.some(k => k.id === 'con_vieja')) throw new Error('el hilo cita no pasó a la lectura')
+      await pg.click('button[aria-label="Encuadrar todo"]'); await esperar(500)
+      const contador = await pg.waitForSelector('g.nodo g.contador-lectura', { timeout: 5000 })
+      await pg.screenshot({ path: path.join(SALIDA, 'lectura-contador.png') })
+      const antes = pg.evaluate(() => location.hash)
+      await contador.click(); await esperar(600)
+      if (!/\/l\/fuente_0\d\d$/.test(await pg.evaluate(() => location.hash))) throw new Error('no abrió la lectura desde el contador (' + await antes + ')')
+      if (await pg.$('dialog[open]')) throw new Error('abrió también la ficha de la fuente')
     })
     if (pg.errores.length) s.fallas.push(...pg.errores)
     return s
@@ -1059,6 +1153,30 @@ const SUITES = {
         if (!/↓ \d+ · ↑ \d+ cambios/.test(txt)) throw new Error('no muestra el resumen de cambios: ' + txt)
         const ultima = await cel.evaluate(() => new Promise(res => { const r = indexedDB.open('canvas-de-citas'); r.onsuccess = () => { const q = r.result.transaction('meta').objectStore('meta').get('sincroUltima'); q.onsuccess = () => res(q.result) } }))
         if (!(ultima?.bytes < 4000)) throw new Error(`viajaron ${ultima?.bytes} bytes (se esperaba solo lo cambiado)`)
+      })
+      await s.paso('lienzo de lectura con una tarjeta clavada: igual en la PC, el celular y la laptop', async () => {
+        await cel.keyboard.press('Escape').catch(() => {}); await esperar(300)
+        // La lectura se crea en la PC (como la app de Windows); llega a los dos aparatos.
+        const d = JSON.parse(enPc())
+        d.proyectos[0].canvas.lecturas = { fuente_001: { notas: [{ id: 'nota_lectura', texto: 'Cita del paper', x: 280, y: -100, en_general: { x: 600, y: 200 } }], listas: [], audios: [], fotos: [], conexiones: [], agrupadores: [] } }
+        fs.writeFileSync(path.join(carpeta, 'proyectos.json'), JSON.stringify(d, null, 2) + '\n'); await esperar(1500)
+        await sincronizarEn(cel); await sincronizarEn(lap)
+        const clavada = async pg => {
+          await pg.evaluate(() => (location.hash = '#/p/proyecto_001')); await esperar(600)
+          await pg.click('button[aria-label="Encuadrar todo"]'); await esperar(500)
+          return pg.waitForSelector('g.tarjeta:has(g.procedencia)', { timeout: 5000 })
+        }
+        await clavada(lap)
+        // El celular la mueve en el general: el cambio viaja a la PC y a la laptop.
+        const r = await (await clavada(cel)).boundingBox()
+        await cel.mouse.move(r.x + r.width / 2, r.y + r.height * .6); await cel.mouse.down()
+        await cel.mouse.move(r.x + r.width / 2 + 100, r.y + r.height * .6 + 40, { steps: 6 }); await cel.mouse.up(); await esperar(500)
+        await sincronizarEn(cel); await sincronizarEn(lap)
+        const enPcAhora = JSON.parse(enPc()).proyectos[0].canvas.lecturas.fuente_001.notas[0]
+        if (enPcAhora.en_general.x === 600) throw new Error('el movimiento no llegó a la PC')
+        if (enPcAhora.x !== 280) throw new Error('cambió su lugar en la lectura')
+        const enLap = await lap.evaluate(() => new Promise(res => { const r = indexedDB.open('canvas-de-citas'); r.onsuccess = () => { const q = r.result.transaction('proyectos').objectStore('proyectos').get('proyecto_001'); q.onsuccess = () => res(q.result.canvas.lecturas?.fuente_001?.notas?.[0]) } }))
+        if (JSON.stringify(enLap?.en_general) !== JSON.stringify(enPcAhora.en_general)) throw new Error(`laptop ${JSON.stringify(enLap?.en_general)} ≠ PC ${JSON.stringify(enPcAhora.en_general)}`)
       })
     } finally { srv.kill() }
     for (const pg of [cel, lap]) if (pg.errores.length) s.fallas.push(...pg.errores)

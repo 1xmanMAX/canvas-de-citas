@@ -32,7 +32,7 @@ export function repartir(datos, carpetas) {
   return partes
 }
 
-const fotosDe = p => [...(p.canvas?.fotos || []), ...Object.values(p.canvas?.objetivos || {}).flatMap(o => o.fotos || [])]
+const fotosDe = p => [p.canvas, ...Object.values(p.canvas?.objetivos || {}), ...Object.values(p.canvas?.lecturas || {})].flatMap(o => o?.fotos || [])
 
 /** Rutas de los documentos que le tocan a una parte: los de sus fuentes y los originales de sus fotos. */
 export function docsDe(parte) {
@@ -100,7 +100,7 @@ export function renumerar(entrantes, existentes, nuevoId) {
   return { datos, mapa }
 }
 
-/** Cambia los ids de fuentes que aparecen en un lienzo (y en sus sub-lienzos de objetivo). */
+/** Cambia los ids de fuentes que aparecen en un lienzo (y en sus sub-lienzos de objetivo y de lectura). */
 function reescribirLienzo(c, F) {
   if (!c) return
   const tablero = t => {
@@ -113,4 +113,9 @@ function reescribirLienzo(c, F) {
   }
   tablero(c)
   for (const o of Object.values(c.objetivos || {})) tablero(o)
+  // Lienzos de lectura: la clave es el id de la fuente.
+  if (c.lecturas) {
+    c.lecturas = Object.fromEntries(Object.entries(c.lecturas).map(([k, t]) => [F(k), t]))
+    for (const t of Object.values(c.lecturas)) tablero(t)
+  }
 }

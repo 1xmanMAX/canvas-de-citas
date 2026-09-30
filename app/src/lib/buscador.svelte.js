@@ -32,8 +32,10 @@ export function enfocar(item) {
     const c = S.citaPorId.get(item.id)
     return c && ir(`#/p/${c.proyecto_id}/f/${c.fuente_id}`)
   }
-  // Tarjetas y agrupadores: su lienzo (el del proyecto o el sub-lienzo del objetivo); objetivos: su sub-lienzo.
-  const lienzo = `#/p/${item.pid}` + (item.clave ? `/o/${item.clave}` : '')
+  // Tarjetas y agrupadores: su lienzo (el del proyecto, el sub-lienzo del objetivo o el lienzo de
+  // lectura de la fuente, clave 'l:<fuente>'); objetivos: su sub-lienzo.
+  const sub = !item.clave ? '' : item.clave.startsWith('l:') ? `/l/${item.clave.slice(2)}` : `/o/${item.clave}`
+  const lienzo = `#/p/${item.pid}` + sub
   if (item.tipo !== 'objetivo') B.resaltar = { id: item.id }
   ir(lienzo)
 }

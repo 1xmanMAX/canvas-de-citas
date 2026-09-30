@@ -272,9 +272,9 @@ export const leerMeta = clave => db.leer('meta', clave)
 export const ponerMeta = (clave, valor) => db.poner('meta', valor, clave)
 
 // --- Originales de fotos (alta resolución): mismo almacén `documentos`, clave = id de la foto ---
-const fotosDe = p => [...(p.canvas?.fotos || []), ...Object.values(p.canvas?.objetivos || {}).flatMap(o => o.fotos || [])]
+const fotosDe = p => [p.canvas, ...Object.values(p.canvas?.objetivos || {}), ...Object.values(p.canvas?.lecturas || {})].flatMap(o => o?.fotos || [])
 
-/** Todas las fotos de todos los proyectos (lienzo y sub-lienzos de objetivos). */
+/** Todas las fotos de todos los proyectos (lienzo, sub-lienzos de objetivos y lienzos de lectura). */
 export const todasLasFotos = () => S.proyectos.flatMap(fotosDe)
 
 export function buscarFoto(id) {

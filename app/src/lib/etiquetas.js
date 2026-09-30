@@ -71,7 +71,7 @@ function item(tipo, id, pid, clave, titulo, textos, campo) {
   return i
 }
 
-/** Todo lo buscable: tarjetas (también de los sub-lienzos), agrupadores, objetivos, fuentes y citas. */
+/** Todo lo buscable: tarjetas (también de los sub-lienzos y lienzos de lectura), agrupadores, objetivos, fuentes y citas. */
 export function indexar({ proyectos = [], fuentes = [], citas = [] }) {
   const out = []
   for (const p of proyectos) {
@@ -83,6 +83,8 @@ export function indexar({ proyectos = [], fuentes = [], citas = [] }) {
     }
     tablero(c, null)
     for (const [clave, t] of Object.entries(c.objetivos || {})) tablero(t, clave)
+    // Lienzos de lectura de cada fuente: clave 'l:<fuente_id>'.
+    for (const [fid, t] of Object.entries(c.lecturas || {})) tablero(t, `l:${fid}`)
     const objetivos = [['og', p.objetivo_general], ...(p.objetivos_especificos || []).map((o, i) => [`oe${i + 1}`, o])]
     for (const [clave, texto] of objetivos) if (texto) out.push(item('objetivo', `${p.id}:${clave}`, p.id, clave, texto, [texto]))
   }

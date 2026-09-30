@@ -8,7 +8,8 @@
   import { S, copiar, guardarCita, agregarCita, eliminarCita, guardarFuente, quitarFuenteDeProyecto, adjuntarDocumento, quitarDocumento, leerDocumento, avisar } from '../lib/store.svelte.js'
   import { ESTADOS_USO, ESTADOS_VERIF, estadoDeCitas, esMarcador, autorCorto, anio, urlFuente, sugerirBibliografia, paginaTexto } from '../lib/citas.js'
 
-  let { fuente, proyectoId, onclose } = $props()
+  // lectura: { total, clavadas } del lienzo de lectura de la fuente; abrirLectura lo abre (en un proyecto).
+  let { fuente, proyectoId, onclose, lectura = null, abrirLectura = null } = $props()
 
   // Puntos clave y referencias que registra la skill de Claude Code (canvas-de-citas).
   const TIPOS_PUNTO = { hallazgo: 'Hallazgo', dato: 'Dato', metodo: 'Método', definicion: 'Definición', marco: 'Marco teórico', vacio: 'Vacío', limitacion: 'Limitación', cita: 'Cita textual' }
@@ -51,10 +52,15 @@
     onclose()
   }
 
-  /** Abre el documento en el visor de la app (panel lateral) y cierra la ficha. */
+  /**
+   * Abre el documento en el visor de la app (panel lateral) y cierra la ficha. En un proyecto se abre
+   * junto a su lienzo de lectura, para que las citas y recortes queden en el espacio de este paper.
+   */
   async function abrirDocumento() {
     await abrirDocumentoFuente(fuente, proyectoId)
-    if (V.archivo) onclose()
+    if (!V.archivo) return
+    if (abrirLectura) abrirLectura()
+    else onclose()
   }
 
   // --- Documento original: zona de arrastrar y soltar ---
@@ -110,6 +116,11 @@
     <FuenteForm {fuente} oncancelar={() => (editandoFuente = false)} onguardar={d => { guardarFuente({ ...d, id: fuente.id }); editandoFuente = false }} />
   {:else}
     <div class="fila envolver acciones">
+      {#if abrirLectura}
+        <button class="btn chico primario" onclick={abrirLectura} title="Espacio propio de esta fuente: sus citas, recortes y notas">
+          <Icono nombre="doc" tam={12} trazo={2} />Lienzo de lectura{lectura?.total ? ` (${lectura.total})` : ''}
+        </button>
+      {/if}
       <button class="btn chico" onclick={() => copiar(bib)}><Icono nombre="copiar" tam={12} trazo={2} />Copiar bibliografía</button>
       {#if url}<a class="btn chico" href={url} target="_blank" rel="noopener">Ver fuente ↗</a>{/if}
       <button class="btn chico" onclick={() => (editandoFuente = true)}>Editar fuente</button>

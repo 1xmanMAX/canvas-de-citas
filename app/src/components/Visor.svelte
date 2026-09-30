@@ -2,7 +2,7 @@
   // Panel lateral para leer documentos sin salir de la app: PDF (visor del navegador o pdf.js),
   // HTML (aislado, sin scripts), Markdown y texto. Desde un HTML, lo seleccionado se vuelve nota.
   import Icono from './Icono.svelte'
-  import { V, cerrarVisor, adjuntarAbierto, notaDesdeSeleccion, fotoDesdeRecorte, marcasDeFuente } from '../lib/visor.svelte.js'
+  import { V, cerrarVisor, adjuntarAbierto, notaDesdeSeleccion, fotoDesdeRecorte, marcasDeFuente, rutaLectura, abrirLecturaDelVisor } from '../lib/visor.svelte.js'
   import { rangoDeCita, resaltar, ESTILO_RESALTADO } from '../lib/resaltar.js'
   import { S, avisar } from '../lib/store.svelte.js'
   import { esAndroid } from '../lib/plataforma.js'
@@ -25,6 +25,9 @@
   // Citas ya tomadas de este documento en el proyecto: se marcan al leer (vínculos).
   const marcas = $derived(marcasDeFuente(V.proyectoId, V.fuenteId))
   let destino = $state('')
+  // Botón para abrir el lienzo de lectura de la fuente, si no es el que está a la vista.
+  let hash = $state(location.hash)
+  const lecturaCerrada = $derived(!!V.proyectoId && !!fuente && hash !== rutaLectura())
   const fuentes = $derived([...S.fuentes].sort((x, y) => autorCorto(x).localeCompare(autorCorto(y), 'es')))
 
   $effect(() => {
@@ -104,12 +107,13 @@
 
   function teclas(e) {
     if (e.key !== 'Escape' || !a || document.querySelector('dialog[open]')) return
+    e.preventDefault() // el lienzo de lectura no se cierra con el mismo Esc
     if (V.recortando) V.recortando = false // Esc cancela el recorte antes de cerrar el visor
     else cerrarVisor()
   }
 </script>
 
-<svelte:window onkeydown={teclas} />
+<svelte:window onkeydown={teclas} onhashchange={() => (hash = location.hash)} />
 
 {#if a}
   <section class="visor" class:grande={V.grande} aria-label="Visor de documento">
@@ -120,8 +124,13 @@
         {#if fuente}<span class="suave">{autorCorto(fuente)} ({anio(fuente)})</span>{/if}
       </div>
       {#if seleccion}
-        <button class="btn chico primario" onclick={() => { notaDesdeSeleccion(seleccion, seleccionPag, seleccionRects); seleccion = '' }} title="Crear una nota en el lienzo con el texto seleccionado">
+        <button class="btn chico primario" onclick={() => { notaDesdeSeleccion(seleccion, seleccionPag, seleccionRects); seleccion = '' }} title="Crear una nota con el texto seleccionado en el lienzo de lectura de esta fuente">
           <Icono nombre="nota" tam={13} />Nota con la cita
+        </button>
+      {/if}
+      {#if lecturaCerrada}
+        <button class="btn chico" onclick={() => { abrirLecturaDelVisor(); V.grande = false; if (matchMedia('(max-width: 820px)').matches) cerrarVisor() }} title="Abrir el lienzo de lectura de esta fuente al lado del documento">
+          <Icono nombre="nota" tam={13} /><span class="solo-escritorio">Lienzo de lectura</span>
         </button>
       {/if}
       {#if esAndroid}
