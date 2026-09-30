@@ -1098,6 +1098,33 @@ const SUITES = {
 
   // Grupo de sincronización: un "celular" (Android simulado) y una "laptop" editan a la vez y
   // todos (con la PC) terminan con la misma versión, enviando solo lo que cambió.
+  // Celular (Android simulado): en ninguna vista la barra superior tapa o corta sus botones.
+  async cabecera(b) {
+    const s = suite('Barra superior en el celular'), pg = await pagina(b)
+    await pg.evaluateOnNewDocument(() => { window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android', nativePromise: async () => ({}) } })
+    await conEjemplo(pg)
+    const vistas = ['#/', '#/citas', '#/p/proyecto_001']
+    for (const ancho of [320, 360, 387, 412]) {
+      await pg.setViewport({ width: ancho, height: 800, isMobile: true, hasTouch: true, deviceScaleFactor: 1 })
+      for (const v of vistas) {
+        await s.paso(`${ancho} px, ${v}: todos los botones de arriba se ven completos`, async () => {
+          await pg.evaluate(h => (location.hash = h), v); await esperar(700)
+          const malos = await pg.$$eval('header.cabecera :is(button, a, input)', (els, W) => Array.from(els).flatMap(e => {
+            const r = e.getBoundingClientRect(), st = getComputedStyle(e)
+            if (!r.width || st.display === 'none' || st.visibility === 'hidden') return []
+            const tapado = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+            const ok = r.left >= -0.5 && r.right <= W + 0.5 && (e.tagName === 'INPUT' ? r.width >= 40 : r.width >= 24) && (tapado === e || e.contains(tapado))
+            return ok ? [] : [`${e.getAttribute("aria-label") || e.textContent.trim() || e.tagName} (${Math.round(r.left)}–${Math.round(r.right)}${tapado && tapado !== e && !e.contains(tapado) ? ", tapado por " + tapado.tagName + "." + tapado.className : ""})`]
+          }), ancho)
+          if (malos.length) throw new Error('cortados o tapados: ' + malos.join(', '))
+          if (ancho === 360) await pg.screenshot({ path: path.join(SALIDA, `cabecera-360-${vistas.indexOf(v)}.png`), clip: { x: 0, y: 0, width: 360, height: 120 } })
+        })
+      }
+    }
+    if (pg.errores.length) s.fallas.push(...pg.errores)
+    await pg.browserContext().close().catch(() => {})
+    return s
+  },
   // Tras publicar, una versión vieja abierta que no encuentra una parte (p. ej. el visor PDF) pasa sola a la nueva.
   async version(b) {
     const s = suite('Versión nueva tras publicar'), pg = await pagina(b)
@@ -1308,7 +1335,8 @@ const SUITES = {
       await s.paso('en pantalla de celular también se puede exportar el .bib', async () => {
         await pg.setViewport({ width: 390, height: 800, isMobile: true, hasTouch: true })
         await pg.evaluate(() => (location.hash = '#/citas')); await esperar(800)
-        await pg.click('button.solo-movil[aria-label="Exportar .bib"]'); await esperar(400)
+        await pg.click('button[aria-label="Filtros"]'); await esperar(400) // en celular, exportar va en el panel de filtros
+        await clicTexto(pg, 'Exportar .bib', '//aside[contains(@class, "filtros")]'); await esperar(400)
         const c = await pg.evaluate(() => window.__compartidos?.at(-1))
         if (c?.[0]?.nombre !== 'bibliografia.bib') throw new Error('no compartió el .bib')
         await pg.setViewport({ width: 1500, height: 950 })

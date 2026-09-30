@@ -784,7 +784,11 @@
   text { user-select: none; }
 
   @media (max-width: 820px) {
-    .buscar { width: 120px; }
+    /* La búsqueda ocupa solo el espacio que sobra: los iconos de la derecha nunca quedan tapados. */
+    .cabecera { gap: 4px; }
+    .cabecera .espacio { display: none; }
+    .cabecera .migas { display: none; } /* el título ya está en el centro del lienzo y en la ficha */
+    .buscar { width: auto; flex: 1 1 0; min-width: 44px; padding: 8px 10px; }
     .barra { top: 10px; left: 50%; }
     .barra { gap: 2px; padding: 4px; overflow-x: auto; scrollbar-width: none; }
     .barra .div { margin: 0 1px; }

@@ -136,7 +136,6 @@
   </div>
   <div class="espacio solo-escritorio"></div>
   <button class="btn solo-escritorio" onclick={() => descargarBib(visibles)}>Exportar .bib</button>
-  <button class="icono-btn solo-movil" aria-label="Exportar .bib" title="Exportar .bib" onclick={() => descargarBib(visibles)}><Icono nombre="descargar" tam={18} /></button>
   <button class="btn primario" aria-label="Agregar fuente" onclick={() => (modal = proyecto ? 'agregar' : 'nueva')}><span class="solo-escritorio">+ Agregar fuente</span><span class="solo-movil">+</span></button>
 <button class="icono-btn" aria-label="Buscar en todo" title="Buscar en todo (Ctrl+F)" onclick={() => (B.abierto = true)}><Icono nombre="buscar" tam={18} /></button>
 <BotonSincro {abrirDatos} />{#if !esAndroid}<button class="icono-btn celular-btn" aria-label="Celular y PixPin" title="Pasar archivos con el celular o PixPin" onclick={abrirCelular}><Icono nombre="celular" tam={18} />{#if R.recibidos.length}<span class="insignia">{R.recibidos.length}</span>{/if}</button>{/if}
@@ -184,6 +183,8 @@
       </div>
     </div>
     <p class="suave n">{visibles.length} de {base.length} fuentes</p>
+    <!-- En el celular la barra de arriba no tiene sitio: exportar va aquí. -->
+    <button class="btn chico solo-movil" onclick={() => descargarBib(visibles)}><Icono nombre="descargar" tam={13} />Exportar .bib</button>
   </aside>
 
   {#key orden + proyecto}
@@ -398,7 +399,9 @@
   .ref-txt { display: block; }
   .ref-acc { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; align-items: center; }
   @media (max-width: 820px) {
-    .busca { max-width: none; }
+    .cabecera { gap: 4px; }
+    .busca { max-width: none; min-width: 44px; }
+    .busca input { padding-right: 8px; }
     .detalle { top: auto !important; height: 70%; width: 100% !important; transform: none; border-left: none; border-top: 1px solid var(--line); border-radius: 16px 16px 0 0; }
   }
 </style>

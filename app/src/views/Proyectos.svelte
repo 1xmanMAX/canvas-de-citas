@@ -143,6 +143,14 @@
   code { font-size: 12px; }
   @media (max-width: 820px) {
     main { padding: 20px 16px; }
+    /* Los botones de la barra nunca se salen de la pantalla: el nombre cede su lugar. */
+    .cabecera { gap: 4px; }
+    .cabecera .fila { min-width: 0; }
+    .cabecera .marca { overflow: hidden; text-overflow: ellipsis; }
+    .cabecera .btn { padding-left: 10px; padding-right: 10px; }
+  }
+  @media (max-width: 440px) {
+    .cabecera .marca { display: none; }
     .rejilla-p { grid-template-columns: 1fr; gap: 14px; }
     .titulo { min-height: 0; }
     .nueva { min-height: 90px; }
