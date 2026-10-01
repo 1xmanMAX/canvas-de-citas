@@ -5,6 +5,8 @@
   import CitaForm from './CitaForm.svelte'
   import FuenteForm from './FuenteForm.svelte'
   import { abrirDocumentoFuente, V } from '../lib/visor.svelte.js'
+  import { arrastrarArchivo, arrastre } from '../lib/archivos.js'
+  import { esAndroid } from '../lib/plataforma.js'
   import { S, copiar, guardarCita, agregarCita, eliminarCita, guardarFuente, quitarFuenteDeProyecto, adjuntarDocumento, quitarDocumento, leerDocumento, avisar } from '../lib/store.svelte.js'
   import { ESTADOS_USO, ESTADOS_VERIF, estadoDeCitas, esMarcador, autorCorto, anio, urlFuente, sugerirBibliografia, paginaTexto } from '../lib/citas.js'
 
@@ -66,10 +68,19 @@
   // --- Documento original: zona de arrastrar y soltar ---
   let encima = $state(false)
   let nombreDoc = $state('')
+  // El archivo listo para arrastrarlo a otra app (la URL tiene que existir antes de empezar a arrastrar).
+  let docArrastre = $state(null) // { blob, url }
   $effect(() => {
     fuente.documento_original
-    leerDocumento(fuente.id).then(d => (nombreDoc = d?.nombre || ''))
+    let url = null
+    leerDocumento(fuente.id).then(d => {
+      nombreDoc = d?.nombre || ''
+      if (d?.blob) docArrastre = { blob: d.blob, url: (url = URL.createObjectURL(d.blob)) }
+      else docArrastre = null
+    })
+    return () => url && URL.revokeObjectURL(url)
   })
+  const nombreAdjunto = $derived(fuente.documento_nombre || nombreDoc || fuente.documento_original?.split('/').pop() || 'documento')
 
   const ACEPTADOS = /\.(pdf|html?|md|txt)$/i
 
@@ -91,6 +102,7 @@
     e.preventDefault()
     e.stopPropagation()
     encima = false
+    if (arrastre.id === fuente.id) return // su propio documento, soltado otra vez en su lugar
     guardarDoc(e.dataTransfer?.files?.[0])
   }
 </script>
@@ -129,6 +141,8 @@
     <!-- Zona para arrastrar y soltar el documento original (o tocar para elegirlo) -->
     <div
       class="zona" class:encima class:con-doc={!!fuente.documento_original}
+      draggable={!!docArrastre && !esAndroid}
+      ondragstart={e => arrastrarArchivo(e, nombreAdjunto, docArrastre?.blob, docArrastre?.url, fuente.id)}
       role="button" tabindex="0" aria-label="Adjuntar documento original: arrastra aquí o haz clic"
       onclick={() => archivo.click()}
       onkeydown={e => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), archivo.click())}
@@ -139,8 +153,8 @@
       <Icono nombre="clip" tam={20} />
       {#if fuente.documento_original}
         <div class="zona-txt">
-          <b>{fuente.documento_nombre || nombreDoc || fuente.documento_original.split('/').pop()}</b>
-          <span class="suave">Suelta otro archivo aquí para reemplazarlo</span>
+          <b>{nombreAdjunto}</b>
+          <span class="suave">{esAndroid ? 'Toca para reemplazarlo' : 'Arrástralo a otra app para compartirlo · suelta otro archivo aquí para reemplazarlo'}</span>
         </div>
         <span class="fila">
           <button class="btn chico" onclick={e => { e.stopPropagation(); abrirDocumento() }}>Abrir</button>

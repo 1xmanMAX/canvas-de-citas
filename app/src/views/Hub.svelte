@@ -12,7 +12,7 @@
   import LecturaLienzo from '../components/LecturaLienzo.svelte'
   import Tarjeta from '../components/Tarjeta.svelte'
   import Chinchetas from '../components/Chinchetas.svelte'
-  import { tablaDelPortapapeles, crecerTabla } from '../lib/tablas.js'
+  import { tablaDelPortapapeles } from '../lib/tablas.js'
   import EditorTarjeta from '../components/EditorTarjeta.svelte'
   import VisorFoto from '../components/VisorFoto.svelte'
   import Agrupador from '../components/Agrupador.svelte'
@@ -591,7 +591,7 @@
       {@const coin = !!q && coincide(it.f, q)}
       <NodoFuente
         x={q0.x} y={q0.y}
-        anio={anio(it.f)} autor={autorCorto(it.f)} chips={it.f.etiquetas || []}
+        anio={anio(it.f)} autor={autorCorto(it.f)} chips={it.f.etiquetas || []} adjunto={!!it.f.documento_original}
         estado={estados.get(it.id)}
         resaltado={coin || conectando?.desde === it.id || destacado === it.id}
         atenuado={!!q && !coin}
@@ -607,7 +607,7 @@
       {#each tarjVista[l] as o (o.id)}
         {@const coin = !!q && coincideTarjeta(o, q)}
         <Tarjeta lista={l} {o} origen={conectando?.desde === o.id} resaltado={coin || destacado === o.id} atenuado={!!q && !coin} alVinculo={() => abrirOrigen(o.origen, p.id, o.id)}
-          alTocar={() => tocar(o.id, () => abrirTarjeta(l, o))} alternar={i => alternar(o, i)} crecer={l === 'tablas' ? tipo => { crecerTabla(o, tipo); guardar() } : null} {...arrastreLibre(o)} redimensionar={l === 'fotos' ? redimensionarFoto(o, () => guardarProyecto(p)) : null} />
+          alTocar={() => tocar(o.id, () => abrirTarjeta(l, o))} alternar={i => alternar(o, i)} {...arrastreLibre(o)} redimensionar={l === 'fotos' ? redimensionarFoto(o, () => guardarProyecto(p)) : null} />
       {/each}
     {/each}
 
@@ -616,7 +616,7 @@
       {@const coin = !!q && coincideTarjeta(c.obj, q)}
       <Tarjeta lista={c.lista} o={c.obj} pos={c.obj.en_general} origen={conectando?.desde === c.obj.id} resaltado={coin || destacado === c.obj.id} atenuado={!!q && !coin}
         alVinculo={() => abrirOrigen(c.obj.origen, p.id, c.obj.id)} procedencia={{ texto: refCorta(c.fid), alTocar: () => abrirLectura(c.fid) }}
-        alTocar={() => tocar(c.obj.id, () => abrirTarjeta(c.lista, c.obj, c.fid))} alternar={i => alternar(c.obj, i)} crecer={c.lista === 'tablas' ? tipo => { crecerTabla(c.obj, tipo); guardar() } : null} {...arrastreClavada(c.obj)} />
+        alTocar={() => tocar(c.obj.id, () => abrirTarjeta(c.lista, c.obj, c.fid))} alternar={i => alternar(c.obj, i)} {...arrastreClavada(c.obj)} />
     {/each}
 
     <!-- Nombre y esquina de los agrupadores: encima, para que ninguna tarjeta los tape -->

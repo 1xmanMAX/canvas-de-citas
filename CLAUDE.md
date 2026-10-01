@@ -148,4 +148,11 @@ pegar varias celdas dentro de una celda las reparte. Núcleo puro `lib/tablas.js
 mantener iguales; comando `tabla` de la skill). Ojo: no agregues listas vacías nuevas al normalizar el proyecto en
 `store.svelte.js` (rompe la base común de la sincronización); se crean solas al usarlas. Prueba: `npm run test:e2e -- tablas`.
 
+**Documentos de las fuentes** (oct. 2026): clip azul en la tarjeta del paper si tiene documento (`NodoFuente`, prop
+`adjunto`); el documento se arrastra fuera de la ficha o del título del visor como archivo (`arrastrarArchivo` en
+`lib/archivos.js`, DownloadURL) y soltar un archivo en la ficha lo adjunta. **"Abrir en otra ventana"** abre
+`#/doc/<fuente>[/<proyecto>]`: solo el visor, sin sincronizar ni guardar; sus notas y recortes se los pide a la ventana
+principal por BroadcastChannel (`lib/ventana-doc.js`). En la app de Windows, `window.open` de la app lo atiende el exe
+(otra ventana suya con el mismo puente; se cierra con `window.ipc.postMessage('cerrar')`). Prueba: `npm run test:e2e -- documentos`.
+
 **Siguiente:** probar el APK en el celular de Max (sin compilar APK salvo que lo pida) contra la app de Windows.

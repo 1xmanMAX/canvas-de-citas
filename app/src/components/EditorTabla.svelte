@@ -6,6 +6,7 @@
   import { tick } from 'svelte'
   import Icono from './Icono.svelte'
   import { avisar } from '../lib/store.svelte.js'
+  import { medir } from '../lib/tarjetas.js'
   import {
     tablaDelPortapapeles, tablaATexto, pegarEn, rango, ampliar, mapaFusiones, fusionar, separar, pintar,
     insertarFila, insertarColumna, quitarFila, quitarColumna, aplicarTabla, COLORES_CELDA, MAX_FILAS, MAX_COLUMNAS
@@ -28,6 +29,11 @@
   const varias = $derived.by(() => { const u = ampliar(t, rango({ f: sel.f1, c: sel.c1 })); return u.f2 !== sel.f2 || u.c2 !== sel.c2 })
   const combinadaEnSel = $derived((t.fusiones || []).some(u => u.fila <= sel.f2 && u.fila + u.filas - 1 >= sel.f1 && u.col <= sel.c2 && u.col + u.cols - 1 >= sel.c1))
   const colorDe = (f, c) => COLORES_CELDA[t.colores?.[`${f},${c}`]] || null
+  // Ancho de cada columna: el mismo reparto que en el lienzo, un poco más holgado (aquí la letra es mayor).
+  const anchos = $derived.by(() => {
+    const d = medir('tablas', { filas: t.filas, fusiones: t.fusiones, encabezado: t.encabezado })
+    return d.cols.slice(1).map((x, j) => Math.max(120, Math.round((x - d.cols[j]) * 1.2)))
+  })
 
   // --- Selección ---
   const elegir = (a, b = a) => (sel = ampliar(t, rango(a, b)))
@@ -179,7 +185,11 @@
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="tabla-ed" class:arrastrando bind:this={marco} onkeydown={teclaMarco} role="grid" tabindex="-1" aria-label="Celdas de la tabla">
   <div class="zona">
-    <table>
+    <table style:width="{22 + anchos.reduce((s, w) => s + w, 0)}px">
+      <colgroup>
+        <col style:width="22px" />
+        {#each anchos as w}<col style:width="{w}px" />{/each}
+      </colgroup>
       <thead>
         <tr>
           <th class="esquina"></th>
@@ -242,14 +252,14 @@
   .tabla-ed { overflow: auto; max-height: 52dvh; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); outline: none; }
   .tabla-ed.arrastrando { user-select: none; -webkit-user-select: none; }
   .zona { position: relative; display: inline-block; padding: 0 30px 30px 0; }
-  table { border-collapse: collapse; }
+  table { border-collapse: collapse; table-layout: fixed; }
   td { padding: 0; border: 1px solid var(--line); vertical-align: top; position: relative; background: #FFFDF8; }
   td.cab { background: #EFEADF; }
   td.cab textarea { font-weight: 600; }
   td.sel { box-shadow: inset 0 0 0 2px var(--accent); }
   td.sel::after { content: ''; position: absolute; inset: 0; background: rgba(47, 79, 181, .08); pointer-events: none; }
   td.unica::after { display: none; }
-  textarea { display: block; width: 130px; min-width: 100%; height: 100%; min-height: 34px; field-sizing: content; max-height: 180px; resize: none; border: none; border-radius: 0; padding: 7px 8px; font: 400 13px var(--sans); background: transparent; }
+  textarea { display: block; width: 100%; height: 100%; min-height: 34px; field-sizing: content; max-height: 180px; resize: none; border: none; border-radius: 0; padding: 7px 8px; font: 400 13px var(--sans); background: transparent; }
   textarea:focus { outline: none; background: rgba(255, 255, 255, .6); }
 
   /* Mangos: la franja de arriba (columnas) y la de la izquierda (filas). */

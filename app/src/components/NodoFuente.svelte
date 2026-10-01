@@ -8,6 +8,7 @@
   let {
     x, y, anio, autor, linea2 = '', chips = [], estado, seleccionado = false, resaltado = false,
     atenuado = false, pista = '', alAbrir, inicio, mover, fin,
+    adjunto = false, // tiene documento (PDF, HTML…): clip azul junto al año
     lectura = null, alLectura = null // { total, clavadas } de su lienzo de lectura: contador que lo abre
   } = $props()
   const nLectura = $derived(lectura?.total || 0)
@@ -57,6 +58,12 @@
     <rect x="12" y="29" width={Math.min(NODO_W - 24, 12 + t.autor.length * 7)} height="10" rx="3" class="barra" />
   {:else}
     <text x="26" y="21" class="chico">{anio}</text>
+    {#if adjunto}
+      <g class="clip" transform="translate({30 + String(anio).length * 6.2} 9) scale(0.55)" aria-label="Tiene documento adjunto">
+        <title>Tiene documento adjunto</title>
+        <path d="M21 12.5l-8.5 8.5a5 5 0 0 1-7-7L14 5.5a3.5 3.5 0 0 1 5 5L10.5 19a2 2 0 0 1-3-3L15 8.5" />
+      </g>
+    {/if}
     <text x="12" y="39" class="autor">{t.autor}</text>
     {#if linea2}<text x="12" y="55" class="chico">{t.linea2}</text>{/if}
     {#if pista}<text x={NODO_W - 12} y="21" class="pista" text-anchor="end">{pista}</text>{/if}
@@ -98,5 +105,6 @@
   .mini { font: 400 10px var(--sans); }
   .autor { font: 600 13px var(--serif); fill: var(--ink); }
   .pista { font: 500 10px var(--sans); fill: var(--using); }
+  .clip path { fill: none; stroke: #2F6FD6; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
   .barra { fill: var(--ink); opacity: .55; pointer-events: none; }
 </style>

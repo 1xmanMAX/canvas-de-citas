@@ -5,12 +5,11 @@
   import { medir, COLORES, TINTAS, colorTrazo, esResaltado, fechaCorta, duracionTexto } from '../lib/tarjetas.js'
   import { sonando, reproducir } from '../lib/audio.svelte.js'
 
-  let { lista, o, origen = false, resaltado = false, atenuado = false, alTocar, alternar, crecer = null, alVinculo = null, inicio, mover, fin, redimensionar = null,
+  let { lista, o, origen = false, resaltado = false, atenuado = false, alTocar, alternar, alVinculo = null, inicio, mover, fin, redimensionar = null,
     clavar = null, procedencia = null, pos = null } = $props()
   // clavar: en el lienzo de lectura de una fuente, la chincheta que la muestra también en el general.
   // procedencia: { texto, alTocar } en el general, la fuente de la que viene una tarjeta clavada.
   // pos: lugar donde se dibuja si no es el suyo (la tarjeta clavada, en el general).
-  // crecer('fila' | 'columna'): en una tabla, los "+" que aparecen al acercar el mouse a su borde.
 
   const d = $derived(medir(lista, o))
   const giro = $derived(lista === 'notas' ? (o.estilo === 'rayada' ? 1 : o.estilo === 'tarjeta' ? 0 : -2) : lista === 'fotos' ? 1.5 : 0)
@@ -90,18 +89,6 @@
     {/each}
     <rect x={d.x0} y={d.ty} width={d.ancho} height={d.alto} rx="3" class="t-borde" />
     {#if d.mas}<text x={d.x0} y={d.masY} class="fecha">+{d.mas} filas más</text>{/if}
-    {#if crecer}
-      <g class="t-mas" role="button" tabindex="0" aria-label="Agregar columna" transform="translate({d.w + 4} {d.ty})"
-        onpointerdown={parar} onclick={e => { parar(e); crecer('columna') }} onkeydown={e => e.key === 'Enter' && crecer('columna')}>
-        <title>Agregar columna</title>
-        <rect width="18" height={d.alto} rx="9" /><path d="M9 {d.alto / 2 - 5}v10M4 {d.alto / 2}h10" />
-      </g>
-      <g class="t-mas" role="button" tabindex="0" aria-label="Agregar fila" transform="translate({d.x0} {d.h + 4})"
-        onpointerdown={parar} onclick={e => { parar(e); crecer('fila') }} onkeydown={e => e.key === 'Enter' && crecer('fila')}>
-        <title>Agregar fila</title>
-        <rect width={d.ancho} height="18" rx="9" /><path d="M{d.ancho / 2 - 5} 9h10M{d.ancho / 2} 4v10" />
-      </g>
-    {/if}
 
   {:else if lista === 'audios'}
     <rect width={d.w} height={d.h} rx="8" class="a-caja" />
@@ -245,15 +232,6 @@
   .t-celda-caja { fill: #FFFDF8; stroke: var(--line); stroke-width: 1; }
   .t-celda-caja.cab { fill: #EFEADF; }
   .t-borde { fill: none; stroke: #CFC8B8; stroke-width: 1; }
-  /* "+" de la tabla: invisibles hasta acercar el mouse (en pantallas táctiles no aparecen: se usa el editor). */
-  .t-mas { opacity: 0; cursor: pointer; transition: opacity .12s; }
-  .t-mas rect { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1; stroke-dasharray: 3 3; }
-  .t-mas path { stroke: var(--accent); stroke-width: 2; stroke-linecap: round; fill: none; pointer-events: none; }
-  .t-mas:hover rect, .t-mas:focus-visible rect { fill: var(--accent); stroke-dasharray: none; }
-  .t-mas:hover path, .t-mas:focus-visible path { stroke: #fff; }
-  .t-mas:focus { outline: none; }
-  @media (hover: hover) { :global(.tarjeta.tablas:hover) .t-mas { opacity: 1; } }
-  .t-mas:focus-visible { opacity: 1; }
   .t-celda { font: 400 12px var(--sans); fill: var(--ink); }
   .t-celda.cab { font-weight: 600; }
   .a-caja { fill: #2F4FB5; }

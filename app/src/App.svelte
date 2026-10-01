@@ -13,13 +13,16 @@
   import { iniciarSincroAutomatica } from './lib/sincro-app.svelte.js'
   import { recibidosAndroid, lienzoAbierto } from './lib/archivos.js'
   import { avisar } from './lib/store.svelte.js'
-  import { abrirArchivo, ACEPTADOS, V } from './lib/visor.svelte.js'
+  import { abrirArchivo, ACEPTADOS, V, abrirDocumentoFuente, abrirSuelto, crearTarjetaCita } from './lib/visor.svelte.js'
+  import { enVentanaDoc, rutaDoc, escucharVentanas, SUELTO } from './lib/ventana-doc.js'
+  import { leerMeta } from './lib/store.svelte.js'
   import { B } from './lib/buscador.svelte.js'
   import Buscador from './components/Buscador.svelte'
 
   // Rutas por hash: #/  ·  #/p/<id>  ·  #/p/<id>/f/<fuente>  ·  #/p/<id>/o/<objetivo>[/f/<fuente>]
   //                 #/p/<id>/l/<fuente> (lienzo de lectura de la fuente)[/f/<fuente>]
   //                 #/citas  ·  #/citas/<id>
+  //                 #/doc/<fuente>[/<proyecto>] (ventana aparte con solo ese documento; lib/ventana-doc.js)
   let hash = $state(location.hash)
   let navegaciones = 0
   const ruta = $derived.by(() => {
@@ -53,6 +56,7 @@
 
   function soltar(e) {
     e.preventDefault()
+    if (doc) return
     const todos = [...(e.dataTransfer?.files || [])]
     const archivos = todos.filter(f => /\.json$/i.test(f.name))
     if (archivos.length) return (datos = { archivos })
@@ -97,12 +101,31 @@
   }
 
   cargarPreferencias()
+  // Ventana de un documento: solo lo carga y lo muestra; no sincroniza ni guarda en las carpetas
+  // (eso lo hace la ventana principal, a la que le pide las notas y recortes).
+  const doc = enVentanaDoc()
+  let docFalta = $state(false)
+  async function abrirDocVentana() {
+    const { fid, pid } = rutaDoc()
+    if (fid === SUELTO) {
+      const d = await leerMeta('docSuelto')
+      if (d?.blob) abrirSuelto(d.nombre, d.blob, pid)
+    } else {
+      const f = S.fuentePorId.get(fid)
+      if (f) await abrirDocumentoFuente(f, pid)
+    }
+    docFalta = !V.archivo
+  }
+  $effect(() => { if (doc) document.title = V.archivo ? `${V.archivo.nombre} · Canvas de Citas` : 'Canvas de Citas' })
   // La sincronización con la PC corre en todo aparato vinculado (celular, laptop…).
-  if (esAndroid) {
+  if (doc) cargar().then(abrirDocVentana)
+  else if (esAndroid) {
     cargar().then(() => { iniciarSincroAutomatica(); revisarRecibidos() })
     document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && revisarRecibidos())
   }
   else cargar().then(() => { iniciarSincroAutomatica(); return iniciarCarpetas() }).then(iniciarCelular)
+  // Las ventanas de documento le piden a esta (la principal) que cree sus notas y recortes.
+  if (!doc) escucharVentanas(crearTarjetaCita)
 </script>
 
 <svelte:window
@@ -114,7 +137,14 @@
 
 <input bind:this={entradaDoc} type="file" accept=".pdf,.html,.htm,.md,.markdown,.txt" hidden onchange={elegidoDoc} />
 
-{#if S.listo}
+{#if doc}
+  {#if docFalta}
+    <div class="no-encontrado">
+      <p>Este documento no está en este dispositivo.</p>
+      <button class="btn" onclick={() => (window.ipc?.postMessage ? window.ipc.postMessage('cerrar') : window.close())}>Cerrar</button>
+    </div>
+  {/if}
+{:else if S.listo}
   {#if ruta.vista === 'hub'}
     {@const p = S.proyectoPorId.get(ruta.pid)}
     {#if p}
@@ -132,7 +162,7 @@
   {/if}
 {/if}
 
-<Visor />
+<Visor ventana={doc} />
 
 {#if B.abierto}<Buscador />{/if}
 

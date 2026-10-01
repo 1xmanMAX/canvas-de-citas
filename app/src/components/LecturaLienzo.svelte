@@ -9,7 +9,7 @@
   import Modal from './Modal.svelte'
   import Tarjeta from './Tarjeta.svelte'
   import Chinchetas from './Chinchetas.svelte'
-  import { tablaDelPortapapeles, crecerTabla } from '../lib/tablas.js'
+  import { tablaDelPortapapeles } from '../lib/tablas.js'
   import EditorTarjeta from './EditorTarjeta.svelte'
   import VisorFoto from './VisorFoto.svelte'
   import Agrupador from './Agrupador.svelte'
@@ -336,7 +336,7 @@
           <Tarjeta lista={l} o={t} origen={conectando?.desde === t.id} resaltado={coin || destacado === t.id} atenuado={!!q && !coin}
             alVinculo={() => abrirOrigen(t.origen, p.id, t.id)} clavar={() => clavar(l, t)}
             alTocar={() => tocar(t.id, () => (modal = { lista: l, o: copia(t) }))}
-            alternar={i => { alternarTarea(t, i); guardar() }} crecer={l === 'tablas' ? tipo => { crecerTabla(t, tipo); guardar() } : null} {...arrastre(t)} redimensionar={l === 'fotos' ? redimensionarFoto(t, guardar) : null} />
+            alternar={i => { alternarTarea(t, i); guardar() }} {...arrastre(t)} redimensionar={l === 'fotos' ? redimensionarFoto(t, guardar) : null} />
         {/each}
       {/each}
 

@@ -16,8 +16,9 @@ use std::net::TcpStream;
 use std::path::PathBuf;
 use std::time::Duration;
 use tao::event::{Event, WindowEvent};
-use tao::event_loop::{ControlFlow, EventLoop};
-use tao::window::WindowBuilder;
+use std::collections::HashMap;
+use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
+use tao::window::{WindowBuilder, WindowId};
 use wry::{NewWindowResponse, PermissionResponse, WebContext, WebViewBuilder};
 
 const URL: &str = "https://1xmanmax.github.io/canvas-de-citas/";
@@ -133,16 +134,9 @@ fn main() {
         }
     }
 
-    let event_loop = EventLoop::new();
-    let mut ventana = WindowBuilder::new().with_title("Canvas de Citas").with_inner_size(tao::dpi::LogicalSize::new(1280.0, 820.0));
-    #[cfg(windows)]
-    {
-        use tao::platform::windows::IconExtWindows;
-        if let Ok(icono) = tao::window::Icon::from_resource(1, None) {
-            ventana = ventana.with_window_icon(Some(icono));
-        }
-    }
-    let ventana = match ventana.build(&event_loop) {
+    let event_loop = EventLoopBuilder::<Pedido>::with_user_event().build();
+    let proxy = event_loop.create_proxy();
+    let ventana = match con_icono(WindowBuilder::new().with_title("Canvas de Citas").with_inner_size(tao::dpi::LogicalSize::new(1280.0, 820.0))).build(&event_loop) {
         Ok(v) => v,
         Err(e) => return aviso(&format!("No se pudo abrir la ventana: {e}")),
     };
@@ -153,9 +147,86 @@ fn main() {
     let prefijo = prefijo_app(&url_app);
     // El token (acceso a las carpetas) solo para la app, nunca para otra página.
     let inicio = format!("if (location.href.startsWith({:?})) window.canvasWindows = Object.freeze({{ puerto: {}, token: {:?} }});", prefijo, puerto(), token);
-    let (p1, p2) = (prefijo.clone(), prefijo.clone());
-    let webview = WebViewBuilder::new_with_web_context(&mut contexto)
-        .with_url(url_app)
+    let principal = ventana.id();
+    let webview = match crear_webview(&ventana, &mut contexto, url_app, &prefijo, &inicio, proxy.clone(), None) {
+        Ok(w) => w,
+        Err(e) => return aviso(&format!("No se pudo abrir WebView2 (¿falta el runtime de Edge WebView2?): {e}")),
+    };
+
+    // Ventanas de documento ("Abrir en otra ventana" del visor): se cierran solas con la principal.
+    let mut otras: HashMap<WindowId, (tao::window::Window, wry::WebView)> = HashMap::new();
+    event_loop.run(move |evento, destino, flujo| {
+        *flujo = ControlFlow::Wait;
+        let _ = (&ventana, &webview);
+        match evento {
+            Event::UserEvent(Pedido::Ventana(url)) => {
+                let b = con_icono(WindowBuilder::new().with_title("Documento · Canvas de Citas").with_inner_size(tao::dpi::LogicalSize::new(1100.0, 900.0)));
+                match b.build(destino) {
+                    Ok(v) => match crear_webview(&v, &mut contexto, url, &prefijo, &inicio, proxy.clone(), Some(v.id())) {
+                        Ok(w) => {
+                            otras.insert(v.id(), (v, w));
+                        }
+                        Err(e) => aviso(&format!("No se pudo abrir la ventana del documento: {e}")),
+                    },
+                    Err(e) => aviso(&format!("No se pudo abrir la ventana del documento: {e}")),
+                }
+            }
+            Event::UserEvent(Pedido::Cerrar(id)) => {
+                otras.remove(&id);
+            }
+            Event::UserEvent(Pedido::Titulo(id, titulo)) => {
+                if let Some((v, _)) = otras.get(&id) {
+                    v.set_title(&titulo);
+                }
+            }
+            Event::WindowEvent { window_id, event: WindowEvent::CloseRequested, .. } => {
+                if window_id == principal {
+                    *flujo = ControlFlow::Exit;
+                } else {
+                    otras.remove(&window_id);
+                }
+            }
+            _ => {}
+        }
+    });
+}
+
+/// Pedidos de las páginas a la ventana principal (por el bucle de eventos).
+enum Pedido {
+    /// window.open de una página de la app: otra ventana (un documento aparte).
+    Ventana(String),
+    /// La ventana de un documento toma el nombre del documento.
+    Titulo(WindowId, String),
+    /// La ventana de un documento pide cerrarse (su botón Cerrar o Esc): window.ipc.postMessage("cerrar").
+    Cerrar(WindowId),
+}
+
+fn con_icono(b: WindowBuilder) -> WindowBuilder {
+    #[cfg(windows)]
+    {
+        use tao::platform::windows::IconExtWindows;
+        if let Ok(icono) = tao::window::Icon::from_resource(1, None) {
+            return b.with_window_icon(Some(icono));
+        }
+    }
+    b
+}
+
+/// La app en un WebView: con el puente a las carpetas, los permisos concedidos y las páginas que
+/// no son la app en el navegador de siempre. `ventana_doc`: si es una ventana de documento, su id.
+fn crear_webview(
+    ventana: &tao::window::Window,
+    contexto: &mut WebContext,
+    url: String,
+    prefijo: &str,
+    inicio: &str,
+    proxy: EventLoopProxy<Pedido>,
+    ventana_doc: Option<WindowId>,
+) -> wry::Result<wry::WebView> {
+    let (p1, p2) = (prefijo.to_string(), prefijo.to_string());
+    let proxy_titulo = proxy.clone();
+    let mut b = WebViewBuilder::new_with_web_context(contexto)
+        .with_url(url)
         .with_initialization_script(inicio)
         // La ventana solo muestra la app: cualquier otra página se abre en el navegador de siempre.
         .with_navigation_handler(move |u| {
@@ -165,8 +236,11 @@ fn main() {
             }
             propia
         })
+        // window.open de la app (un documento aparte): otra ventana nuestra, con el mismo puente.
         .with_new_window_req_handler(move |u, _| {
-            if !u.starts_with(&p2) {
+            if u.starts_with(&p2) {
+                let _ = proxy.send_event(Pedido::Ventana(u));
+            } else {
                 abrir_fuera(&u);
             }
             NewWindowResponse::Deny
@@ -178,25 +252,26 @@ fn main() {
         // y usa el gesto para acercar el lienzo, el PDF o la foto (lib/gestos.js).
         .with_hotkeys_zoom(true)
         .with_devtools(false);
+    if let Some(id) = ventana_doc {
+        let proxy_cerrar = proxy_titulo.clone();
+        b = b
+            .with_document_title_changed_handler(move |t| {
+                let _ = proxy_titulo.send_event(Pedido::Titulo(id, t));
+            })
+            .with_ipc_handler(move |m| {
+                if m.body() == "cerrar" {
+                    let _ = proxy_cerrar.send_event(Pedido::Cerrar(id));
+                }
+            });
+    }
     // La página (de internet) habla con el puente de esta misma PC: que Chromium no lo bloquee como
     // "acceso a la red local". Se mantienen las opciones que wry pone por defecto.
     #[cfg(windows)]
-    let webview = {
+    let b = {
         use wry::WebViewBuilderExtWindows;
-        webview.with_additional_browser_args("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,LocalNetworkAccessChecks,PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults")
+        b.with_additional_browser_args("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,LocalNetworkAccessChecks,PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults")
     };
-    let webview = webview.build(&ventana);
-    let _webview = match webview {
-        Ok(w) => w,
-        Err(e) => return aviso(&format!("No se pudo abrir WebView2 (¿falta el runtime de Edge WebView2?): {e}")),
-    };
-
-    event_loop.run(move |evento, _, flujo| {
-        *flujo = ControlFlow::Wait;
-        if let Event::WindowEvent { event: WindowEvent::CloseRequested, .. } = evento {
-            *flujo = ControlFlow::Exit;
-        }
-    });
+    b.build(ventana)
 }
 
 #[cfg(test)]

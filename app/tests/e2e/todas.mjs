@@ -1098,6 +1098,74 @@ const SUITES = {
 
   // Grupo de sincronización: un "celular" (Android simulado) y una "laptop" editan a la vez y
   // todos (con la PC) terminan con la misma versión, enviando solo lo que cambió.
+  // Documentos de las fuentes: clip en la tarjeta, arrastrar el archivo fuera/dentro y abrirlo en otra ventana.
+  async documentos(b) {
+    const s = suite('Documentos: clip, arrastrar y otra ventana'), pg = await pagina(b)
+    await conEjemplo(pg)
+    await pg.evaluate(() => (location.hash = '#/p/proyecto_001')); await esperar(900)
+    const clipDe = autor => pg.$$eval('g.nodo', (gs, a) => { const g = gs.find(x => x.getAttribute('aria-label').startsWith(a)); return g ? !!g.querySelector('.clip') : null }, autor)
+    await s.paso('la tarjeta del paper muestra el clip solo si tiene documento', async () => {
+      const autor = await pg.evaluate(() => [...document.querySelectorAll('g.nodo')].map(g => g.getAttribute('aria-label'))[0])
+      if (await clipDe('Priestley')) throw new Error('clip sin documento')
+      await adjuntar(pg, 'fuente_003', PDF)
+      await pg.keyboard.press('Escape'); await esperar(500)
+      const nombre = await pg.evaluate(() => [...document.querySelectorAll('g.nodo')].filter(g => g.querySelector('.clip')).map(g => g.getAttribute('aria-label')))
+      if (nombre.length !== 1) throw new Error('clips: ' + JSON.stringify(nombre) + ' (primera: ' + autor + ')')
+      const g = await pg.$$eval('g.nodo', gs => { const r = gs.find(x => x.querySelector('.clip')).getBoundingClientRect(); return { x: r.x - 20, y: r.y - 20, width: r.width + 40, height: r.height + 40 } })
+      await pg.screenshot({ path: path.join(SALIDA, 'documento-clip.png'), clip: g })
+    })
+    await s.paso('el documento de la ficha se arrastra como archivo (DownloadURL) a otra app', async () => {
+      await pg.evaluate(() => (location.hash = '#/p/proyecto_001/f/fuente_003'))
+      await pg.waitForSelector('dialog[open] .zona.con-doc[draggable="true"]', { timeout: 5000 })
+      const r = await pg.$eval('dialog[open] .zona.con-doc', z => {
+        const dt = new DataTransfer()
+        z.dispatchEvent(new DragEvent('dragstart', { dataTransfer: dt, bubbles: true, cancelable: true }))
+        return { url: dt.getData('DownloadURL'), archivos: dt.files.length }
+      })
+      if (!/^application\/pdf:.+\.pdf:blob:/.test(r.url)) throw new Error('DownloadURL: ' + r.url)
+      if (r.archivos !== 1) throw new Error('no lleva el archivo: ' + r.archivos)
+    })
+    await s.paso('soltar un archivo de otra app sobre la ficha lo adjunta', async () => {
+      await pg.keyboard.press('Escape'); await esperar(300)
+      await pg.evaluate(() => (location.hash = '#/p/proyecto_001/f/fuente_001'))
+      await pg.waitForSelector('dialog[open] .zona', { timeout: 5000 })
+      await pg.$eval('dialog[open] .zona', z => {
+        const dt = new DataTransfer()
+        dt.items.add(new File(['<html><body><p>Artículo de prueba</p></body></html>'], 'articulo.html', { type: 'text/html' }))
+        z.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }))
+      })
+      await pg.waitForSelector('dialog[open] .zona.con-doc', { timeout: 5000 })
+      const txt = await pg.$eval('dialog[open] .zona', z => z.textContent)
+      if (!txt.includes('articulo.html')) throw new Error(txt)
+      await pg.keyboard.press('Escape'); await esperar(500)
+      if (!(await clipDe('Priestley')) && (await pg.$$eval('g.nodo .clip', x => x.length)) !== 2) throw new Error('no apareció el segundo clip')
+    })
+    await s.paso('"Abrir en otra ventana" muestra solo ese documento y su nota va al lienzo de lectura de la principal', async () => {
+      await pg.evaluate(() => (location.hash = '#/p/proyecto_001/f/fuente_003'))
+      await pg.waitForSelector('dialog[open] .zona.con-doc', { timeout: 5000 })
+      await clicTexto(pg, 'Abrir'); await pg.waitForSelector('.visor', { timeout: 10000 }); await esperar(500)
+      const antes = ((await lienzoGuardado(pg)).lecturas?.fuente_003?.notas || []).length
+      await pg.click('button[aria-label="Abrir en otra ventana"]')
+      const t = await b.waitForTarget(x => x.url().includes('#/doc/fuente_003/proyecto_001'), { timeout: 8000 })
+      const doc = await t.page()
+      await doc.waitForSelector('.visor.ventana', { timeout: 10000 })
+      if (await doc.$('.cabecera')) throw new Error('la ventana muestra también la app')
+      if (await doc.$('button[aria-label="Abrir en otra ventana"]')) throw new Error('repite el botón de otra ventana')
+      await doc.waitForFunction(() => document.querySelectorAll('.pag-pdf[data-n="0"] .capa-texto text').length > 5, { timeout: 30000 })
+      if (!/\.pdf · Canvas de Citas$/.test(await doc.title())) throw new Error('título: ' + await doc.title())
+      await doc.evaluate(() => { const t = [...document.querySelectorAll('.pag-pdf[data-n="0"] .capa-texto text')].find(x => x.textContent.length > 40); const r = document.createRange(); r.selectNodeContents(t); getSelection().removeAllRanges(); getSelection().addRange(r) })
+      await esperar(300); await clicTexto(doc, 'Nota con la cita'); await esperar(1200)
+      const notas = (await lienzoGuardado(pg)).lecturas.fuente_003.notas
+      if (notas.length !== antes + 1 || !/pág\. 1$/.test(notas.at(-1).titulo)) throw new Error(`notas ${antes} → ${notas.length}`)
+      const aviso = await doc.$eval('.aviso', a => a.textContent).catch(() => '')
+      if (!aviso.includes('ventana principal')) throw new Error('aviso: ' + aviso)
+      await doc.screenshot({ path: path.join(SALIDA, 'documento-ventana.png') })
+      await doc.close()
+    })
+    if (pg.errores.length) s.fallas.push(...pg.errores)
+    await pg.browserContext().close().catch(() => {})
+    return s
+  },
   // Tablas: crearlas en el lienzo, pegarlas del portapapeles (Excel/Word/Markdown) y buscar en ellas.
   async tablas(b) {
     const s = suite('Tablas'), pg = await pagina(b)
@@ -1159,20 +1227,19 @@ const SUITES = {
       if (t.colores?.['1,1'] !== 'verde') throw new Error('colores: ' + JSON.stringify(t.colores))
       if (t.filas[0][1] !== 'Zona' || t.filas[1][1] !== 'Costa' || t.filas[0][0] !== '') throw new Error('celdas: ' + JSON.stringify(t.filas))
     })
-    await s.paso('en el lienzo, los "+" de la tabla agregan columna y fila sin abrir el editor', async () => {
-      const t0 = (await tablas()).at(-1)
-      const g = (await pg.$$('g.tarjeta.tablas')).at(-1)
-      await g.evaluate(x => x.querySelector('[aria-label="Agregar columna"]').dispatchEvent(new MouseEvent('click', { bubbles: true })))
-      await g.evaluate(x => x.querySelector('[aria-label="Agregar fila"]').dispatchEvent(new MouseEvent('click', { bubbles: true })))
-      await esperar(500)
-      const t1 = (await tablas()).at(-1)
-      if (t1.filas[0].length !== t0.filas[0].length + 1 || t1.filas.length !== t0.filas.length + 1) throw new Error(`${t0.filas.length}×${t0.filas[0].length} → ${t1.filas.length}×${t1.filas[0].length}`)
-      if (await pg.$('dialog[open]')) throw new Error('abrió el editor')
-      const caja = await g.boundingBox()
-      await pg.mouse.move(caja.x + caja.width / 2, caja.y + caja.height / 2); await esperar(250)
-      const op = await g.evaluate(x => getComputedStyle(x.querySelector('.t-mas')).opacity)
-      if (op !== '1') throw new Error('los "+" no aparecen al pasar el mouse (opacidad ' + op + ')')
-      await pg.screenshot({ path: path.join(SALIDA, 'tablas-mas.png') })
+    await s.paso('los "+" solo están en el editor, y ahí la tabla no se aprieta: las columnas guardan su ancho', async () => {
+      if (await pg.$('g.tarjeta.tablas .t-mas, g.tarjeta.tablas [aria-label="Agregar columna"]')) throw new Error('hay "+" en el lienzo')
+      await pg.click('button[aria-label="Añadir tabla"]')
+      await pg.waitForSelector('dialog[open] .tabla-ed textarea', { timeout: 3000 })
+      const largo = 'Deriva máxima de entrepiso permitida para estructuras de concreto armado según la norma'
+      for (let i = 0; i < 6; i++) await pg.$eval('dialog[open] button[aria-label="Agregar columna a la derecha"]', x => x.click())
+      await pg.$eval('dialog[open] td[data-f="1"][data-c="0"] textarea', t => t.focus()); await pg.keyboard.type(largo)
+      await esperar(200)
+      const m = await pg.$eval('dialog[open] .tabla-ed', d => ({ visible: d.clientWidth, total: d.scrollWidth, col0: d.querySelector('td[data-f="1"][data-c="0"]').getBoundingClientRect().width, col1: d.querySelector('td[data-f="1"][data-c="1"]').getBoundingClientRect().width }))
+      if (!(m.total > m.visible)) throw new Error('la tabla se apretó al espacio visible: ' + JSON.stringify(m))
+      if (!(m.col0 > m.col1 * 1.5) || m.col1 < 115) throw new Error('anchos de columna: ' + JSON.stringify(m))
+      await pg.screenshot({ path: path.join(SALIDA, 'tablas-editor-ancho.png') })
+      await pg.keyboard.press('Escape'); await esperar(300)
     })
     await s.paso('pegar en el lienzo una tabla de Excel (HTML) crea una tarjeta de tabla', async () => {
       const antes = (await tablas()).length

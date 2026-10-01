@@ -15,7 +15,7 @@
   import { untrack } from 'svelte'
   import { B } from '../lib/buscador.svelte.js'
   import Chinchetas from './Chinchetas.svelte'
-  import { tablaDelPortapapeles, crecerTabla } from '../lib/tablas.js'
+  import { tablaDelPortapapeles } from '../lib/tablas.js'
   import EditorTarjeta from './EditorTarjeta.svelte'
   import VisorFoto from './VisorFoto.svelte'
   import Agrupador from './Agrupador.svelte'
@@ -387,7 +387,7 @@
 
       <!-- Fuentes que sustentan el objetivo -->
       {#each fuentes as x (x.id)}
-        <NodoFuente x={x.x} y={x.y} anio={anio(x.f)} autor={autorCorto(x.f)} chips={x.f.etiquetas || []}
+        <NodoFuente x={x.x} y={x.y} anio={anio(x.f)} autor={autorCorto(x.f)} chips={x.f.etiquetas || []} adjunto={!!x.f.documento_original}
           estado={estadoDe(x.id)} resaltado={conectando?.desde === x.id || destacado === x.id}
           alAbrir={() => tocar(x.id, () => abrirFuente(x.id))} {...arrastre(o.fuentes.find(y => y.id === x.id))} />
       {/each}
@@ -397,7 +397,7 @@
         {#each tarjVista[l] as t (t.id)}
           <Tarjeta lista={l} o={t} origen={conectando?.desde === t.id} resaltado={destacado === t.id} alVinculo={() => abrirOrigen(t.origen, p.id, t.id)}
             alTocar={() => tocar(t.id, () => (modal = { lista: l, o: copia(t) }))}
-            alternar={i => { alternarTarea(t, i); guardar() }} crecer={l === 'tablas' ? tipo => { crecerTabla(t, tipo); guardar() } : null} {...arrastre(t)} redimensionar={l === 'fotos' ? redimensionarFoto(t, guardar) : null} />
+            alternar={i => { alternarTarea(t, i); guardar() }} {...arrastre(t)} redimensionar={l === 'fotos' ? redimensionarFoto(t, guardar) : null} />
         {/each}
       {/each}
 

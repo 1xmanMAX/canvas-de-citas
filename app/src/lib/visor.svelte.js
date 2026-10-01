@@ -5,6 +5,7 @@ import { nuevaTarjeta, guardarTarjeta } from './tablero.js'
 import { asegurarTablero, idLocal, cajas } from './tarjetas.js'
 import { asegurarLectura } from './lecturas.js'
 import { autorCorto, anio } from './citas.js'
+import { enVentanaDoc, pedirAPrincipal } from './ventana-doc.js'
 
 export const ACEPTADOS = /\.(pdf|html?|md|markdown|txt)$/i
 
@@ -45,6 +46,11 @@ export async function abrirDocumentoFuente(fuente, proyectoId = null) {
   abrir(fuente.documento_nombre || d.nombre || 'documento', d.blob, fuente.id, proyectoId)
 }
 
+/** Abre un archivo sin fuente (en la ventana de documento, el que se pasó por la base local). */
+export function abrirSuelto(nombre, blob, proyectoId = null) {
+  abrir(nombre, blob, null, proyectoId)
+}
+
 /** Abre un archivo del equipo (elegido o soltado). */
 export function abrirArchivo(archivo, proyectoId = null) {
   if (!ACEPTADOS.test(archivo.name)) return avisar('El visor abre PDF, HTML, Markdown o TXT')
@@ -77,13 +83,14 @@ function referencia(pagina) {
 }
 
 /** Ruta del lienzo de lectura de la fuente abierta en el visor (o null si no es de un proyecto). */
-export const rutaLectura = () => (V.proyectoId && V.fuenteId ? `#/p/${V.proyectoId}/l/${V.fuenteId}` : null)
+export const rutaLectura = (pid = V.proyectoId, fid = V.fuenteId) => (pid && fid ? `#/p/${pid}/l/${fid}` : null)
 
 /** Abre el lienzo de lectura de la fuente del visor (a la izquierda del documento). */
-export function abrirLecturaDelVisor() {
-  const r = rutaLectura()
+export function abrirLecturaDelVisor(pid = V.proyectoId, fid = V.fuenteId) {
+  if (enVentanaDoc()) return
+  const r = rutaLectura(pid, fid)
   if (!r || location.hash === r) return
-  if (location.hash.startsWith(`#/p/${V.proyectoId}`)) location.replace(r)
+  if (location.hash.startsWith(`#/p/${pid}`)) location.replace(r)
   else location.hash = r
 }
 
@@ -92,10 +99,18 @@ export function abrirLecturaDelVisor() {
  * (p.canvas.lecturas[fuente], lib/lecturas.js), junto a la fuente del centro y conectada a ella con
  * un hilo "cita"; desde allí se puede clavar en el lienzo general. Un archivo suelto va al general.
  */
-function tarjetaCita(lista, datos, aviso) {
-  const p = S.proyectoPorId.get(V.proyectoId)
-  if (!p) return avisar('Abre el documento desde un proyecto para citar en el lienzo')
-  const f = V.fuenteId ? S.fuentePorId.get(V.fuenteId) : null
+async function tarjetaCita(lista, datos, aviso) {
+  const pedido = { lista, datos, aviso, proyectoId: V.proyectoId, fuenteId: V.fuenteId }
+  // En una ventana de documento, la tarjeta la crea la ventana principal (ver lib/ventana-doc.js).
+  if (enVentanaDoc() && pedido.proyectoId && await pedirAPrincipal(pedido)) return avisar(`${aviso} (en la ventana principal)`)
+  crearTarjetaCita(pedido)
+}
+
+/** Crea la tarjeta de una cita en su proyecto; devuelve el proyecto (o null). */
+export function crearTarjetaCita({ lista, datos, aviso, proyectoId, fuenteId }) {
+  const p = S.proyectoPorId.get(proyectoId)
+  if (!p) { avisar('Abre el documento desde un proyecto para citar en el lienzo'); return null }
+  const f = fuenteId ? S.fuentePorId.get(fuenteId) : null
   if (f) {
     const c = asegurarLectura(p.canvas, f.id)
     const ocupadas = [{ x: -180, y: -90, w: 360, h: 180 }, ...[...cajas(c).values()].map(({ x, y, w, h }) => ({ x, y, w, h }))]
@@ -103,14 +118,16 @@ function tarjetaCita(lista, datos, aviso) {
     guardarTarjeta(c, lista, t, true)
     c.conexiones.push({ id: idLocal('con'), desde: f.id, hasta: t.id, etiqueta: 'cita' })
     guardarProyecto(p)
-    abrirLecturaDelVisor()
-    return avisar(`${aviso} de ${autorCorto(f)} (${anio(f)})`)
+    abrirLecturaDelVisor(p.id, f.id)
+    avisar(`${aviso} de ${autorCorto(f)} (${anio(f)})`)
+    return p
   }
   const c = asegurarTablero(p.canvas)
   const ocupadas = [...cajas(c).values()].map(({ x, y, w, h }) => ({ x, y, w, h }))
   guardarTarjeta(c, lista, nuevaTarjeta(lista, 750, -80, datos, ocupadas), true)
   guardarProyecto(p)
   avisar(aviso)
+  return p
 }
 
 /**

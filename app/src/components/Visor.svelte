@@ -7,7 +7,11 @@
   import { S, avisar } from '../lib/store.svelte.js'
   import { esAndroid } from '../lib/plataforma.js'
   import { bloquearZoomDelNavegador } from '../lib/gestos.js'
-  import { guardarArchivo } from '../lib/archivos.js'
+  import { guardarArchivo, arrastrarArchivo } from '../lib/archivos.js'
+  import { abrirEnVentana } from '../lib/ventana-doc.js'
+
+  // ventana: el visor es toda la ventana (la de "Abrir en otra ventana"): sin volver al lienzo ni adjuntar.
+  let { ventana = false } = $props()
   import { autorCorto, anio } from '../lib/citas.js'
 
   // Lector de PDF propio (PDFium en un hilo aparte): se descarga la primera vez que se abre un PDF.
@@ -109,26 +113,32 @@
     if (e.key !== 'Escape' || !a || document.querySelector('dialog[open]')) return
     e.preventDefault() // el lienzo de lectura no se cierra con el mismo Esc
     if (V.recortando) V.recortando = false // Esc cancela el recorte antes de cerrar el visor
-    else cerrarVisor()
+    else cerrar()
   }
+  // En la app de Windows la ventana del documento la cierra el exe (window.ipc); en el navegador, window.close().
+  const cerrar = () => (!ventana ? cerrarVisor() : window.ipc?.postMessage ? window.ipc.postMessage('cerrar') : window.close())
 </script>
 
 <svelte:window onkeydown={teclas} onhashchange={() => (hash = location.hash)} />
 
 {#if a}
-  <section class="visor" class:grande={V.grande} aria-label="Visor de documento">
+  <section class="visor" class:grande={V.grande} class:ventana aria-label="Visor de documento">
     <header class="v-cab">
+      <!-- El nombre se arrastra: el archivo sale a otra app (Escritorio, correo…) o a otra fuente. -->
+      <div class="v-arrastre" draggable={!esAndroid} role="img" aria-label="Arrastra para llevar el archivo a otra app"
+        title={esAndroid ? a.nombre : 'Arrastra para llevar el archivo a otra app'} ondragstart={e => arrastrarArchivo(e, a.nombre, a.blob, a.url, V.fuenteId)}>
       <Icono nombre="doc" tam={16} />
       <div class="v-titulo">
         <b title={a.nombre}>{a.nombre}</b>
         {#if fuente}<span class="suave">{autorCorto(fuente)} ({anio(fuente)})</span>{/if}
+      </div>
       </div>
       {#if seleccion}
         <button class="btn chico primario" onclick={() => { notaDesdeSeleccion(seleccion, seleccionPag, seleccionRects); seleccion = '' }} title="Crear una nota con el texto seleccionado en el lienzo de lectura de esta fuente">
           <Icono nombre="nota" tam={13} />Nota con la cita
         </button>
       {/if}
-      {#if lecturaCerrada}
+      {#if lecturaCerrada && !ventana}
         <button class="btn chico" onclick={() => { abrirLecturaDelVisor(); V.grande = false; if (matchMedia('(max-width: 820px)').matches) cerrarVisor() }} title="Abrir el lienzo de lectura de esta fuente al lado del documento">
           <Icono nombre="nota" tam={13} /><span class="solo-escritorio">Lienzo de lectura</span>
         </button>
@@ -137,16 +147,21 @@
         <!-- En el celular no hay pestañas ni descargas: se guarda o envía con "Compartir". -->
         <button class="icono-btn" title="Guardar o compartir" aria-label="Guardar o compartir" onclick={() => guardarArchivo(a.nombre, a.blob).catch(e => avisar(e.message))}><Icono nombre="descargar" tam={15} /></button>
       {:else}
-        <a class="icono-btn" href={a.url} target="_blank" rel="noopener" title="Abrir en otra pestaña" aria-label="Abrir en otra pestaña"><Icono nombre="externo" tam={15} /></a>
+        {#if !ventana}
+          <button class="icono-btn" title="Abrir en otra ventana (solo este documento)" aria-label="Abrir en otra ventana"
+            onclick={() => abrirEnVentana({ archivo: a, fuenteId: V.fuenteId, proyectoId: V.proyectoId })}><Icono nombre="externo" tam={15} /></button>
+        {/if}
         <a class="icono-btn" href={a.url} download={a.nombre} title="Descargar" aria-label="Descargar"><Icono nombre="descargar" tam={15} /></a>
       {/if}
+      {#if !ventana}
       <button class="icono-btn solo-escritorio" aria-label={V.grande ? 'Media pantalla' : 'Pantalla completa'} title={V.grande ? 'Media pantalla' : 'Pantalla completa'} onclick={() => (V.grande = !V.grande)}>
         <Icono nombre={V.grande ? 'reducir' : 'agrandar'} tam={16} />
       </button>
-      <button class="icono-btn" aria-label="Cerrar visor" title="Cerrar (Esc)" onclick={cerrarVisor}><Icono nombre="cerrar" tam={18} trazo={2} /></button>
+      {/if}
+      <button class="icono-btn" aria-label={ventana ? 'Cerrar ventana' : 'Cerrar visor'} title="Cerrar (Esc)" onclick={cerrar}><Icono nombre="cerrar" tam={18} trazo={2} /></button>
     </header>
 
-    {#if !fuente && fuentes.length}
+    {#if !fuente && fuentes.length && !ventana}
       <div class="v-adjuntar">
         <span class="suave">Adjuntar a una fuente:</span>
         <select bind:value={destino} aria-label="Fuente">
@@ -185,6 +200,9 @@
     border-left: 1px solid var(--line); box-shadow: -10px 0 30px rgba(33, 31, 26, .16);
   }
   .visor.grande { width: 100vw; min-width: 0; border-left: none; }
+  .visor.ventana { top: 0; width: 100vw; min-width: 0; border-left: none; box-shadow: none; }
+  .v-arrastre { display: flex; align-items: center; gap: 8px; flex-grow: 1; min-width: 0; cursor: grab; }
+  .v-arrastre:active { cursor: grabbing; }
   .v-cab { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; border-bottom: 1px solid var(--line); background: var(--paper-dim); }
   .v-titulo { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
   .v-titulo b { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

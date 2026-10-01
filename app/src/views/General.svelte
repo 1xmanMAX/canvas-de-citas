@@ -200,7 +200,7 @@
       {#each items as it (it.id)}
         {@const pos = disp.pos.get(it.id)}
         <NodoFuente
-          x={pos.x} y={pos.y} anio={anio(it.f)} autor={autorCorto(it.f)} linea2={it.f.titulo}
+          x={pos.x} y={pos.y} anio={anio(it.f)} autor={autorCorto(it.f)} linea2={it.f.titulo} adjunto={!!it.f.documento_original}
           estado={verifDe(it.f)} seleccionado={sel === it.id}
           alAbrir={() => (sel = it.id)}
         />

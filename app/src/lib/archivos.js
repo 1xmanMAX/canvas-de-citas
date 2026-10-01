@@ -40,3 +40,21 @@ export async function recibidosAndroid() {
 
 /** El lienzo abierto (Hub) se registra aquí para recibir imágenes, audios y textos. */
 export const lienzoAbierto = { insertar: null }
+
+/** Lo que se está arrastrando desde la app (para no "soltarlo" sobre sí mismo). */
+export const arrastre = { id: null }
+
+/**
+ * Arrastrar un documento de la app a otra (Escritorio, Explorador, correo, WhatsApp Web…): Chrome y
+ * Edge (WebView2) lo entregan como archivo con DownloadURL; dentro de la app llega como un archivo.
+ */
+export function arrastrarArchivo(e, nombre, blob, url, id = null) {
+  const dt = e.dataTransfer
+  if (!dt || !blob || !url) return
+  const tipo = blob.type || 'application/octet-stream'
+  dt.effectAllowed = 'copy'
+  try { dt.setData('DownloadURL', `${tipo}:${String(nombre).replace(/[:\\/]/g, '_')}:${url}`) } catch { /* sin soporte */ }
+  try { dt.items.add(new File([blob], nombre, { type: tipo })) } catch { /* sin soporte */ }
+  arrastre.id = id
+  e.currentTarget?.addEventListener?.('dragend', () => (arrastre.id = null), { once: true })
+}
