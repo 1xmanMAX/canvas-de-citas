@@ -37,7 +37,7 @@ Campos de fuente: `tipo_fuente` (articulo_cientifico, libro, capitulo_libro, nor
 ## Tarjetas del lienzo
 | Comando | Qué hace |
 |---|---|
-| `nota --texto "…" [--titulo] [--estilo adhesiva|rayada|tarjeta] [--letra sans|serif|mono|mano] [--color amarillo|rosa|verde|celeste|naranja|lila]` | Nota |
+| `nota --texto "…" [--titulo] [--estilo adhesiva|rayada|tarjeta] [--letra sans|serif|mono|mano|libro|moderna|elegante|redonda|plumon|escolar|antigua|codigo|lapicero] [--color amarillo|rosa|verde|celeste|naranja|lila]` | Nota |
 | `lista --titulo "…" --tareas "a|b|c"` | Lista de tareas |
 | `tabla --titulo "…" --texto "<tabla en Markdown o TSV>"` · `--archivo tabla.md` · `--encabezado no` | Tabla (filas y columnas) |
 | `tarea <lista> --agregar "d|e" · --marcar 2 · --desmarcar 2 · --quitar 3 · --editar 1 --texto "…"` | Modifica una lista |

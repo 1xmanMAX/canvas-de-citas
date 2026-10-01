@@ -11,6 +11,7 @@
   import { esAndroid } from '../lib/plataforma.js'
   import { transcribirAudio } from '../lib/voz.js'
   import EditorTabla from './EditorTabla.svelte'
+  import SelectorLetra from './SelectorLetra.svelte'
   import { tablaVacia, limpiarTabla, aplicarTabla } from '../lib/tablas.js'
 
   /** `o` es una copia editable; `vinculos` los nombres de lo que está conectado a la tarjeta. */
@@ -72,6 +73,7 @@
   function guardar() {
     if (lista === 'listas' && nuevaTarea.trim()) agregarTarea()
     if (lista === 'tablas') aplicarTabla(o, limpiarTabla(o))
+    if (!o.letra) delete o.letra
     if (!o.etiquetas?.length) delete o.etiquetas
     guardado = true
     onguardar(o)
@@ -82,7 +84,7 @@
   {#if lista === 'notas'}
     <label class="campo"><span>Título (opcional)</span><input type="text" bind:value={o.titulo} placeholder="Extended Mind, p. 114" use:autocompletar={{ sugerir }} /></label>
     <!-- svelte-ignore a11y_autofocus -->
-    <textarea rows="6" bind:value={o.texto} use:autocompletar={{ sugerir }} autofocus aria-label="Texto de la nota" style="font-family:{LETRAS[o.letra || 'sans'].css};font-size:{o.letra === 'mano' ? 21 : 14}px"
+    <textarea rows="6" bind:value={o.texto} use:autocompletar={{ sugerir }} autofocus aria-label="Texto de la nota" style="font-family:{LETRAS[o.letra || 'sans'].css};font-weight:{LETRAS[o.letra || 'sans'].normal};font-size:{Math.round(14 * LETRAS[o.letra || 'sans'].escala)}px"
       class="texto-nota" placeholder="Escribe la idea, cita o pendiente…"></textarea>
     <div class="opciones">
       <div class="opcion"><span class="rotulo">Papel</span>
@@ -90,11 +92,7 @@
           {#each Object.entries(PAPELES) as [k, v]}<button aria-pressed={(o.estilo || 'adhesiva') === k} onclick={() => (o.estilo = k)}>{v.nombre}</button>{/each}
         </div>
       </div>
-      <div class="opcion"><span class="rotulo">Letra</span>
-        <div class="segmentado">
-          {#each Object.entries(LETRAS) as [k, v]}<button aria-pressed={(o.letra || 'sans') === k} style="font-family:{v.css}{k === 'mano' ? ';font-size:17px' : ''}" onclick={() => (o.letra = k)}>{v.nombre}</button>{/each}
-        </div>
-      </div>
+      <SelectorLetra bind:valor={o.letra} />
       {#if o.estilo !== 'rayada'}
         <div class="opcion"><span class="rotulo">Color</span>
           <div class="colores">
@@ -148,6 +146,8 @@
     {/if}
 
   {/if}
+
+  {#if lista !== 'notas'}<SelectorLetra bind:valor={o.letra} original />{/if}
 
   <CampoEtiquetas bind:valor={o.etiquetas} />
 

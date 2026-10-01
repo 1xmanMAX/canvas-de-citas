@@ -127,7 +127,7 @@ export function accionesAgrupadores({ lienzo, elementos, cajaPorId = null, antes
     caja,
 
     /** Crea un agrupador con los elementos `ids` acomodados dentro. `ubicar(w, h)` → esquina. */
-    crear(titulo, color, ids, ubicar) {
+    crear(titulo, color, ids, ubicar, letra) {
       antes()
       fijar()
       const els = porId(ids)
@@ -135,6 +135,7 @@ export function accionesAgrupadores({ lienzo, elementos, cajaPorId = null, antes
       const { x, y } = ubicar(g.w, g.h)
       g.x = Math.round(x); g.y = Math.round(y)
       g.miembros = els.map(e => e.id)
+      if (letra) g.letra = letra
       colocar(els, new Map([...pos].map(([id, p]) => [id, { x: p.x + g.x, y: p.y + g.y }])))
       quitarDeOtros(g.miembros, g)
       lista().push(g)
@@ -143,11 +144,13 @@ export function accionesAgrupadores({ lienzo, elementos, cajaPorId = null, antes
     },
 
     /** Cambia nombre y color; mete los `ids` nuevos y saca los que ya no están. */
-    editar(g, { titulo, color, ids }) {
+    editar(g, { titulo, color, ids, letra }) {
       antes()
       fijar()
       g.titulo = titulo.trim() || 'Grupo'
       g.color = color
+      if (letra) g.letra = letra
+      else delete g.letra
       const quedan = new Set(ids)
       const actuales = miembros(g)
       const salen = actuales.filter(e => !quedan.has(e.id))

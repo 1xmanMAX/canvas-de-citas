@@ -102,14 +102,14 @@
   const agrupadoresVista = $derived((o.agrupadores || []).filter(g => cruza(cajasGrupos.get(g.id))))
   const cuantos = $derived(new Map((o.agrupadores || []).map(g => [g.id, Array.isArray(g.miembros) ? g.miembros.length : grupos.miembros(g).length])))
   const editarAgrupador = g => (modal = { grupo: true, agrupador: g, dentro: g ? grupos.miembros(g).map(e => e.id) : [] })
-  function guardarAgrupador({ titulo, color, ids }) {
+  function guardarAgrupador({ titulo, color, letra, ids }) {
     const g = modal.agrupador
-    if (g) grupos.editar(g, { titulo, color, ids })
+    if (g) grupos.editar(g, { titulo, color, letra, ids })
     else {
       const els = elementos().filter(e => ids.includes(e.id))
       const c = els.length ? { x: els.reduce((s, e) => s + e.caja.x + e.caja.w / 2, 0) / els.length, y: els.reduce((s, e) => s + e.caja.y + e.caja.h / 2, 0) / els.length } : lienzo.centro()
       const libres = ocupadas.filter(x => !els.some(e => e.caja.x === x.x && e.caja.y === x.y && e.caja.w === x.w))
-      grupos.crear(titulo, color, ids, (w, h) => lugarLibre(libres, w, h, c.x, c.y, 40))
+      grupos.crear(titulo, color, ids, (w, h) => lugarLibre(libres, w, h, c.x, c.y, 40), letra)
       avisar('Agrupador creado')
     }
     modal = null
@@ -394,7 +394,7 @@
     {/if}
   {/key}
 {:else if modal?.grupo}
-  <EditorAgrupador nuevo={!modal.agrupador} titulo={modal.agrupador?.titulo || ''} color={modal.agrupador?.color || 'azul'}
+  <EditorAgrupador nuevo={!modal.agrupador} titulo={modal.agrupador?.titulo || ''} color={modal.agrupador?.color || 'azul'} letra={modal.agrupador?.letra}
     elementos={elementos().map(({ id, nombre, tipo }) => ({ id, nombre, tipo }))} dentro={modal.dentro}
     onguardar={guardarAgrupador} onclose={() => (modal = null)}
     oneliminar={() => { grupos.eliminar(modal.agrupador); modal = null }}

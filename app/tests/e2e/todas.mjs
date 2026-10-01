@@ -1098,6 +1098,70 @@ const SUITES = {
 
   // Grupo de sincronización: un "celular" (Android simulado) y una "laptop" editan a la vez y
   // todos (con la PC) terminan con la misma versión, enviando solo lo que cambió.
+  // Letras: en notas, listas, tablas, fotos y agrupadores se elige la letra; se guarda y se dibuja con ella.
+  async letras(b) {
+    const s = suite('Letras en todas partes'), pg = await pagina(b)
+    await conEjemplo(pg)
+    await pg.evaluate(() => (location.hash = '#/p/proyecto_001')); await esperar(900)
+    const elegir = nombre => pg.$$eval('dialog[open] .letras button', (bs, n) => bs.find(x => x.textContent.trim() === n).click(), nombre)
+    const fuenteDe = (sel, i = -1) => pg.$$eval(sel, (ts, i) => getComputedStyle(ts.at(i)).fontFamily, i)
+    await s.paso('nota: 13 letras para elegir; con "Plumón" se guarda y se dibuja con ella', async () => {
+      await pg.click('button[aria-label="Añadir nota"]')
+      await pg.type('dialog[open] textarea', 'Idea con letra chida')
+      const n = await pg.$$eval('dialog[open] .letras button', bs => bs.length)
+      if (n !== 13) throw new Error('letras: ' + n)
+      await elegir('Plumón'); await clicTexto(pg, 'Guardar', '//dialog[@open]'); await esperar(600)
+      const nota = (await lienzoGuardado(pg)).notas.at(-1)
+      if (nota.letra !== 'plumon') throw new Error('letra: ' + nota.letra)
+      if (!/Permanent Marker/.test(await fuenteDe('g.tarjeta.notas text.n-texto'))) throw new Error('no se dibuja con Plumón')
+    })
+    await s.paso('lista y tabla: "Original" por defecto; con otra letra cambian título y contenido', async () => {
+      await pg.click('button[aria-label="Añadir lista de tareas"]')
+      await pg.type('dialog[open] input[type=text]', 'Pendientes')
+      if (!(await pg.$eval('dialog[open] .letras button.activa', b => b.textContent.trim() === 'Original'))) throw new Error('no empieza en Original')
+      await pg.type('dialog[open] form input', 'Leer a Priestley'); await pg.keyboard.press('Enter')
+      await elegir('Libro'); await clicTexto(pg, 'Guardar', '//dialog[@open]'); await esperar(600)
+      if ((await lienzoGuardado(pg)).listas.at(-1).letra !== 'libro') throw new Error('lista sin letra')
+      if (!/Lora/.test(await fuenteDe('g.tarjeta.listas text.l-item'))) throw new Error('la lista no usa Libro')
+      await pg.click('button[aria-label="Añadir tabla"]')
+      await pg.waitForSelector('dialog[open] .tabla-ed textarea', { timeout: 3000 })
+      await pg.$eval('dialog[open] td[data-f="0"][data-c="0"] textarea', t => t.focus()); await pg.keyboard.type('Código E.030')
+      await elegir('Código'); await esperar(150)
+      if (!/JetBrains Mono/.test(await pg.$eval('dialog[open] .tabla-ed textarea', t => getComputedStyle(t).fontFamily))) throw new Error('el editor no muestra la letra')
+      await clicTexto(pg, 'Guardar', '//dialog[@open]'); await esperar(600)
+      if ((await lienzoGuardado(pg)).tablas.at(-1).letra !== 'codigo') throw new Error('tabla sin letra')
+      if (!/JetBrains Mono/.test(await fuenteDe('g.tarjeta.tablas text.t-celda'))) throw new Error('la tabla no usa Código')
+    })
+    await s.paso('foto: título y texto con la letra elegida', async () => {
+      await (await pg.$('input[type=file][accept="image/*"]')).uploadFile(IMG)
+      await pg.waitForSelector('dialog.visor-foto[open] .letras', { timeout: 8000 }); await esperar(300)
+      await pg.type('dialog.visor-foto[open] input[type=text]', 'Ensayo de laboratorio')
+      await pg.$$eval('dialog.visor-foto[open] .letras button', bs => bs.find(x => x.textContent.trim() === 'Lapicero').click())
+      await clicTexto(pg, 'Guardar', '//dialog[@open]'); await esperar(800)
+      const f = (await lienzoGuardado(pg)).fotos.at(-1)
+      if (f.letra !== 'lapicero') throw new Error('foto: ' + f.letra)
+      if (!/Kalam/.test(await fuenteDe('g.tarjeta.fotos text.f-titulo'))) throw new Error('la foto no usa Lapicero')
+    })
+    await s.paso('agrupador: su nombre con la letra elegida', async () => {
+      await pg.click('button[aria-label="Agrupar elementos"]')
+      await pg.type('dialog[open] input[placeholder^="Marco"]', 'Antecedentes')
+      await (await pg.$$('dialog[open] .lista input[type=checkbox]')).at(-1).click()
+      await elegir('Elegante'); await clicTexto(pg, 'Crear agrupador'); await esperar(600)
+      const g = (await lienzoGuardado(pg)).agrupadores.at(-1)
+      if (g.letra !== 'elegante') throw new Error('agrupador: ' + JSON.stringify(g))
+      if (!/Playfair Display/.test(await fuenteDe('.agrupador.frente .titulo text'))) throw new Error('el nombre no usa Elegante')
+    })
+    await s.paso('las letras se descargan y quedan listas (sin internet, vienen con la app)', async () => {
+      await esperar(500)
+      const ok = await pg.evaluate(() => ['400 16px "Permanent Marker"', '400 16px Lora', '400 16px "JetBrains Mono"', '400 16px Kalam', '700 16px "Playfair Display"'].map(f => document.fonts.check(f)))
+      if (ok.includes(false)) throw new Error('sin cargar: ' + JSON.stringify(ok))
+      await pg.click('.zoom .porc'); await esperar(500)
+      await pg.screenshot({ path: path.join(SALIDA, 'letras.png') })
+    })
+    if (pg.errores.length) s.fallas.push(...pg.errores)
+    await pg.browserContext().close().catch(() => {})
+    return s
+  },
   // Documentos de las fuentes: clip en la tarjeta, arrastrar el archivo fuera/dentro y abrirlo en otra ventana.
   async documentos(b) {
     const s = suite('Documentos: clip, arrastrar y otra ventana'), pg = await pagina(b)

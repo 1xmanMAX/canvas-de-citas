@@ -38,7 +38,7 @@ const ok = m => console.log(m)
 const TIPOS_FUENTE = ['articulo_cientifico', 'libro', 'capitulo_libro', 'normativa_tecnica', 'otro']
 const ESTADOS_USO = ['usando', 'revisado_no_usado', 'no_revisado']
 const ESTADOS_VERIF = ['verificado', 'dudoso', 'no_verificado']
-const ESTILOS = ['adhesiva', 'rayada', 'tarjeta'], LETRAS = ['sans', 'serif', 'mono', 'mano']
+const ESTILOS = ['adhesiva', 'rayada', 'tarjeta'], LETRAS = ['sans', 'serif', 'mono', 'mano', 'libro', 'moderna', 'elegante', 'redonda', 'plumon', 'escolar', 'antigua', 'codigo', 'lapicero']
 const COLORES = ['amarillo', 'rosa', 'verde', 'celeste', 'naranja', 'lila']
 const enLista = (v, l, campo) => { if (v != null && v !== '' && !l.includes(v)) fallar(`${campo} "${v}" no válido. Usa: ${l.join(', ')}`) }
 

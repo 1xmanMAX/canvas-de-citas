@@ -157,7 +157,7 @@ que la app no lo restaure. Lo de abajo describe el formato por si hay que editar
   al proyecto en \`citas.json\`.
 - **Agregar una nota o una lista de tareas al lienzo:** en el proyecto (o en \`canvas.objetivos.<clave>\`)
   añade a \`canvas.notas\` \`{ "id": "nota_<algo único>", "titulo": "", "texto": "…", "estilo": "adhesiva", "letra": "sans", "color": "amarillo", "creado": "<ISO>", "x": 0, "y": 0 }\`
-  (estilo: adhesiva | rayada | tarjeta; letra: sans | serif | mono | mano) o a \`canvas.listas\`
+  (estilo: adhesiva | rayada | tarjeta; letra: sans | serif | mono | mano | libro | moderna | elegante | redonda | plumon | escolar | antigua | codigo | lapicero; listas, tablas, notas de voz, fotos y agrupadores también aceptan \`letra\`, opcional) o a \`canvas.listas\`
   \`{ "id": "lista_<algo único>", "titulo": "…", "items": [{ "t": "tarea", "hecho": false }], "creado": "<ISO>", "x": 0, "y": 0 }\`.
   Tablas en \`canvas.tablas\`: \`{ "id": "tabla_<algo único>", "titulo": "…", "filas": [["Encabezado", "…"], ["celda", "…"]], "encabezado": true, "creado": "<ISO>", "x": 0, "y": 0 }\`
   (todas las filas con el mismo número de celdas; \`encabezado\`: la primera fila va en negrita). Opcionales:

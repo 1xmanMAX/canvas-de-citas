@@ -8,10 +8,11 @@
   import { S } from '../lib/store.svelte.js'
   import { ancho } from '../lib/texto.js'
   import { COLORES_GRUPO } from '../lib/agrupadores.js'
+  import { fuente } from '../lib/tarjetas.js'
 
   let { g, caja, capa = 'fondo', n = 0, lejos = false, resaltado = false, alTocar, arrastre } = $props()
   const L = getContext('lienzo')
-  const FUENTE = '600 14px "Work Sans", system-ui, sans-serif'
+  const FUENTE = $derived(g.letra ? fuente(g.letra, 14, true) : '600 14px "Work Sans", system-ui, sans-serif')
   const color = $derived(COLORES_GRUPO[g.color] || COLORES_GRUPO.azul)
   const texto = $derived(g.titulo + (n ? `  · ${n}` : ''))
   const wTitulo = $derived((S.tipografias, Math.min(caja.w - 16, ancho(texto, FUENTE) + 28)))
@@ -29,7 +30,7 @@
   <g class="titulo" transform="translate({caja.x + 10} {caja.y + 10})" role="button" tabindex="0" aria-label="Agrupador: {g.titulo}"
     onpointerdown={tocarOArrastrar} onkeydown={e => e.key === 'Enter' && alTocar?.()}>
     <rect width={wTitulo} height={lejos ? 30 : 26} rx="13" />
-    <text x="14" y={lejos ? 20 : 17.5} class:grande={lejos}>{texto}</text>
+    <text x="14" y={lejos ? 20 : 17.5} class:grande={lejos} style={g.letra ? `font:${lejos ? fuente(g.letra, 16, true) : FUENTE}` : null}>{texto}</text>
   </g>
 {/if}
 </g>

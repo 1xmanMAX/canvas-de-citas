@@ -1,12 +1,14 @@
 <script>
   // Crear o editar un agrupador: nombre, color y qué elementos del lienzo van dentro.
   import Modal from './Modal.svelte'
+  import SelectorLetra from './SelectorLetra.svelte'
   import { autocompletar } from '../lib/autocompletar.js'
   import { sugerir } from '../lib/buscador.svelte.js'
   import { COLORES_GRUPO } from '../lib/agrupadores.js'
 
   /** `elementos`: [{ id, nombre, tipo }]; `dentro`: ids que ya están en el recuadro. */
-  let { nuevo = false, titulo = '', color = 'azul', elementos = [], dentro = [], onguardar, oneliminar, onacomodar, onclose } = $props()
+  let { nuevo = false, titulo = '', color = 'azul', letra = undefined, elementos = [], dentro = [], onguardar, oneliminar, onacomodar, onclose } = $props()
+  let letraElegida = $state(letra)
 
   let nombre = $state(titulo)
   let tinta = $state(color)
@@ -22,7 +24,7 @@
     s.has(id) ? s.delete(id) : s.add(id)
     marcados = s
   }
-  const guardar = () => onguardar({ titulo: nombre, color: tinta, ids: [...marcados] })
+  const guardar = () => onguardar({ titulo: nombre, color: tinta, letra: letraElegida, ids: [...marcados] })
 </script>
 
 <Modal titulo={nuevo ? 'Nuevo agrupador' : 'Agrupador'} {onclose} ancho={520}>
@@ -33,6 +35,7 @@
       <button class="color" role="radio" aria-checked={tinta === k} aria-label={k} style="--c:{v}" onclick={() => (tinta = k)}></button>
     {/each}
   </div>
+  <SelectorLetra bind:valor={letraElegida} original />
   <div class="elegir">
     <div class="fila entre">
       <span class="rotulo">Elementos dentro · {marcados.size}</span>

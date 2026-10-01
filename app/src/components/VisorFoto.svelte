@@ -6,6 +6,7 @@
   import { onMount, untrack } from 'svelte'
   import Icono from './Icono.svelte'
   import CampoEtiquetas from './CampoEtiquetas.svelte'
+  import SelectorLetra from './SelectorLetra.svelte'
   import { autocompletar } from '../lib/autocompletar.js'
   import { sugerir } from '../lib/buscador.svelte.js'
   import { TINTAS, RESALTADORES, colorTrazo, esResaltado } from '../lib/tarjetas.js'
@@ -274,6 +275,7 @@
             <textarea rows="5" bind:value={o.texto} use:autocompletar={{ sugerir }} placeholder="Todo lo que quieras anotar sobre esta foto"></textarea></label>
           <label class="campo"><span>Anotación a mano (se ve en rojo bajo la foto)</span>
             <input type="text" bind:value={o.anotacion} use:autocompletar={{ sugerir }} class="mano" placeholder="¿coincide con Villarreal?" /></label>
+          <SelectorLetra bind:valor={o.letra} original />
           <CampoEtiquetas bind:valor={o.etiquetas} />
           {#if o.origen && onvinculo}
             <button class="btn vinculo-doc" onclick={onvinculo}>

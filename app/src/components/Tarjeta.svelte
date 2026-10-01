@@ -67,7 +67,7 @@
 
   {:else if lista === 'listas'}
     <rect width={d.w} height={d.h} rx="10" class="l-caja" />
-    {#each d.titulo as l, i}<text x="14" y={30 + i * 19} class="l-titulo">{l}</text>{/each}
+    {#each d.titulo as l, i}<text x="14" y={d.tituloY[i]} class="l-titulo" style={o.letra ? `font:${d.fT}` : null}>{l}</text>{/each}
     <text x={d.w - 12} y="28" text-anchor="end" class="l-avance">{(o.items || []).filter(x => x.hecho).length}/{(o.items || []).length}</text>
     {#each d.items as it, i}
       <g class="casilla" role="checkbox" aria-checked={!!it.hecho} tabindex="0" aria-label={it.t}
@@ -76,16 +76,16 @@
         <rect x="14" y={it.y + 1} width="13" height="13" rx="3" class="c-caja" class:hecho={it.hecho} />
         {#if it.hecho}<path d="M16.5 {it.y + 7.5}l3 3 5-6" class="c-check" />{/if}
       </g>
-      {#each it.lineas as l, j}<text x="36" y={it.y + 12 + j * 17} class="l-item" class:hecho={it.hecho}>{l}</text>{/each}
+      {#each it.lineas as l, j}<text x="36" y={it.y + d.baseI + j * d.lhI} class="l-item" class:hecho={it.hecho} style={o.letra ? `font:${d.fI}` : null}>{l}</text>{/each}
     {/each}
     {#if o.creado}<text x={d.w - 12} y={d.fechaY} text-anchor="end" class="fecha">{fechaCorta(o.creado)}</text>{/if}
 
   {:else if lista === 'tablas'}
     <rect width={d.w} height={d.h} rx="8" class="l-caja" />
-    {#each d.titulo as l, i}<text x="12" y={28 + i * 19} class="l-titulo">{l}</text>{/each}
+    {#each d.titulo as l, i}<text x="12" y={28 + i * 19} class="l-titulo" style={o.letra ? `font:${d.fTit}` : null}>{l}</text>{/each}
     {#each d.celdas as c}
       <rect x={c.x} y={c.y} width={c.w} height={c.h} class="t-celda-caja" class:cab={c.cab} style={c.fondo ? `fill:${c.fondo}` : ''} />
-      {#each c.lineas as l, k}<text x={c.x + 8} y={c.y + 17 + k * 15} class="t-celda" class:cab={c.cab}>{l}</text>{/each}
+      {#each c.lineas as l, k}<text x={c.x + 8} y={c.y + d.base + k * d.lh} class="t-celda" class:cab={c.cab} style={o.letra ? `font:${c.cab ? d.fCab : d.fC}` : null}>{l}</text>{/each}
     {/each}
     <rect x={d.x0} y={d.ty} width={d.ancho} height={d.alto} rx="3" class="t-borde" />
     {#if d.mas}<text x={d.x0} y={d.masY} class="fecha">+{d.mas} filas más</text>{/if}
@@ -103,7 +103,7 @@
       {@const h = 3 + v * 34}
       <rect x={64 + i * ((d.w - 80) / o.onda.length)} y={62 - h / 2} width="2" height={h} rx="1" class="a-barra" class:suena />
     {/each}
-    {#each d.lineas as l, i}<text x="16" y={d.y0 + i * 16} class="a-texto" class:vacia={!o.transcripcion}>{l}</text>{/each}
+    {#each d.lineas as l, i}<text x="16" y={d.y0 + i * d.lh} class="a-texto" class:vacia={!o.transcripcion} style={o.letra ? `font:${d.fA}` : null}>{l}</text>{/each}
     {#if o.creado}<text x="16" y={d.fechaY} class="a-fecha">{fechaCorta(o.creado)}</text>{/if}
 
   {:else}
@@ -121,8 +121,8 @@
         {/each}
       </svg>
     {/if}
-    {#each d.titulo as l, i}<text x="8" y={d.tituloY[i]} class="f-titulo">{l}</text>{/each}
-    {#each d.texto as l, i}<text x="8" y={d.textoY[i]} class="f-texto">{l}</text>{/each}
+    {#each d.titulo as l, i}<text x="8" y={d.tituloY[i]} class="f-titulo" style={o.letra ? `font:${d.fT}` : null}>{l}</text>{/each}
+    {#each d.texto as l, i}<text x="8" y={d.textoY[i]} class="f-texto" style={o.letra ? `font:${d.fX}` : null}>{l}</text>{/each}
     {#each d.anotacion as l, i}<text x="8" y={d.anotacionY[i]} class="f-mano">{l}</text>{/each}
     {#if redimensionar}
       <rect x={d.w - 18} y={d.h - 18} width="20" height="20" rx="4" class="esquina" role="button" tabindex="-1" aria-label="Cambiar tamaño de la foto"

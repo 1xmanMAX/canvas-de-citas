@@ -4,7 +4,7 @@
 const NODO_W = 150, HUB_W = 420
 
 const lineas = (t, w, px) => String(t || '').split('\n').reduce((n, par) => n + Math.max(1, Math.ceil((par.length * px) / w)), 0)
-const ANCHO_LETRA = { sans: 6.4, serif: 6.8, mono: 7.6, mano: 7.2 }
+const ANCHO_LETRA = { sans: 6.4, serif: 6.8, mono: 7.6, mano: 7.2, libro: 6.9, moderna: 6.9, elegante: 6.8, redonda: 6.6, plumon: 7.6, escolar: 6.8, antigua: 7.7, codigo: 7.4, lapicero: 7.2 }
 const LH = { sans: 18.75, serif: 19.5, mono: 19.5, mano: 22 }
 const PAPEL_W = { adhesiva: 168, rayada: 210, tarjeta: 190 }
 
@@ -12,8 +12,8 @@ const PAPEL_W = { adhesiva: 168, rayada: 210, tarjeta: 190 }
 export function tamano(lista, o) {
   if (lista === 'notas') {
     const w = PAPEL_W[o.estilo] || 168, letra = o.letra || 'sans'
-    const n = Math.min(14, lineas(o.texto || 'Nota vacía', w - 32, ANCHO_LETRA[letra]))
-    return { w, h: Math.round(26 + (o.titulo ? 28 : 0) + n * LH[letra] + (o.creado ? 14 : 0)) }
+    const n = Math.min(14, lineas(o.texto || 'Nota vacía', w - 32, ANCHO_LETRA[letra] || 7))
+    return { w, h: Math.round(26 + (o.titulo ? 28 : 0) + n * (LH[letra] || 20) + (o.creado ? 14 : 0)) }
   }
   if (lista === 'listas') {
     const items = (o.items || []).slice(0, 30).reduce((s, it) => s + Math.min(3, lineas(it.t, 170, 6.4)) * 17 + 7, 0)
