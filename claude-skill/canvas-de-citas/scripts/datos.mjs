@@ -72,7 +72,7 @@ export function asegurarProyecto(p) {
   const c = (p.canvas ||= {})
   c.modo ||= 'radial'
   c.posiciones ||= {}
-  for (const l of ['notas', 'fotos', 'listas', 'audios', 'conexiones']) c[l] ||= []
+  for (const l of ['notas', 'fotos', 'listas', 'tablas', 'audios', 'conexiones']) c[l] ||= []
   c.objetivos ||= {}
   return p
 }
@@ -101,7 +101,7 @@ export const idLocal = prefijo => `${prefijo}_${Date.now().toString(36)}${Math.r
 export const ahoraISO = () => new Date().toISOString()
 
 // --- Búsqueda de cualquier elemento por id ---
-export const LISTAS_TARJETA = ['notas', 'listas', 'audios', 'fotos']
+export const LISTAS_TARJETA = ['notas', 'listas', 'tablas', 'audios', 'fotos']
 
 /**
  * Lienzo donde vive una tarjeta/conexión: p.canvas, p.canvas.objetivos[clave] o el lienzo de lectura
@@ -156,6 +156,6 @@ export function subLienzo(p, clave) {
   if (!clave) return p.canvas
   if (!clavesObjetivo(p).includes(clave)) throw new Error(`Objetivo "${clave}" no existe. Válidos: ${clavesObjetivo(p).join(', ') || '(ninguno)'}`)
   const o = (p.canvas.objetivos[clave] ||= {})
-  for (const l of ['indicadores', 'fuentes', 'notas', 'listas', 'audios', 'fotos', 'conexiones']) o[l] ||= []
+  for (const l of ['indicadores', 'fuentes', 'notas', 'listas', 'tablas', 'audios', 'fotos', 'conexiones']) o[l] ||= []
   return o
 }

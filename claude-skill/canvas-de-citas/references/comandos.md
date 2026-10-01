@@ -39,6 +39,7 @@ Campos de fuente: `tipo_fuente` (articulo_cientifico, libro, capitulo_libro, nor
 |---|---|
 | `nota --texto "…" [--titulo] [--estilo adhesiva|rayada|tarjeta] [--letra sans|serif|mono|mano] [--color amarillo|rosa|verde|celeste|naranja|lila]` | Nota |
 | `lista --titulo "…" --tareas "a|b|c"` | Lista de tareas |
+| `tabla --titulo "…" --texto "<tabla en Markdown o TSV>"` · `--archivo tabla.md` · `--encabezado no` | Tabla (filas y columnas) |
 | `tarea <lista> --agregar "d|e" · --marcar 2 · --desmarcar 2 · --quitar 3 · --editar 1 --texto "…"` | Modifica una lista |
 | `imagen <ruta.png/jpg/webp/gif/svg> [--titulo] [--texto] [--anotacion]` | Imagen (se reduce como en la app) |
 | `grafico <tipo> --datos '{…}' --titulo "…" [--subtitulo] [--fuente "INEI (2023)"] [--unidad "%"] [--eje-x] [--eje-y] [--valores] [--coma] [--decimales 1] [--guardar f.svg] [--solo-archivo]` | Gráfico SVG como tarjeta (el SVG temporal se borra salvo con `--guardar`) |

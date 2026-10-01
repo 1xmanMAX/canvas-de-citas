@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Canvas de Citas desde Claude Code: leer, agregar, modificar y borrar todo lo de la app
-// (proyectos, objetivos, fuentes, citas, documentos, notas, listas, imágenes, gráficos, conexiones).
+// (proyectos, objetivos, fuentes, citas, documentos, notas, listas, tablas, imágenes, gráficos, conexiones).
 // Uso: node canvas.mjs <comando> [argumentos] [--opciones]   ·   node canvas.mjs ayuda
 import fs from 'node:fs'
 import path from 'node:path'
@@ -13,6 +13,7 @@ import { cargarImagen, extraerDataURL } from './imagen.mjs'
 import { grafico } from './grafico.mjs'
 import { aMarkdown } from './convertir.mjs'
 import { indexar as indexarEtiquetas, parsearConsulta, coincideConsulta } from './etiquetas.mjs'
+import { tablaDelPortapapeles } from './tablas.mjs'
 
 // --- Argumentos ---
 const [cmd = 'ayuda', ...resto] = process.argv.slice(2)
@@ -72,7 +73,7 @@ function colocar(lista, o, ocupadas) {
 
 function nuevaTarjeta(lista, datos) {
   const d = cargar(), { p, clave, c, ocupadas } = destino(d)
-  const pref = { notas: 'nota', listas: 'lista', audios: 'audio', fotos: 'foto' }[lista]
+  const pref = { notas: 'nota', listas: 'lista', tablas: 'tabla', audios: 'audio', fotos: 'foto' }[lista]
   const o = colocar(lista, { id: idLocal(pref), ...datos, creado: ahoraISO(), x: 0, y: 0 }, ocupadas)
   c[lista].push(o)
   guardar(d, ['proyectos'])
@@ -88,6 +89,10 @@ function tarjetasMd(c, s = '') {
   for (const l of c.listas || []) {
     L.push(`${s}- \`${l.id}\` Lista «${una(l.titulo) || 'sin título'}»`)
     ;(l.items || []).forEach((it, i) => L.push(`${s}  ${i + 1}. [${it.hecho ? 'x' : ' '}] ${una(it.t)}`))
+  }
+  for (const t of c.tablas || []) {
+    L.push(`${s}- \`${t.id}\` Tabla «${una(t.titulo) || 'sin título'}» (${t.filas?.length || 0}×${t.filas?.[0]?.length || 0}${t.encabezado ? ', con encabezado' : ''})`)
+    for (const r of t.filas || []) L.push(`${s}  | ${r.map(x => una(x)).join(' | ')} |`)
   }
   for (const a of c.audios || []) L.push(`${s}- \`${a.id}\` Nota de voz ${Math.round(a.duracion || 0)} s: ${a.transcripcion ? `«${una(a.transcripcion)}»` : '(sin transcripción)'}`)
   for (const f of c.fotos || []) {
@@ -196,7 +201,7 @@ C.buscar = () => {
   for (const f of d.fuentes) if (hay([f.titulo, ...(f.autores || []), f.revista_o_editorial, f.doi_o_url, f.tema, f.entrada_bibliografia].join(' '))) ok(`fuente \`${f.id}\` ${refF(f)} — ${corta(f.titulo)}`)
   for (const c of d.citas) if (hay([c.cita_en_texto, c.contexto].join(' '))) ok(`cita \`${c.id}\` (${c.proyecto_id}, ${c.fuente_id}) ${corta(c.cita_en_texto + ' ' + c.contexto)}`)
   for (const p of d.proyectos) for (const { clave, c } of lienzos(p)) for (const l of LISTAS_TARJETA) for (const t of c[l] || [])
-    if (hay([t.titulo, t.texto, t.anotacion, t.transcripcion, ...(t.items || []).map(i => i.t)].join(' '))) ok(`${l.slice(0, -1)} \`${t.id}\` en ${donde(p, clave)}: ${corta(t.titulo || t.texto || t.transcripcion || (t.items || []).map(i => i.t).join('; '))}`)
+    if (hay([t.titulo, t.texto, t.anotacion, t.transcripcion, ...(t.items || []).map(i => i.t), ...(t.filas || []).flat()].join(' '))) ok(`${l.slice(0, -1)} \`${t.id}\` en ${donde(p, clave)}: ${corta(t.titulo || t.texto || t.transcripcion || (t.items || []).map(i => i.t).join('; ') || (t.filas || []).map(r => r.join(' | ')).join('; '))}`)
 }
 
 C.obtener = () => {
@@ -316,6 +321,15 @@ C.nota = () => {
 C.lista = () => {
   const tareas = String(op.tareas || '').split('|').map(t => t.trim()).filter(Boolean)
   nuevaTarjeta('listas', { titulo: op.titulo || 'Lista de tareas', items: tareas.map(t => ({ t, hecho: false })) })
+}
+
+// Tabla: --texto (o --archivo) con una tabla en Markdown o separada por tabulaciones (TSV); HTML con <table> también.
+C.tabla = () => {
+  const texto = op.archivo ? fs.readFileSync(op.archivo, 'utf8') : op.texto || fallar('Falta --texto o --archivo con la tabla (Markdown o TSV)')
+  const t = tablaDelPortapapeles(/<table/i.test(texto) ? texto : '', texto)
+    || fallar('No se reconoce una tabla: usa Markdown (| a | b | con la línea |---|) o texto separado por tabulaciones')
+  const encabezado = op.encabezado === undefined ? true : !/^(no|false|0)$/i.test(String(op.encabezado))
+  nuevaTarjeta('tablas', { titulo: op.titulo || '', filas: t.filas, encabezado: t.encabezado || encabezado })
 }
 
 C.tarea = () => {

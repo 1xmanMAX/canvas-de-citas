@@ -12,6 +12,7 @@
   import LecturaLienzo from '../components/LecturaLienzo.svelte'
   import Tarjeta from '../components/Tarjeta.svelte'
   import Chinchetas from '../components/Chinchetas.svelte'
+  import { tablaDelPortapapeles } from '../lib/tablas.js'
   import EditorTarjeta from '../components/EditorTarjeta.svelte'
   import VisorFoto from '../components/VisorFoto.svelte'
   import Agrupador from '../components/Agrupador.svelte'
@@ -331,7 +332,7 @@
   let tSoltar
 
   /** Crea tarjetas a partir de archivos (imágenes y audios) o texto, a partir del punto (x, y). */
-  async function insertar(archivos, texto, x, y) {
+  async function insertar(archivos, texto, x, y, html = '') {
     let n = 0
     for (const archivo of archivos) {
       try {
@@ -346,7 +347,11 @@
         n++
       } catch { avisar(`No se pudo leer ${archivo.name}`) }
     }
-    if (!archivos.length && texto.trim()) {
+    const tabla = !archivos.length && tablaDelPortapapeles(html, texto)
+    if (tabla) {
+      (cv.tablas ||= []).push(nuevaTarjeta('tablas', x, y, tabla, ocupadas))
+      n++
+    } else if (!archivos.length && texto.trim()) {
       cv.notas.push(nuevaTarjeta('notas', x, y, { texto: texto.trim().slice(0, 4000) }, ocupadas))
       n++
     }
@@ -376,7 +381,7 @@
     if (!imagenes.length && !texto.trim()) return
     e.preventDefault()
     const c = lienzo.centro()
-    insertar(imagenes, texto, c.x, c.y)
+    insertar(imagenes, texto, c.x, c.y, imagenes.length ? '' : dt.getData('text/html'))
   }
 
   /** Datos arrastrados que el lienzo puede recibir (los .json los importa la app). */
@@ -630,6 +635,7 @@
   <div class="barra" role="toolbar" aria-label="Herramientas del lienzo">
     <button class="icono-btn" aria-label="Añadir nota" title="Nota" onclick={() => crear('notas')}><Icono nombre="nota" /></button>
     <button class="icono-btn" aria-label="Añadir lista de tareas" title="Lista de tareas" onclick={() => crear('listas')}><Icono nombre="tareas" /></button>
+    <button class="icono-btn" aria-label="Añadir tabla" title="Tabla (también puedes pegar una de Excel, Word o Markdown con Ctrl+V)" onclick={() => crear('tablas')}><Icono nombre="tabla" /></button>
     <button class="icono-btn" aria-label="Grabar nota de voz" title="Nota de voz" onclick={() => crear('audios')}><Icono nombre="mic" /></button>
     <button class="icono-btn" aria-label="Añadir foto" title="Foto" onclick={() => entradaFoto.click()}><Icono nombre="foto" /></button>
     <input bind:this={entradaFoto} type="file" accept="image/*" hidden onchange={nuevaFoto} />

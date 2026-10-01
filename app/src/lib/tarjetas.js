@@ -1,4 +1,4 @@
-// Tarjetas libres del lienzo (notas, listas de tareas, notas de voz y fotos): estilos, medidas
+// Tarjetas libres del lienzo (notas, listas de tareas, tablas, notas de voz y fotos): estilos, medidas
 // y búsqueda. Las comparten el lienzo del proyecto y los sub-lienzos de cada objetivo.
 import { S } from './store.svelte.js'
 import { F, envolver, limpiarCache, ancho } from './texto.js'
@@ -10,8 +10,8 @@ export { ANCHO_FOTO } from './medidas-foto.js'
 document.fonts?.load('500 18px Caveat').then(() => { limpiarCache(); S.tipografias++ }).catch(() => {})
 
 /** Listas del tablero, en orden de dibujo (las fotos quedan encima). */
-export const LISTAS = ['notas', 'listas', 'audios', 'fotos']
-export const TIPO = { notas: 'nota', listas: 'lista', audios: 'audio', fotos: 'foto' }
+export const LISTAS = ['notas', 'listas', 'tablas', 'audios', 'fotos']
+export const TIPO = { notas: 'nota', listas: 'lista', tablas: 'tabla', audios: 'audio', fotos: 'foto' }
 
 export function asegurarTablero(c) {
   for (const l of LISTAS) c[l] ||= []
@@ -76,6 +76,39 @@ function lista(l) {
   return { w, titulo, items, h: Math.round(y + 10 + (l.creado ? 12 : 0)), fechaY: Math.round(y + 14) }
 }
 
+// Tabla: columnas al ancho de su texto más largo (con tope), celdas de hasta 4 renglones.
+const FTB = { celda: '400 12px "Work Sans", system-ui, sans-serif', cabeza: '600 12px "Work Sans", system-ui, sans-serif' }
+const FILAS_VISTA = 40
+function tabla(t) {
+  const todas = t.filas?.length ? t.filas : [['']]
+  const filas = todas.slice(0, FILAS_VISTA)
+  const cab = !!t.encabezado
+  const fuente = i => (cab && i === 0 ? FTB.cabeza : FTB.celda)
+  const ncol = Math.max(1, ...filas.map(r => r.length))
+  let anchos = Array.from({ length: ncol }, (_, j) => Math.round(Math.min(220, Math.max(48,
+    ...filas.map((r, i) => Math.max(0, ...String(r[j] ?? '').split('\n').map(l => ancho(l, fuente(i))))).map(w => w + 18)))))
+  // La tarjeta abarca la tabla o el título (hasta 360 px); si sobra espacio, las columnas lo reparten.
+  const tituloW = t.titulo?.trim() ? Math.min(360, ancho(t.titulo.trim(), FT.lista)) + 24 : 0
+  const w = Math.round(Math.max(120, tituloW, anchos.reduce((s, x) => s + x, 0) + 20))
+  const sobra = w - 20 - anchos.reduce((s, x) => s + x, 0)
+  if (sobra > 0) anchos = anchos.map((x, j) => x + Math.floor(sobra / ncol) + (j < sobra % ncol ? 1 : 0))
+  const anchoTabla = anchos.reduce((s, x) => s + x, 0)
+  const titulo = t.titulo?.trim() ? envolver(t.titulo.trim(), FT.lista, w - 24, 2) : []
+  const x0 = 10, ty = titulo.length ? 14 + titulo.length * 19 + 4 : 10
+  const cols = anchos.reduce((a, cw) => [...a, a.at(-1) + cw], [x0])
+  let y = ty
+  const lineas = filas.map((r, i) => {
+    const celdas = anchos.map((cw, j) => ({ x: cols[j], lineas: envolver(r[j] ?? '', fuente(i), cw - 16, 4) }))
+    const h = Math.max(1, ...celdas.map(c => c.lineas.length)) * 15 + 10
+    const fila = { y, h, celdas }
+    y += h
+    return fila
+  })
+  const mas = todas.length - filas.length
+  const alto = y - ty
+  return { w, titulo, cab, x0, ty, cols, ancho: anchoTabla, alto, filas: lineas, mas, masY: y + 15, h: Math.round(y + (mas ? 24 : 10)) }
+}
+
 function audio(a) {
   const w = 240
   const lineas = envolver(a.transcripcion?.trim() || 'Sin transcripción', FT.audio, w - 32, 4)
@@ -96,11 +129,11 @@ function foto(f) {
   return { w, iw, ih, titulo, tituloY, texto, textoY, anotacion, anotacionY, h: Math.round(y + 12) }
 }
 
-const MEDIR = { notas: nota, listas: lista, audios: audio, fotos: foto }
+const MEDIR = { notas: nota, listas: lista, tablas: tabla, audios: audio, fotos: foto }
 // Memo por tarjeta: mover una tarjeta no cambia su tamaño, así que no se vuelve a medir el texto.
 const memo = new WeakMap()
 const firma = (lista, o) => [lista, S.tipografias, o.texto, o.titulo, o.estilo, o.letra, o.creado ? 1 : 0, o.transcripcion,
-  o.anotacion, o.proporcion, o.ancho, o.etiquetas?.join('|'), o.items?.map(i => (i.hecho ? '1' : '0') + i.t).join('\u0001')].join('\u0002')
+  o.anotacion, o.proporcion, o.ancho, o.etiquetas?.join('|'), o.items?.map(i => (i.hecho ? '1' : '0') + i.t).join('\u0001'), o.encabezado ? 1 : 0, o.filas?.map(r => r.join('\u0003')).join('\u0001')].join('\u0002')
 // Chips de etiquetas (#tema) y menciones (@Persona) bajo la tarjeta: hasta 3 y un "+n".
 const PALETA_CHIP = ['#E8E1F5', '#DDEBF7', '#DFF2E4', '#FBEBD3', '#F8DEDC', '#E3F1F1', '#F2EED9', '#ECE3DA']
 const FUENTE_CHIP = '600 10.5px "Work Sans", system-ui, sans-serif'
@@ -139,7 +172,7 @@ export function cajas(c) {
 // --- Búsqueda y nombres ---
 const normal = t => String(t ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 export function textoDe(o) {
-  return [o.titulo, o.texto, o.anotacion, o.transcripcion, ...(o.items || []).map(i => i.t)].filter(Boolean).join(' ')
+  return [o.titulo, o.texto, o.anotacion, o.transcripcion, ...(o.items || []).map(i => i.t), ...(o.filas || []).flat()].filter(Boolean).join(' ')
 }
 /** Búsqueda en el lienzo: palabras, #tema y @persona (escritos en el texto o puestos como chips). */
 export const coincideTarjeta = (o, q) => coincideConsulta({ texto: textoDe(o), ...etiquetasDe(textosTarjeta(o), o.etiquetas) }, parsearConsulta(q))
@@ -148,6 +181,7 @@ export function nombreTarjeta(lista, o) {
   const corto = t => { t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length > 48 ? t.slice(0, 47) + '…' : t }
   if (lista === 'notas') return `Nota: ${corto(o.titulo || o.texto) || 'vacía'}`
   if (lista === 'listas') return `Lista: ${corto(o.titulo) || 'de tareas'} (${(o.items || []).filter(i => i.hecho).length}/${(o.items || []).length})`
+  if (lista === 'tablas') return `Tabla: ${corto(o.titulo || o.filas?.[0]?.filter(Boolean).join(', ')) || 'sin título'} (${o.filas?.length || 0}×${o.filas?.[0]?.length || 0})`
   if (lista === 'audios') return `Nota de voz ${duracionTexto(o.duracion)}${o.transcripcion ? ': ' + corto(o.transcripcion) : ''}`
   return `Foto: ${corto(o.titulo || o.anotacion) || 'sin título'}`
 }

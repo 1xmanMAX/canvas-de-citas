@@ -15,6 +15,7 @@
   import { untrack } from 'svelte'
   import { B } from '../lib/buscador.svelte.js'
   import Chinchetas from './Chinchetas.svelte'
+  import { tablaDelPortapapeles } from '../lib/tablas.js'
   import EditorTarjeta from './EditorTarjeta.svelte'
   import VisorFoto from './VisorFoto.svelte'
   import Agrupador from './Agrupador.svelte'
@@ -278,17 +279,20 @@
     modal = null
   }
 
-  /** Ctrl+V con texto mientras el sub-lienzo está abierto: nota nueva en el centro. */
+  /** Ctrl+V con texto mientras el sub-lienzo está abierto: nota (o tabla) nueva en el centro. */
   function pegar(e) {
     if (modal || document.querySelector('dialog[open]')) return
     if (e.target.closest?.('input, textarea, [contenteditable]')) return
     const texto = e.clipboardData?.getData('text/plain') || ''
-    if (!texto.trim()) return
+    const tabla = tablaDelPortapapeles(e.clipboardData?.getData('text/html') || '', texto)
+    if (!tabla && !texto.trim()) return
     e.preventDefault()
     const c = lienzo.centro()
-    asegurar().notas.push(nuevaTarjeta('notas', c.x, c.y, { texto: texto.trim().slice(0, 4000) }, ocupadas))
+    const s = asegurar()
+    if (tabla) (s.tablas ||= []).push(nuevaTarjeta('tablas', c.x, c.y, tabla, ocupadas))
+    else s.notas.push(nuevaTarjeta('notas', c.x, c.y, { texto: texto.trim().slice(0, 4000) }, ocupadas))
     guardar()
-    avisar('Nota agregada')
+    avisar(tabla ? 'Tabla agregada' : 'Nota agregada')
   }
 
   function teclas(e) {
@@ -414,6 +418,7 @@
       <div class="div"></div>
       <button class="icono-btn" aria-label="Añadir nota" title="Nota" onclick={() => crear('notas')}><Icono nombre="nota" /></button>
       <button class="icono-btn" aria-label="Añadir lista de tareas" title="Lista de tareas" onclick={() => crear('listas')}><Icono nombre="tareas" /></button>
+      <button class="icono-btn" aria-label="Añadir tabla" title="Tabla (también puedes pegar una de Excel, Word o Markdown con Ctrl+V)" onclick={() => crear('tablas')}><Icono nombre="tabla" /></button>
       <button class="icono-btn" aria-label="Grabar nota de voz" title="Nota de voz" onclick={() => crear('audios')}><Icono nombre="mic" /></button>
       <button class="icono-btn" aria-label="Añadir foto" title="Foto" onclick={() => entradaFoto.click()}><Icono nombre="foto" /></button>
       <input bind:this={entradaFoto} type="file" accept="image/*" hidden onchange={nuevaFoto} />

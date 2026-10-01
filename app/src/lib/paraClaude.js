@@ -23,13 +23,17 @@ function nombreNodo(id, p, o) {
   return id === 'hub' ? 'el proyecto' : id === 'objetivo' ? 'el objetivo' : `\`${id}\``
 }
 
-/** Notas, listas de tareas, notas de voz (con transcripción) y fotos de un lienzo. */
+/** Notas, listas de tareas, tablas, notas de voz (con transcripción) y fotos de un lienzo. */
 function tarjetas(c, sangria = '') {
   const L = []
   for (const n of c.notas || []) L.push(`${sangria}- Nota${n.titulo ? ` «${una(n.titulo)}»` : ''}: ${una(n.texto)}`)
   for (const l of c.listas || []) {
     L.push(`${sangria}- Lista de tareas «${una(l.titulo) || 'sin título'}» \`${l.id}\``)
     for (const it of l.items || []) L.push(`${sangria}  - [${it.hecho ? 'x' : ' '}] ${una(it.t)}`)
+  }
+  for (const t of c.tablas || []) {
+    L.push(`${sangria}- Tabla «${una(t.titulo) || 'sin título'}» \`${t.id}\` (${t.filas?.length || 0} filas × ${t.filas?.[0]?.length || 0} columnas)`)
+    for (const r of (t.filas || []).slice(0, 30)) L.push(`${sangria}  | ${r.map(x => una(x)).join(' | ')} |`)
   }
   for (const a of c.audios || []) L.push(`${sangria}- Nota de voz (${duracionTexto(a.duracion)}${a.creado ? `, ${a.creado.slice(0, 10)}` : ''}): ${a.transcripcion ? `«${una(a.transcripcion)}»` : '(sin transcripción)'}`)
   for (const f of c.fotos || []) {
@@ -100,7 +104,7 @@ function proyecto(p) {
   if (lecturas.length) {
     L.push('### Lienzos de lectura (uno por fuente)', '')
     for (const [fid, t, l] of lecturas) {
-      const n = ['notas', 'listas', 'audios', 'fotos'].reduce((s, k) => s + (t[k] || []).filter(x => x.en_general).length, 0)
+      const n = ['notas', 'listas', 'tablas', 'audios', 'fotos'].reduce((s, k) => s + (t[k] || []).filter(x => x.en_general).length, 0)
       L.push(`- ${S.fuentePorId.has(fid) ? ref(S.fuentePorId.get(fid)) : `\`${fid}\` (fuente borrada)`}${n ? ` · ${n} clavada${n === 1 ? '' : 's'} en el lienzo general` : ''}`, ...l)
     }
     L.push('')
@@ -155,10 +159,12 @@ que la app no lo restaure. Lo de abajo describe el formato por si hay que editar
   añade a \`canvas.notas\` \`{ "id": "nota_<algo único>", "titulo": "", "texto": "…", "estilo": "adhesiva", "letra": "sans", "color": "amarillo", "creado": "<ISO>", "x": 0, "y": 0 }\`
   (estilo: adhesiva | rayada | tarjeta; letra: sans | serif | mono | mano) o a \`canvas.listas\`
   \`{ "id": "lista_<algo único>", "titulo": "…", "items": [{ "t": "tarea", "hecho": false }], "creado": "<ISO>", "x": 0, "y": 0 }\`.
+  Tablas en \`canvas.tablas\`: \`{ "id": "tabla_<algo único>", "titulo": "…", "filas": [["Encabezado", "…"], ["celda", "…"]], "encabezado": true, "creado": "<ISO>", "x": 0, "y": 0 }\`
+  (todas las filas con el mismo número de celdas; \`encabezado\`: la primera fila va en negrita).
   Las notas de voz (\`canvas.audios\`) y fotos (\`canvas.fotos\`) llevan el archivo incrustado: no las crees, solo
   puedes corregir su \`transcripcion\`, \`titulo\`, \`texto\` o \`anotacion\`.
 - **Lienzo de lectura de cada fuente:** \`canvas.lecturas.<fuente_id>\` es un tablero propio de esa fuente
-  (\`notas\`, \`listas\`, \`audios\`, \`fotos\`, \`conexiones\`, \`agrupadores\`, con la fuente al centro en (0, 0)).
+  (\`notas\`, \`listas\`, \`tablas\`, \`audios\`, \`fotos\`, \`conexiones\`, \`agrupadores\`, con la fuente al centro en (0, 0)).
   Ahí van las citas y recortes tomados del documento. Una tarjeta con \`"en_general": { "x": 0, "y": 0 }\`
   está "clavada": también se ve en el lienzo general del proyecto, en esa posición (sin ese campo, solo en su lectura).
 - **Agrupadores** (recuadros punteados con nombre): \`canvas.agrupadores\` (o en \`canvas.objetivos.<clave>\`)

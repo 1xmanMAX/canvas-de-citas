@@ -140,4 +140,10 @@ tarjeta, con otro lugar); en el general muestra de qué fuente viene y un hilo a
 contador de su lectura que la abre. Al abrir un proyecto, las citas con `origen` que aún estén en el general pasan solas a su
 lectura, clavadas en el mismo lugar (`migrarALecturas`; los sub-lienzos de objetivo no se tocan). Prueba: `npm run test:e2e -- lectura`.
 
+**Tablas** (sep. 2026): tarjeta `canvas.tablas` (también en objetivos y lecturas): `{ id, titulo?, filas: [[…]], encabezado?, x, y }`.
+Se crean con el botón de la barra o pegando (Ctrl+V) una tabla de Excel/Word/Sheets (HTML), Markdown o TSV; en el editor,
+pegar varias celdas dentro de una celda las reparte. Núcleo puro `lib/tablas.js` (copia en `claude-skill/.../scripts/tablas.mjs`:
+mantener iguales; comando `tabla` de la skill). Ojo: no agregues listas vacías nuevas al normalizar el proyecto en
+`store.svelte.js` (rompe la base común de la sincronización); se crean solas al usarlas. Prueba: `npm run test:e2e -- tablas`.
+
 **Siguiente:** probar el APK en el celular de Max (sin compilar APK salvo que lo pida) contra la app de Windows.

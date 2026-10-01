@@ -16,7 +16,7 @@
   $effect(() => { entrada?.focus() })
 
   const GRUPOS = [
-    ['nota', 'Notas', 'nota'], ['lista', 'Listas de tareas', 'tareas'], ['audio', 'Notas de voz', 'mic'], ['foto', 'Fotos', 'foto'],
+    ['nota', 'Notas', 'nota'], ['lista', 'Listas de tareas', 'tareas'], ['tabla', 'Tablas', 'tabla'], ['audio', 'Notas de voz', 'mic'], ['foto', 'Fotos', 'foto'],
     ['agrupador', 'Agrupadores', 'agrupar'], ['objetivo', 'Objetivos', 'objetivo'], ['fuente', 'Fuentes', 'libro'], ['cita', 'Citas', 'enlace']
   ]
   const PALETA = ['#E8E1F5', '#DDEBF7', '#DFF2E4', '#FBEBD3', '#F8DEDC', '#E3F1F1', '#F2EED9', '#ECE3DA']
@@ -62,7 +62,7 @@
 
     {#if pestana === 'resultados'}
       {#if vacia}
-        <p class="suave nota">Escribe para buscar en notas, listas, notas de voz, fotos, agrupadores, objetivos, fuentes y citas de todos tus proyectos. Ejemplo: <code>#retrabajo @Villarreal costo</code>.</p>
+        <p class="suave nota">Escribe para buscar en notas, listas, tablas, notas de voz, fotos, agrupadores, objetivos, fuentes y citas de todos tus proyectos. Ejemplo: <code>#retrabajo @Villarreal costo</code>.</p>
       {:else if !resultados.length}
         <p class="suave nota">Nada coincide con “{B.q}”.</p>
       {:else}

@@ -1098,6 +1098,94 @@ const SUITES = {
 
   // Grupo de sincronización: un "celular" (Android simulado) y una "laptop" editan a la vez y
   // todos (con la PC) terminan con la misma versión, enviando solo lo que cambió.
+  // Tablas: crearlas en el lienzo, pegarlas del portapapeles (Excel/Word/Markdown) y buscar en ellas.
+  async tablas(b) {
+    const s = suite('Tablas'), pg = await pagina(b)
+    await conEjemplo(pg)
+    await pg.evaluate(() => (location.hash = '#/p/proyecto_001')); await esperar(900)
+    const pegarEnLienzo = (html, texto) => pg.evaluate((html, texto) => {
+      const dt = new DataTransfer()
+      if (html) dt.setData('text/html', html)
+      dt.setData('text/plain', texto)
+      document.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
+    }, html, texto)
+    const tablas = async () => (await lienzoGuardado(pg)).tablas || []
+    await s.paso('crear una tabla desde la barra, escribir, agregar fila y guardar', async () => {
+      await pg.click('button[aria-label="Añadir tabla"]')
+      await pg.waitForSelector('dialog[open] .tabla-ed textarea', { timeout: 3000 })
+      await pg.type('dialog[open] input[type=text]', 'Normas')
+      const celdas = await pg.$$('dialog[open] .tabla-ed textarea')
+      if (celdas.length !== 9) throw new Error('no empieza con 3×3: ' + celdas.length)
+      await celdas[0].type('Norma'); await celdas[1].type('País')
+      await celdas[3].type('E.030'); await celdas[4].type('Perú')
+      await clicTexto(pg, 'Fila', '//dialog[@open]')
+      if ((await pg.$$('dialog[open] .tabla-ed tbody tr')).length !== 4) throw new Error('no agregó la fila')
+      await clicTexto(pg, 'Guardar', '//dialog[@open]'); await esperar(600)
+      const t = (await tablas()).at(-1)
+      if (!t || t.titulo !== 'Normas') throw new Error('no se guardó: ' + JSON.stringify(t))
+      // Al guardar se quitan las filas y columnas vacías del final.
+      if (JSON.stringify(t.filas) !== JSON.stringify([['Norma', 'País'], ['E.030', 'Perú']]) || t.encabezado !== true) throw new Error('celdas: ' + JSON.stringify(t))
+      const txt = await pg.$eval(`g.tarjeta.tablas`, g => g.textContent)
+      if (!txt.includes('E.030') || !txt.includes('Normas')) throw new Error('no se dibuja: ' + txt)
+    })
+    await s.paso('pegar en el lienzo una tabla de Excel (HTML) crea una tarjeta de tabla', async () => {
+      const antes = (await tablas()).length
+      await pegarEnLienzo('<table><tr><th>Autor</th><th>Año</th></tr><tr><td>Priestley</td><td>2007</td></tr><tr><td>Chopra</td><td>2012</td></tr></table>', 'Autor\tAño\nPriestley\t2007\nChopra\t2012')
+      await esperar(700)
+      const l = await tablas()
+      if (l.length !== antes + 1) throw new Error('no creó la tabla')
+      if (l.at(-1).filas.length !== 3 || !l.at(-1).encabezado) throw new Error(JSON.stringify(l.at(-1)))
+    })
+    await s.paso('pegar una tabla en Markdown también; texto normal sigue siendo nota', async () => {
+      const antes = (await tablas()).length, notas = (await lienzoGuardado(pg)).notas.length
+      await pegarEnLienzo('', '| Deriva | Límite |\n|---|---|\n| Concreto | 0.007 |'); await esperar(600)
+      await pegarEnLienzo('', 'Una idea suelta'); await esperar(600)
+      const c = await lienzoGuardado(pg)
+      if (c.tablas.length !== antes + 1 || c.tablas.at(-1).filas[1][1] !== '0.007') throw new Error('markdown: ' + JSON.stringify(c.tablas.at(-1)))
+      if (c.notas.length !== notas + 1) throw new Error('el texto no se volvió nota')
+    })
+    await s.paso('pegar varias celdas dentro de una celda las reparte y agranda la tabla', async () => {
+      await pg.click('.zoom .porc'); await esperar(500) // encuadra todo
+      { const g = await (await pg.$$('g.tarjeta.tablas')).at(0).boundingBox(); await pg.screenshot({ path: path.join(SALIDA, 'tablas-lienzo.png') }) }
+      const r = await (await pg.$$('g.tarjeta.tablas')).at(-1).boundingBox()
+      await pg.mouse.click(r.x + r.width / 2, r.y + 6)
+      const abierto = await pg.waitForSelector('dialog[open] .tabla-ed textarea', { timeout: 3000 }).catch(() => null)
+      if (!abierto) throw new Error('no abrió el editor al tocar la tabla')
+      await pg.evaluate(() => {
+        const celdas = document.querySelectorAll('dialog[open] .tabla-ed textarea')
+        const dt = new DataTransfer(); dt.setData('text/plain', 'a\tb\tc\nd\te\tf')
+        celdas[3].dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
+      })
+      await esperar(300)
+      await pg.screenshot({ path: path.join(SALIDA, 'tablas-editor.png') })
+      const filas = await pg.$$eval('dialog[open] .tabla-ed tbody tr', trs => trs.map(tr => [...tr.querySelectorAll('textarea')].map(t => t.value)))
+      if (JSON.stringify(filas) !== JSON.stringify([['Deriva', 'Límite', '', ''], ['Concreto', 'a', 'b', 'c'], ['', 'd', 'e', 'f']]))
+        throw new Error('celdas: ' + JSON.stringify(filas))
+      await pg.keyboard.press('Escape'); await esperar(300)
+    })
+    await s.paso('el buscador general encuentra el texto de una celda', async () => {
+      await pg.click('button[aria-label="Buscar en todo"]')
+      await pg.waitForSelector('dialog[open] .buscador input', { timeout: 3000 })
+      await pg.type('dialog[open] .buscador input', 'Priestley 2007')
+      await pg.waitForSelector('dialog[open] .resultado', { timeout: 3000 })
+      const txt = await pg.$eval('dialog[open] .buscador', d => d.textContent)
+      if (!txt.includes('Tablas')) throw new Error('no aparece en Tablas: ' + txt.slice(0, 300))
+      await pg.click('dialog[open] button[aria-label="Cerrar"]').catch(() => pg.keyboard.press('Escape')); await esperar(300)
+      if (await pg.$('dialog[open]')) await pg.keyboard.press('Escape')
+      await pg.screenshot({ path: path.join(SALIDA, 'tablas.png') })
+    })
+    await s.paso('también en el lienzo de lectura y en el de un objetivo', async () => {
+      await pg.evaluate(() => (location.hash = '#/p/proyecto_001/o/oe1')); await esperar(900)
+      await pg.screenshot({ path: path.join(SALIDA, 'tablas-objetivo.png') })
+      await pegarEnLienzo('', 'x\ty\n1\t2'); await esperar(600)
+      const c = await lienzoGuardado(pg)
+      if (!c.objetivos?.oe1?.tablas?.length) throw new Error('no se pegó en el objetivo')
+      if (!(await pg.$('button[aria-label="Añadir tabla"]'))) throw new Error('falta el botón en el objetivo')
+    })
+    if (pg.errores.length) s.fallas.push(...pg.errores)
+    await pg.browserContext().close().catch(() => {})
+    return s
+  },
   // Celular (Android simulado): en ninguna vista la barra superior tapa o corta sus botones.
   async cabecera(b) {
     const s = suite('Barra superior en el celular'), pg = await pagina(b)

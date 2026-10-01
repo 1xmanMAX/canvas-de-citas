@@ -1,5 +1,5 @@
 <script>
-  // Tarjeta libre del lienzo (nota, lista de tareas, nota de voz o foto) dibujada en SVG.
+  // Tarjeta libre del lienzo (nota, lista de tareas, tabla, nota de voz o foto) dibujada en SVG.
   import { getContext } from 'svelte'
   import Arrastrable from './Arrastrable.svelte'
   import { medir, COLORES, TINTAS, colorTrazo, esResaltado, fechaCorta, duracionTexto } from '../lib/tarjetas.js'
@@ -18,7 +18,7 @@
   const suena = $derived(sonando.id === o.id)
   const parar = e => e.stopPropagation()
   const clase = $derived(`tarjeta ${lista} ${origen ? 'origen' : ''} ${atenuado ? 'atenuada' : ''}`)
-  const etiqueta = { notas: 'Nota', listas: 'Lista de tareas', audios: 'Nota de voz', fotos: 'Foto' }
+  const etiqueta = { notas: 'Nota', listas: 'Lista de tareas', tablas: 'Tabla', audios: 'Nota de voz', fotos: 'Foto' }
   const teclaCasilla = (e, i) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); alternar?.(i) } }
   const tocarPlay = () => o.audio && reproducir(o.id, o.audio)
 
@@ -35,6 +35,10 @@
     if (lista === 'listas') return [
       ...d.titulo.map((t, i) => barra(14, 30 + i * 19 - 11, t, d.w - 60, 8, 11)),
       ...d.items.flatMap(it => [{ x: 14, y: it.y + 1, w: 13, h: 13 }, ...it.lineas.map((t, j) => barra(36, it.y + 3 + j * 17, t, d.w - 50, 6.4, 9))])
+    ]
+    if (lista === 'tablas') return [
+      ...d.titulo.map((t, i) => barra(12, 28 + i * 19 - 11, t, d.w - 24, 8, 11)),
+      ...d.filas.flatMap(f => f.celdas.map((c, j) => barra(c.x + 8, f.y + 6, c.lineas[0] || '', d.cols[j + 1] - c.x - 16, 6.4, 9)))
     ]
     if (lista === 'audios') return [{ x: 16, y: 50, w: d.w - 32, h: 24 }, ...d.lineas.map((t, i) => barra(16, d.y0 + i * 16 - 9, t, d.w - 32, 6, 9))]
     return [...d.titulo.map((t, i) => barra(8, d.tituloY[i] - 9, t, d.iw, 6.8, 9)), ...d.texto.map((t, i) => barra(8, d.textoY[i] - 8, t, d.iw, 6, 8)), ...d.anotacion.map((t, i) => barra(8, d.anotacionY[i] - 12, t, d.iw, 7, 12))]
@@ -75,6 +79,20 @@
       {#each it.lineas as l, j}<text x="36" y={it.y + 12 + j * 17} class="l-item" class:hecho={it.hecho}>{l}</text>{/each}
     {/each}
     {#if o.creado}<text x={d.w - 12} y={d.fechaY} text-anchor="end" class="fecha">{fechaCorta(o.creado)}</text>{/if}
+
+  {:else if lista === 'tablas'}
+    <rect width={d.w} height={d.h} rx="8" class="l-caja" />
+    {#each d.titulo as l, i}<text x="12" y={28 + i * 19} class="l-titulo">{l}</text>{/each}
+    {#if d.cab}<rect x={d.x0} y={d.ty} width={d.ancho} height={d.filas[0].h} class="t-cab" />{/if}
+    {#each d.filas as f, i}
+      {#if i > 0}<line x1={d.x0} x2={d.x0 + d.ancho} y1={f.y} y2={f.y} class="t-linea" />{/if}
+      {#each f.celdas as c}
+        {#each c.lineas as l, k}<text x={c.x + 8} y={f.y + 17 + k * 15} class="t-celda" class:cab={d.cab && i === 0}>{l}</text>{/each}
+      {/each}
+    {/each}
+    {#each d.cols.slice(1, -1) as x}<line x1={x} x2={x} y1={d.ty} y2={d.ty + d.alto} class="t-linea" />{/each}
+    <rect x={d.x0} y={d.ty} width={d.ancho} height={d.alto} rx="3" class="t-borde" />
+    {#if d.mas}<text x={d.x0} y={d.masY} class="fecha">+{d.mas} filas más</text>{/if}
 
   {:else if lista === 'audios'}
     <rect width={d.w} height={d.h} rx="8" class="a-caja" />
@@ -215,6 +233,11 @@
   .c-caja { fill: var(--paper); stroke: var(--ink-soft); stroke-width: 1.3; }
   .c-caja.hecho { fill: var(--using); stroke: var(--using); }
   .c-check { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+  .t-cab { fill: #EFEADF; }
+  .t-linea { stroke: var(--line); stroke-width: 1; }
+  .t-borde { fill: none; stroke: #CFC8B8; stroke-width: 1; }
+  .t-celda { font: 400 12px var(--sans); fill: var(--ink); }
+  .t-celda.cab { font-weight: 600; }
   .a-caja { fill: #2F4FB5; }
   .a-rotulo { font: 600 10.5px var(--sans); letter-spacing: .08em; fill: rgba(255, 255, 255, .85); }
   .a-play { cursor: pointer; }

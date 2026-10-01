@@ -12,7 +12,7 @@
   let tinta = $state(color)
   let marcados = $state(new Set(dentro))
   let filtro = $state('')
-  const TIPOS = { fuente: 'Fuentes', nota: 'Notas', lista: 'Listas', audio: 'Notas de voz', foto: 'Fotos', indicador: 'Indicadores' }
+  const TIPOS = { fuente: 'Fuentes', nota: 'Notas', lista: 'Listas', tabla: 'Tablas', audio: 'Notas de voz', foto: 'Fotos', indicador: 'Indicadores' }
   const norm = t => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
   const visibles = $derived(filtro.trim() ? elementos.filter(e => norm(e.nombre).includes(norm(filtro.trim()))) : elementos)
   const porTipo = $derived(Object.entries(TIPOS).map(([t, rotulo]) => ({ t, rotulo, els: visibles.filter(e => e.tipo === t) })).filter(x => x.els.length))

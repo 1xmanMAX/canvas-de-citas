@@ -62,8 +62,8 @@ function normalizado(item) {
   return { temas, personas, texto: normalizar(item.texto) + ' ' + temas.join(' ') + ' ' + personas.join(' ') }
 }
 
-const TIPO_LISTA = { notas: 'nota', listas: 'lista', audios: 'audio', fotos: 'foto' }
-export const textosTarjeta = o => [o.titulo, o.texto, o.anotacion, o.transcripcion, ...(o.items || []).map(i => i.t)].filter(Boolean)
+const TIPO_LISTA = { notas: 'nota', listas: 'lista', tablas: 'tabla', audios: 'audio', fotos: 'foto' }
+export const textosTarjeta = o => [o.titulo, o.texto, o.anotacion, o.transcripcion, ...(o.items || []).map(i => i.t), ...(o.filas || []).flat()].filter(Boolean)
 
 function item(tipo, id, pid, clave, titulo, textos, campo) {
   const i = { tipo, id, pid, clave, titulo, texto: textos.join(' '), ...etiquetasDe(textos, campo) }

@@ -1,5 +1,6 @@
 // Operaciones sobre las tarjetas libres de un lienzo `c` (p.canvas o un sub-lienzo de objetivo).
 import { medir, asegurarTablero, idLocal, ahoraISO, TIPO, ANCHO_FOTO } from './tarjetas.js'
+import { tablaVacia } from './tablas.js'
 
 const copia = o => JSON.parse(JSON.stringify(o))
 
@@ -27,6 +28,7 @@ export function nuevaTarjeta(lista, x, y, datos = {}, ocupadas = null) {
   const base = {
     notas: { titulo: '', texto: '', estilo: 'adhesiva', letra: 'sans', color: 'amarillo' },
     listas: { titulo: '', items: [] },
+    tablas: { titulo: '', filas: tablaVacia(), encabezado: true },
     audios: { audio: '', duracion: 0, onda: [], transcripcion: '' },
     fotos: { titulo: '', texto: '', anotacion: '', imagen: '', proporcion: 4 / 3, trazos: [] }
   }[lista]

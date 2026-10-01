@@ -109,7 +109,7 @@ function reescribirLienzo(c, F) {
     for (const g of t.agrupadores || []) g.miembros = (g.miembros || []).map(F)
     for (const f of t.fuentes || []) f.id = F(f.id)
     // Notas y fotos creadas desde el visor recuerdan de qué documento salieron.
-    for (const l of ['notas', 'fotos', 'listas', 'audios']) for (const x of t[l] || []) if (x.origen?.fuente) x.origen.fuente = F(x.origen.fuente)
+    for (const l of ['notas', 'fotos', 'listas', 'tablas', 'audios']) for (const x of t[l] || []) if (x.origen?.fuente) x.origen.fuente = F(x.origen.fuente)
   }
   tablero(c)
   for (const o of Object.values(c.objetivos || {})) tablero(o)

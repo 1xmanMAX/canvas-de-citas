@@ -10,7 +10,7 @@ const medir = () => ({ w: 200, h: 100 })
 test('asegurarLectura crea el tablero una sola vez, con todas sus listas', () => {
   const cv = {}
   const t = asegurarLectura(cv, 'fuente_001')
-  assert.deepEqual(Object.keys(t).sort(), ['agrupadores', 'audios', 'conexiones', 'fotos', 'listas', 'notas'])
+  assert.deepEqual(Object.keys(t).sort(), ['agrupadores', 'audios', 'conexiones', 'fotos', 'listas', 'notas', 'tablas'])
   t.notas.push({ id: 'n1' })
   assert.equal(asegurarLectura(cv, 'fuente_001').notas.length, 1)
 })

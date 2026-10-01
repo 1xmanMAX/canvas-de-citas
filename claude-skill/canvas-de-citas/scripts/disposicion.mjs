@@ -19,6 +19,12 @@ export function tamano(lista, o) {
     const items = (o.items || []).slice(0, 30).reduce((s, it) => s + Math.min(3, lineas(it.t, 170, 6.4)) * 17 + 7, 0)
     return { w: 220, h: Math.round(41 + items + 22) }
   }
+  if (lista === 'tablas') {
+    const filas = (o.filas || [['']]).slice(0, 40), n = Math.max(1, ...filas.map(r => r.length))
+    const cols = Array.from({ length: n }, (_, j) => Math.min(220, Math.max(48, ...filas.map(r => String(r[j] || '').length * 6.6 + 18))))
+    const w = Math.max(120, cols.reduce((s, x) => s + x, 0) + 20)
+    return { w: Math.round(w), h: Math.round((o.titulo ? 42 : 10) + filas.length * 25 + 10) }
+  }
   if (lista === 'audios') return { w: 240, h: 104 + (Math.min(4, lineas(o.transcripcion || 'x', 208, 6.2)) - 1) * 16 + 34 }
   const ih = Math.min(240, Math.max(90, 184 / (o.proporcion || 4 / 3)))
   return { w: 200, h: Math.round(8 + ih + 8 + (o.titulo ? 30 : 0) + (o.texto ? 42 : 0) + (o.anotacion ? 63 : 0) + 12) }

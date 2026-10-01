@@ -4,9 +4,9 @@
 // (campo opcional); la tarjeta sigue siendo una sola: se edita igual desde los dos lienzos.
 // Puro (sin navegador): las medidas se reciben como `medir(lista, obj)` → { w, h }.
 
-export const LISTAS = ['notas', 'listas', 'audios', 'fotos']
+export const LISTAS = ['notas', 'listas', 'tablas', 'audios', 'fotos']
 
-export const vacia = () => ({ notas: [], listas: [], audios: [], fotos: [], conexiones: [], agrupadores: [] })
+export const vacia = () => ({ notas: [], listas: [], tablas: [], audios: [], fotos: [], conexiones: [], agrupadores: [] })
 
 /** Tablero de lectura de la fuente, creado la primera vez que se le agrega algo. */
 export function asegurarLectura(cv, fid) {
