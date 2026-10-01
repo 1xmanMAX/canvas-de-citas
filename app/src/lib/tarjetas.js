@@ -4,6 +4,7 @@ import { S } from './store.svelte.js'
 import { F, envolver, limpiarCache, ancho } from './texto.js'
 import { etiquetasDe, colorEtiqueta, textosTarjeta, coincideConsulta, parsearConsulta } from './etiquetas.js'
 import { cajaFoto } from './medidas-foto.js'
+import { mapaFusiones, COLORES_CELDA } from './tablas.js'
 export { ANCHO_FOTO } from './medidas-foto.js'
 
 // La letra manuscrita solo se descarga cuando se usa: al llegar, se vuelve a medir el texto.
@@ -76,17 +77,34 @@ function lista(l) {
   return { w, titulo, items, h: Math.round(y + 10 + (l.creado ? 12 : 0)), fechaY: Math.round(y + 14) }
 }
 
-// Tabla: columnas al ancho de su texto más largo (con tope), celdas de hasta 4 renglones.
+// Tabla: columnas al ancho de su texto más largo (con tope), celdas de hasta 4 renglones (las
+// combinadas, hasta 8), con su color de fondo. Devuelve cada celda visible ya ubicada.
 const FTB = { celda: '400 12px "Work Sans", system-ui, sans-serif', cabeza: '600 12px "Work Sans", system-ui, sans-serif' }
 const FILAS_VISTA = 40
+const anchoTexto = (t, font) => Math.max(0, ...String(t ?? '').split('\n').map(l => ancho(l, font)))
 function tabla(t) {
   const todas = t.filas?.length ? t.filas : [['']]
-  const filas = todas.slice(0, FILAS_VISTA)
+  const nf = Math.min(FILAS_VISTA, todas.length)
   const cab = !!t.encabezado
   const fuente = i => (cab && i === 0 ? FTB.cabeza : FTB.celda)
-  const ncol = Math.max(1, ...filas.map(r => r.length))
-  let anchos = Array.from({ length: ncol }, (_, j) => Math.round(Math.min(220, Math.max(48,
-    ...filas.map((r, i) => Math.max(0, ...String(r[j] ?? '').split('\n').map(l => ancho(l, fuente(i))))).map(w => w + 18)))))
+  const ncol = Math.max(1, ...todas.slice(0, nf).map(r => r.length))
+  const cubre = mapaFusiones(t)
+  // Celdas visibles: las sueltas y la esquina de cada combinada (recortada a lo que se ve).
+  const visibles = []
+  for (let f = 0; f < nf; f++) for (let c = 0; c < ncol; c++) {
+    const u = cubre(f, c)
+    if (u && (u.fila !== f || u.col !== c)) continue
+    visibles.push({ f, c, filas: u ? Math.min(u.filas, nf - f) : 1, cols: u ? Math.min(u.cols, ncol - c) : 1, texto: todas[f]?.[c] ?? '' })
+  }
+  let anchos = Array(ncol).fill(48)
+  for (const v of visibles) if (v.cols === 1) anchos[v.c] = Math.max(anchos[v.c], Math.min(220, anchoTexto(v.texto, fuente(v.f)) + 18))
+  // Una combinada con texto largo ensancha (con tope) las columnas que abarca.
+  for (const v of visibles) if (v.cols > 1) {
+    const tiene = anchos.slice(v.c, v.c + v.cols).reduce((s, x) => s + x, 0)
+    const falta = Math.min(220 * v.cols, anchoTexto(v.texto, fuente(v.f)) + 18) - tiene
+    if (falta > 0) for (let j = 0; j < v.cols; j++) anchos[v.c + j] += Math.ceil(falta / v.cols)
+  }
+  anchos = anchos.map(Math.round)
   // La tarjeta abarca la tabla o el título (hasta 360 px); si sobra espacio, las columnas lo reparten.
   const tituloW = t.titulo?.trim() ? Math.min(360, ancho(t.titulo.trim(), FT.lista)) + 24 : 0
   const w = Math.round(Math.max(120, tituloW, anchos.reduce((s, x) => s + x, 0) + 20))
@@ -96,17 +114,23 @@ function tabla(t) {
   const titulo = t.titulo?.trim() ? envolver(t.titulo.trim(), FT.lista, w - 24, 2) : []
   const x0 = 10, ty = titulo.length ? 14 + titulo.length * 19 + 4 : 10
   const cols = anchos.reduce((a, cw) => [...a, a.at(-1) + cw], [x0])
-  let y = ty
-  const lineas = filas.map((r, i) => {
-    const celdas = anchos.map((cw, j) => ({ x: cols[j], lineas: envolver(r[j] ?? '', fuente(i), cw - 16, 4) }))
-    const h = Math.max(1, ...celdas.map(c => c.lineas.length)) * 15 + 10
-    const fila = { y, h, celdas }
-    y += h
-    return fila
-  })
-  const mas = todas.length - filas.length
-  const alto = y - ty
-  return { w, titulo, cab, x0, ty, cols, ancho: anchoTabla, alto, filas: lineas, mas, masY: y + 15, h: Math.round(y + (mas ? 24 : 10)) }
+  for (const v of visibles) v.lineas = envolver(v.texto, fuente(v.f), cols[v.c + v.cols] - cols[v.c] - 16, v.filas > 1 || v.cols > 1 ? 8 : 4)
+  // Alto de cada fila: el de sus celdas sueltas; si una combinada no cabe, crece su última fila.
+  const altos = Array(nf).fill(25)
+  for (const v of visibles) if (v.filas === 1) altos[v.f] = Math.max(altos[v.f], v.lineas.length * 15 + 10)
+  for (const v of visibles) if (v.filas > 1) {
+    const tiene = altos.slice(v.f, v.f + v.filas).reduce((s, x) => s + x, 0)
+    const falta = v.lineas.length * 15 + 10 - tiene
+    if (falta > 0) altos[v.f + v.filas - 1] += falta
+  }
+  const filasY = altos.reduce((a, h) => [...a, a.at(-1) + h], [ty])
+  const celdas = visibles.map(v => ({
+    x: cols[v.c], y: filasY[v.f], w: cols[v.c + v.cols] - cols[v.c], h: filasY[v.f + v.filas] - filasY[v.f],
+    lineas: v.lineas, cab: cab && v.f === 0, fondo: COLORES_CELDA[t.colores?.[`${v.f},${v.c}`]] || null, f: v.f, c: v.c
+  }))
+  const y = filasY.at(-1)
+  const mas = todas.length - nf
+  return { w, titulo, cab, x0, ty, cols, filasY, ancho: anchoTabla, alto: y - ty, celdas, mas, masY: y + 15, h: Math.round(y + (mas ? 24 : 10)) }
 }
 
 function audio(a) {
@@ -133,7 +157,7 @@ const MEDIR = { notas: nota, listas: lista, tablas: tabla, audios: audio, fotos:
 // Memo por tarjeta: mover una tarjeta no cambia su tamaño, así que no se vuelve a medir el texto.
 const memo = new WeakMap()
 const firma = (lista, o) => [lista, S.tipografias, o.texto, o.titulo, o.estilo, o.letra, o.creado ? 1 : 0, o.transcripcion,
-  o.anotacion, o.proporcion, o.ancho, o.etiquetas?.join('|'), o.items?.map(i => (i.hecho ? '1' : '0') + i.t).join('\u0001'), o.encabezado ? 1 : 0, o.filas?.map(r => r.join('\u0003')).join('\u0001')].join('\u0002')
+  o.anotacion, o.proporcion, o.ancho, o.etiquetas?.join('|'), o.items?.map(i => (i.hecho ? '1' : '0') + i.t).join('\u0001'), o.encabezado ? 1 : 0, o.filas?.map(r => r.join('\u0003')).join('\u0001'), JSON.stringify(o.fusiones || null), JSON.stringify(o.colores || null)].join('\u0002')
 // Chips de etiquetas (#tema) y menciones (@Persona) bajo la tarjeta: hasta 3 y un "+n".
 const PALETA_CHIP = ['#E8E1F5', '#DDEBF7', '#DFF2E4', '#FBEBD3', '#F8DEDC', '#E3F1F1', '#F2EED9', '#ECE3DA']
 const FUENTE_CHIP = '600 10.5px "Work Sans", system-ui, sans-serif'

@@ -91,7 +91,7 @@ function tarjetasMd(c, s = '') {
     ;(l.items || []).forEach((it, i) => L.push(`${s}  ${i + 1}. [${it.hecho ? 'x' : ' '}] ${una(it.t)}`))
   }
   for (const t of c.tablas || []) {
-    L.push(`${s}- \`${t.id}\` Tabla «${una(t.titulo) || 'sin título'}» (${t.filas?.length || 0}×${t.filas?.[0]?.length || 0}${t.encabezado ? ', con encabezado' : ''})`)
+    L.push(`${s}- \`${t.id}\` Tabla «${una(t.titulo) || 'sin título'}» (${t.filas?.length || 0}×${t.filas?.[0]?.length || 0}${t.encabezado ? ', con encabezado' : ''}${t.fusiones?.length ? `, combinadas: ${t.fusiones.map(u => `(${u.fila + 1},${u.col + 1}) ${u.filas}×${u.cols}`).join(' ')}` : ''}${t.colores ? `, colores: ${Object.entries(t.colores).map(([k, v]) => `(${k.split(',').map(n => +n + 1).join(',')}) ${v}`).join(' ')}` : ''})`)
     for (const r of t.filas || []) L.push(`${s}  | ${r.map(x => una(x)).join(' | ')} |`)
   }
   for (const a of c.audios || []) L.push(`${s}- \`${a.id}\` Nota de voz ${Math.round(a.duracion || 0)} s: ${a.transcripcion ? `«${una(a.transcripcion)}»` : '(sin transcripción)'}`)

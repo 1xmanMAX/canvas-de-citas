@@ -5,11 +5,12 @@
   import { medir, COLORES, TINTAS, colorTrazo, esResaltado, fechaCorta, duracionTexto } from '../lib/tarjetas.js'
   import { sonando, reproducir } from '../lib/audio.svelte.js'
 
-  let { lista, o, origen = false, resaltado = false, atenuado = false, alTocar, alternar, alVinculo = null, inicio, mover, fin, redimensionar = null,
+  let { lista, o, origen = false, resaltado = false, atenuado = false, alTocar, alternar, crecer = null, alVinculo = null, inicio, mover, fin, redimensionar = null,
     clavar = null, procedencia = null, pos = null } = $props()
   // clavar: en el lienzo de lectura de una fuente, la chincheta que la muestra también en el general.
   // procedencia: { texto, alTocar } en el general, la fuente de la que viene una tarjeta clavada.
   // pos: lugar donde se dibuja si no es el suyo (la tarjeta clavada, en el general).
+  // crecer('fila' | 'columna'): en una tabla, los "+" que aparecen al acercar el mouse a su borde.
 
   const d = $derived(medir(lista, o))
   const giro = $derived(lista === 'notas' ? (o.estilo === 'rayada' ? 1 : o.estilo === 'tarjeta' ? 0 : -2) : lista === 'fotos' ? 1.5 : 0)
@@ -38,7 +39,7 @@
     ]
     if (lista === 'tablas') return [
       ...d.titulo.map((t, i) => barra(12, 28 + i * 19 - 11, t, d.w - 24, 8, 11)),
-      ...d.filas.flatMap(f => f.celdas.map((c, j) => barra(c.x + 8, f.y + 6, c.lineas[0] || '', d.cols[j + 1] - c.x - 16, 6.4, 9)))
+      ...d.celdas.map(c => barra(c.x + 8, c.y + 8, c.lineas[0] || '', c.w - 16, 6.4, 9))
     ]
     if (lista === 'audios') return [{ x: 16, y: 50, w: d.w - 32, h: 24 }, ...d.lineas.map((t, i) => barra(16, d.y0 + i * 16 - 9, t, d.w - 32, 6, 9))]
     return [...d.titulo.map((t, i) => barra(8, d.tituloY[i] - 9, t, d.iw, 6.8, 9)), ...d.texto.map((t, i) => barra(8, d.textoY[i] - 8, t, d.iw, 6, 8)), ...d.anotacion.map((t, i) => barra(8, d.anotacionY[i] - 12, t, d.iw, 7, 12))]
@@ -83,16 +84,24 @@
   {:else if lista === 'tablas'}
     <rect width={d.w} height={d.h} rx="8" class="l-caja" />
     {#each d.titulo as l, i}<text x="12" y={28 + i * 19} class="l-titulo">{l}</text>{/each}
-    {#if d.cab}<rect x={d.x0} y={d.ty} width={d.ancho} height={d.filas[0].h} class="t-cab" />{/if}
-    {#each d.filas as f, i}
-      {#if i > 0}<line x1={d.x0} x2={d.x0 + d.ancho} y1={f.y} y2={f.y} class="t-linea" />{/if}
-      {#each f.celdas as c}
-        {#each c.lineas as l, k}<text x={c.x + 8} y={f.y + 17 + k * 15} class="t-celda" class:cab={d.cab && i === 0}>{l}</text>{/each}
-      {/each}
+    {#each d.celdas as c}
+      <rect x={c.x} y={c.y} width={c.w} height={c.h} class="t-celda-caja" class:cab={c.cab} style={c.fondo ? `fill:${c.fondo}` : ''} />
+      {#each c.lineas as l, k}<text x={c.x + 8} y={c.y + 17 + k * 15} class="t-celda" class:cab={c.cab}>{l}</text>{/each}
     {/each}
-    {#each d.cols.slice(1, -1) as x}<line x1={x} x2={x} y1={d.ty} y2={d.ty + d.alto} class="t-linea" />{/each}
     <rect x={d.x0} y={d.ty} width={d.ancho} height={d.alto} rx="3" class="t-borde" />
     {#if d.mas}<text x={d.x0} y={d.masY} class="fecha">+{d.mas} filas más</text>{/if}
+    {#if crecer}
+      <g class="t-mas" role="button" tabindex="0" aria-label="Agregar columna" transform="translate({d.w + 4} {d.ty})"
+        onpointerdown={parar} onclick={e => { parar(e); crecer('columna') }} onkeydown={e => e.key === 'Enter' && crecer('columna')}>
+        <title>Agregar columna</title>
+        <rect width="18" height={d.alto} rx="9" /><path d="M9 {d.alto / 2 - 5}v10M4 {d.alto / 2}h10" />
+      </g>
+      <g class="t-mas" role="button" tabindex="0" aria-label="Agregar fila" transform="translate({d.x0} {d.h + 4})"
+        onpointerdown={parar} onclick={e => { parar(e); crecer('fila') }} onkeydown={e => e.key === 'Enter' && crecer('fila')}>
+        <title>Agregar fila</title>
+        <rect width={d.ancho} height="18" rx="9" /><path d="M{d.ancho / 2 - 5} 9h10M{d.ancho / 2} 4v10" />
+      </g>
+    {/if}
 
   {:else if lista === 'audios'}
     <rect width={d.w} height={d.h} rx="8" class="a-caja" />
@@ -233,9 +242,18 @@
   .c-caja { fill: var(--paper); stroke: var(--ink-soft); stroke-width: 1.3; }
   .c-caja.hecho { fill: var(--using); stroke: var(--using); }
   .c-check { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
-  .t-cab { fill: #EFEADF; }
-  .t-linea { stroke: var(--line); stroke-width: 1; }
+  .t-celda-caja { fill: #FFFDF8; stroke: var(--line); stroke-width: 1; }
+  .t-celda-caja.cab { fill: #EFEADF; }
   .t-borde { fill: none; stroke: #CFC8B8; stroke-width: 1; }
+  /* "+" de la tabla: invisibles hasta acercar el mouse (en pantallas táctiles no aparecen: se usa el editor). */
+  .t-mas { opacity: 0; cursor: pointer; transition: opacity .12s; }
+  .t-mas rect { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1; stroke-dasharray: 3 3; }
+  .t-mas path { stroke: var(--accent); stroke-width: 2; stroke-linecap: round; fill: none; pointer-events: none; }
+  .t-mas:hover rect, .t-mas:focus-visible rect { fill: var(--accent); stroke-dasharray: none; }
+  .t-mas:hover path, .t-mas:focus-visible path { stroke: #fff; }
+  .t-mas:focus { outline: none; }
+  @media (hover: hover) { :global(.tarjeta.tablas:hover) .t-mas { opacity: 1; } }
+  .t-mas:focus-visible { opacity: 1; }
   .t-celda { font: 400 12px var(--sans); fill: var(--ink); }
   .t-celda.cab { font-weight: 600; }
   .a-caja { fill: #2F4FB5; }

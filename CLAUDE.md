@@ -141,6 +141,8 @@ contador de su lectura que la abre. Al abrir un proyecto, las citas con `origen`
 lectura, clavadas en el mismo lugar (`migrarALecturas`; los sub-lienzos de objetivo no se tocan). Prueba: `npm run test:e2e -- lectura`.
 
 **Tablas** (sep. 2026): tarjeta `canvas.tablas` (también en objetivos y lecturas): `{ id, titulo?, filas: [[…]], encabezado?, x, y }`.
+Celdas combinadas (`fusiones`) y pintadas (`colores`), opcionales; las operaciones (fusionar, pintar,
+insertar/quitar filas y columnas sin descuadrarlas) son puras en `lib/tablas.js` y el editor es `EditorTabla.svelte`.
 Se crean con el botón de la barra o pegando (Ctrl+V) una tabla de Excel/Word/Sheets (HTML), Markdown o TSV; en el editor,
 pegar varias celdas dentro de una celda las reparte. Núcleo puro `lib/tablas.js` (copia en `claude-skill/.../scripts/tablas.mjs`:
 mantener iguales; comando `tabla` de la skill). Ojo: no agregues listas vacías nuevas al normalizar el proyecto en

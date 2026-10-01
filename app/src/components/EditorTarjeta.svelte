@@ -10,8 +10,8 @@
   import { LETRAS, PAPELES, COLORES, fechaCorta, duracionTexto } from '../lib/tarjetas.js'
   import { esAndroid } from '../lib/plataforma.js'
   import { transcribirAudio } from '../lib/voz.js'
-  import { tablaDelPortapapeles, tablaATexto, pegarEn, normalizarTabla, tablaVacia, MAX_FILAS, MAX_COLUMNAS } from '../lib/tablas.js'
-  import { avisar } from '../lib/store.svelte.js'
+  import EditorTabla from './EditorTabla.svelte'
+  import { tablaVacia, limpiarTabla, aplicarTabla } from '../lib/tablas.js'
 
   /** `o` es una copia editable; `vinculos` los nombres de lo que está conectado a la tarjeta. */
   let { lista, o = $bindable(), nueva = false, vinculos = [], onguardar, oneliminar, onduplicar, onvinculo = null, ontranscripcion = null, onclose } = $props()
@@ -28,40 +28,6 @@
     if (lista === 'tablas' && !o.filas?.length) o.filas = tablaVacia()
   })
 
-  // --- Tablas ---
-  const columnas = $derived(o.filas?.[0]?.length || 0)
-  const agregarFila = () => o.filas.length < MAX_FILAS && o.filas.push(Array(columnas).fill(''))
-  const agregarColumna = () => columnas < MAX_COLUMNAS && o.filas.forEach(r => r.push(''))
-  const quitarFila = i => o.filas.length > 1 && o.filas.splice(i, 1)
-  const quitarColumna = j => columnas > 1 && o.filas.forEach(r => r.splice(j, 1))
-  /** Pegar varias celdas (de Excel, Word, Markdown…) desde una celda: se reparten y la tabla crece. */
-  function pegarCelda(e, i, j) {
-    const t = tablaDelPortapapeles(e.clipboardData?.getData('text/html') || '', e.clipboardData?.getData('text/plain') || '')
-    if (!t) return
-    e.preventDefault()
-    o.filas = pegarEn(o.filas, i, j, t.filas)
-  }
-  const tieneDatos = () => o.filas.some(r => r.some(c => c.trim()))
-  async function pegarPortapapeles() {
-    let html = '', texto = ''
-    try {
-      for (const it of await navigator.clipboard.read()) {
-        if (!html && it.types.includes('text/html')) html = await (await it.getType('text/html')).text()
-        if (!texto && it.types.includes('text/plain')) texto = await (await it.getType('text/plain')).text()
-      }
-    } catch {
-      try { texto = await navigator.clipboard.readText() } catch { return avisar('No se pudo leer el portapapeles: pega con Ctrl+V (o mantén presionada una celda y elige Pegar)') }
-    }
-    const t = tablaDelPortapapeles(html, texto)
-    if (!t) return avisar('En el portapapeles no hay una tabla (copia celdas de Excel, Word, Google Sheets o una tabla en Markdown)')
-    if (tieneDatos() && !confirm('¿Reemplazar el contenido de la tabla por la del portapapeles?')) return
-    o.filas = t.filas
-    o.encabezado = t.encabezado || !!o.encabezado
-  }
-  async function copiarTabla() {
-    try { await navigator.clipboard.writeText(tablaATexto(normalizarTabla(o.filas))); avisar('Tabla copiada: pégala en Excel, Word o Sheets') }
-    catch { avisar('No se pudo copiar') }
-  }
   function agregarTarea(e) {
     e?.preventDefault()
     for (const t of nuevaTarea.split('\n').map(x => x.trim()).filter(Boolean)) o.items.push({ t, hecho: false })
@@ -105,7 +71,7 @@
 
   function guardar() {
     if (lista === 'listas' && nuevaTarea.trim()) agregarTarea()
-    if (lista === 'tablas') { const f = normalizarTabla(o.filas); o.filas = f.length ? f : [['']] }
+    if (lista === 'tablas') aplicarTabla(o, limpiarTabla(o))
     if (!o.etiquetas?.length) delete o.etiquetas
     guardado = true
     onguardar(o)
@@ -163,37 +129,7 @@
   {:else if lista === 'tablas'}
     <!-- svelte-ignore a11y_autofocus -->
     <label class="campo"><span>Título (opcional)</span><input type="text" bind:value={o.titulo} use:autocompletar={{ sugerir }} placeholder="Comparación de normas sísmicas" autofocus={nueva} /></label>
-    <div class="tabla-ed">
-      <table>
-        <thead>
-          <tr>
-            {#each o.filas[0] as _, j}
-              <th><button class="icono-btn mini" aria-label="Quitar columna {j + 1}" title="Quitar columna" disabled={columnas === 1} onclick={() => quitarColumna(j)}><Icono nombre="cerrar" tam={12} /></button></th>
-            {/each}
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each o.filas as fila, i}
-            <tr class:cab={o.encabezado && i === 0}>
-              {#each fila as _, j}
-                <td><textarea rows="1" bind:value={o.filas[i][j]} aria-label="Fila {i + 1}, columna {j + 1}" onpaste={e => pegarCelda(e, i, j)}></textarea></td>
-              {/each}
-              <td class="acc"><button class="icono-btn mini" aria-label="Quitar fila {i + 1}" title="Quitar fila" disabled={o.filas.length === 1} onclick={() => quitarFila(i)}><Icono nombre="cerrar" tam={12} /></button></td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-    <div class="fila envolver">
-      <button class="btn chico" onclick={agregarFila}><Icono nombre="mas" tam={13} />Fila</button>
-      <button class="btn chico" onclick={agregarColumna}><Icono nombre="mas" tam={13} />Columna</button>
-      <label class="encabezado"><input type="checkbox" bind:checked={o.encabezado} /> Primera fila como encabezado</label>
-      <span class="espacio"></span>
-      <button class="btn chico" onclick={pegarPortapapeles} title="Trae la tabla que copiaste en Excel, Word, Google Sheets o en Markdown">Pegar tabla</button>
-      <button class="btn chico fantasma" onclick={copiarTabla} title="Para pegarla en Excel, Word o Sheets">Copiar</button>
-    </div>
-    <p class="suave pista-tabla">Pega varias celdas dentro de una celda y se reparten solas; la tabla crece si hace falta.</p>
+    <EditorTabla bind:t={o} />
 
   {:else if lista === 'audios'}
     {#if !o.audio}
@@ -240,16 +176,6 @@
 
 <style>
   .texto-nota { resize: vertical; line-height: 1.45; }
-  .tabla-ed { overflow: auto; max-height: 50dvh; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
-  .tabla-ed table { border-collapse: collapse; }
-  .tabla-ed th { padding: 2px; text-align: center; background: var(--paper-dim); position: sticky; top: 0; z-index: 1; }
-  .tabla-ed td { padding: 0; border: 1px solid var(--line); vertical-align: top; }
-  .tabla-ed td.acc { border: none; padding: 2px; vertical-align: middle; }
-  .tabla-ed textarea { display: block; width: 140px; min-width: 100%; min-height: 34px; field-sizing: content; max-height: 160px; resize: none; border: none; border-radius: 0; padding: 7px 8px; font: 400 13px var(--sans); background: transparent; }
-  .tabla-ed textarea:focus { outline: 2px solid var(--accent); outline-offset: -2px; background: #fff; }
-  .tabla-ed tr.cab textarea { font-weight: 600; background: #EFEADF; }
-  .encabezado { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
-  .pista-tabla { font-size: 12px; margin: -6px 0 0; }
   .pista-voz { font-size: 12px; }
   .pista-voz.error { color: var(--unreviewed); }
   .opciones { display: flex; flex-direction: column; gap: 10px; }

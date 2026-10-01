@@ -32,7 +32,7 @@ function tarjetas(c, sangria = '') {
     for (const it of l.items || []) L.push(`${sangria}  - [${it.hecho ? 'x' : ' '}] ${una(it.t)}`)
   }
   for (const t of c.tablas || []) {
-    L.push(`${sangria}- Tabla «${una(t.titulo) || 'sin título'}» \`${t.id}\` (${t.filas?.length || 0} filas × ${t.filas?.[0]?.length || 0} columnas)`)
+    L.push(`${sangria}- Tabla «${una(t.titulo) || 'sin título'}» \`${t.id}\` (${t.filas?.length || 0} filas × ${t.filas?.[0]?.length || 0} columnas${t.fusiones?.length ? `, ${t.fusiones.length} celdas combinadas` : ''})`)
     for (const r of (t.filas || []).slice(0, 30)) L.push(`${sangria}  | ${r.map(x => una(x)).join(' | ')} |`)
   }
   for (const a of c.audios || []) L.push(`${sangria}- Nota de voz (${duracionTexto(a.duracion)}${a.creado ? `, ${a.creado.slice(0, 10)}` : ''}): ${a.transcripcion ? `«${una(a.transcripcion)}»` : '(sin transcripción)'}`)
@@ -160,7 +160,9 @@ que la app no lo restaure. Lo de abajo describe el formato por si hay que editar
   (estilo: adhesiva | rayada | tarjeta; letra: sans | serif | mono | mano) o a \`canvas.listas\`
   \`{ "id": "lista_<algo único>", "titulo": "…", "items": [{ "t": "tarea", "hecho": false }], "creado": "<ISO>", "x": 0, "y": 0 }\`.
   Tablas en \`canvas.tablas\`: \`{ "id": "tabla_<algo único>", "titulo": "…", "filas": [["Encabezado", "…"], ["celda", "…"]], "encabezado": true, "creado": "<ISO>", "x": 0, "y": 0 }\`
-  (todas las filas con el mismo número de celdas; \`encabezado\`: la primera fila va en negrita).
+  (todas las filas con el mismo número de celdas; \`encabezado\`: la primera fila va en negrita). Opcionales:
+  \`fusiones\` \`[{ "fila": 0, "col": 0, "filas": 1, "cols": 2 }]\` (celdas combinadas; el texto va en la primera) y
+  \`colores\` \`{ "1,0": "verde" }\` (fondo de la celda fila,columna: amarillo | verde | celeste | rosa | naranja | lila | gris).
   Las notas de voz (\`canvas.audios\`) y fotos (\`canvas.fotos\`) llevan el archivo incrustado: no las crees, solo
   puedes corregir su \`transcripcion\`, \`titulo\`, \`texto\` o \`anotacion\`.
 - **Lienzo de lectura de cada fuente:** \`canvas.lecturas.<fuente_id>\` es un tablero propio de esa fuente
