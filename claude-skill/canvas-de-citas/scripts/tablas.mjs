@@ -280,6 +280,3 @@ export function aplicarTabla(o, r) {
   if (r.colores && Object.keys(r.colores).length) o.colores = r.colores; else delete o.colores
   return o
 }
-
-/** Los "+" del lienzo: una fila al final o una columna a la derecha (cambia la tarjeta). */
-export const crecerTabla = (o, tipo) => aplicarTabla(o, tipo === 'columna' ? insertarColumna(o, o.filas?.[0]?.length || 0) : insertarFila(o, o.filas?.length || 0))
