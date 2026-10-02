@@ -35,7 +35,7 @@
       <button class="color" role="radio" aria-checked={tinta === k} aria-label={k} style="--c:{v}" onclick={() => (tinta = k)}></button>
     {/each}
   </div>
-  <SelectorLetra bind:valor={letraElegida} original />
+  <SelectorLetra bind:valor={letraElegida} original muestra={nombre} />
   <div class="elegir">
     <div class="fila entre">
       <span class="rotulo">Elementos dentro · {marcados.size}</span>

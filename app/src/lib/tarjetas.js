@@ -5,6 +5,12 @@ import { F, envolver, limpiarCache, ancho } from './texto.js'
 import { etiquetasDe, colorEtiqueta, textosTarjeta, coincideConsulta, parsearConsulta } from './etiquetas.js'
 import { cajaFoto } from './medidas-foto.js'
 import { mapaFusiones, COLORES_CELDA } from './tablas.js'
+import { tieneFormato, envolverConFormato, sinFormato } from './formato.js'
+
+// Texto con **negrita**, *cursiva*, __subrayado__ o ==resaltado== (lib/formato.js): renglones con tramos;
+// sin marcas, renglones de texto simple como siempre.
+const envolverF = (t, font, max, n = 99) => (tieneFormato(t) ? envolverConFormato(t, font, max, n, ancho) : envolver(t, font, max, n))
+const textoRenglon = l => (typeof l === 'string' ? l : l.texto)
 export { ANCHO_FOTO } from './medidas-foto.js'
 
 // La letra manuscrita solo se descarga cuando se usa: al llegar, se vuelve a medir el texto.
@@ -86,7 +92,7 @@ function nota(n) {
   const w = PAPELES[n.estilo]?.w || 168
   const L = LETRAS[n.letra] || LETRAS.sans
   const titulo = n.titulo?.trim() ? envolver(n.titulo.trim().toUpperCase(), FT.titulo, w - 32, 2) : []
-  const lineas = envolver(n.texto || (titulo.length ? '' : 'Nota vacía'), L.font, w - 32, 14).filter((l, i, a) => l || a.length === 1)
+  const lineas = envolverF(n.texto || (titulo.length ? '' : 'Nota vacía'), L.font, w - 32, 14).filter((l, i, a) => textoRenglon(l) || a.length === 1)
   let y = 12
   const tituloY = titulo.map((_, i) => (y += 14, y + 2))
   if (titulo.length) y += 14
@@ -103,7 +109,7 @@ function lista(l) {
   const tituloY = titulo.map((_, i) => Math.round(30 + (i + 0.6) * lhT - 0.6 * 19))
   let y = 14 + titulo.length * lhT + 8
   const items = (l.items || []).slice(0, 30).map(it => {
-    const lineas = envolver(it.t || '…', fI, w - 50, 3)
+    const lineas = envolverF(it.t || '…', fI, w - 50, 3)
     const r = { ...it, lineas, y }
     y += lineas.length * lhI + 7
     return r
@@ -115,7 +121,7 @@ function lista(l) {
 // combinadas, hasta 8), con su color de fondo. Devuelve cada celda visible ya ubicada.
 const FTB = { celda: '400 12px "Work Sans", system-ui, sans-serif', cabeza: '600 12px "Work Sans", system-ui, sans-serif' }
 const FILAS_VISTA = 40
-const anchoTexto = (t, font) => Math.max(0, ...String(t ?? '').split('\n').map(l => ancho(l, font)))
+const anchoTexto = (t, font) => Math.max(0, ...sinFormato(t).split('\n').map(l => ancho(l, font)))
 function tabla(t) {
   const todas = t.filas?.length ? t.filas : [['']]
   const nf = Math.min(FILAS_VISTA, todas.length)
@@ -151,7 +157,7 @@ function tabla(t) {
   const titulo = t.titulo?.trim() ? envolver(t.titulo.trim(), fTit, w - 24, 2) : []
   const x0 = 10, ty = titulo.length ? 14 + titulo.length * 19 + 4 : 10
   const cols = anchos.reduce((a, cw) => [...a, a.at(-1) + cw], [x0])
-  for (const v of visibles) v.lineas = envolver(v.texto, fuenteFila(v.f), cols[v.c + v.cols] - cols[v.c] - 16, v.filas > 1 || v.cols > 1 ? 8 : 4)
+  for (const v of visibles) v.lineas = envolverF(v.texto, fuenteFila(v.f), cols[v.c + v.cols] - cols[v.c] - 16, v.filas > 1 || v.cols > 1 ? 8 : 4)
   // Alto de cada fila: el de sus celdas sueltas; si una combinada no cabe, crece su última fila.
   const altos = Array(nf).fill(25)
   for (const v of visibles) if (v.filas === 1) altos[v.f] = Math.max(altos[v.f], v.lineas.length * lh + 10)
@@ -173,7 +179,7 @@ function tabla(t) {
 function audio(a) {
   const w = 240
   const fA = a.letra ? fuente(a.letra, 12) : FT.audio, lh = a.letra ? renglon(a.letra, 12) : 16
-  const lineas = envolver(a.transcripcion?.trim() || 'Sin transcripción', fA, w - 32, 4)
+  const lineas = envolverF(a.transcripcion?.trim() || 'Sin transcripción', fA, w - 32, 4)
   const y0 = 104
   return { w, lineas, y0, fA, lh, h: Math.round(y0 + (lineas.length - 1) * lh + 34), fechaY: Math.round(y0 + (lineas.length - 1) * lh + 24) }
 }
@@ -186,7 +192,7 @@ function foto(f) {
   const lhT = f.letra ? renglon(f.letra, 11.5) - 1 : 15, lhX = f.letra ? renglon(f.letra, 11) - 1 : 14
   const titulo = f.titulo?.trim() ? envolver(f.titulo.trim(), fT, iw, 2) : []
   const tituloY = titulo.map(() => (y += lhT))
-  const texto = f.texto?.trim() ? envolver(f.texto.trim(), fX, iw, 3) : []
+  const texto = f.texto?.trim() ? envolverF(f.texto.trim(), fX, iw, 3) : []
   const textoY = texto.map(() => (y += lhX))
   if (texto.length || titulo.length) y += 4
   const anotacion = f.anotacion?.trim() ? envolver(f.anotacion.trim(), FT.mano, iw, 3) : []

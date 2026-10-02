@@ -30,21 +30,27 @@
     if (!simple) return []
     if (lista === 'notas') return [
       ...d.titulo.map((t, i) => barra(16, d.tituloY[i] - 8, t, d.w - 32, 7)),
-      ...d.lineas.map((t, i) => barra(16, d.y0 + i * d.L.lh - 9, t, d.w - 32, d.L.lh > 20 ? 7 : 6.4, 9))
+      ...d.lineas.map((t, i) => barra(16, d.y0 + i * d.L.lh - 9, txt(t), d.w - 32, d.L.lh > 20 ? 7 : 6.4, 9))
     ]
     if (lista === 'listas') return [
       ...d.titulo.map((t, i) => barra(14, 30 + i * 19 - 11, t, d.w - 60, 8, 11)),
-      ...d.items.flatMap(it => [{ x: 14, y: it.y + 1, w: 13, h: 13 }, ...it.lineas.map((t, j) => barra(36, it.y + 3 + j * 17, t, d.w - 50, 6.4, 9))])
+      ...d.items.flatMap(it => [{ x: 14, y: it.y + 1, w: 13, h: 13 }, ...it.lineas.map((t, j) => barra(36, it.y + 3 + j * 17, txt(t), d.w - 50, 6.4, 9))])
     ]
     if (lista === 'tablas') return [
       ...d.titulo.map((t, i) => barra(12, 28 + i * 19 - 11, t, d.w - 24, 8, 11)),
-      ...d.celdas.map(c => barra(c.x + 8, c.y + 8, c.lineas[0] || '', c.w - 16, 6.4, 9))
+      ...d.celdas.map(c => barra(c.x + 8, c.y + 8, txt(c.lineas[0] || ''), c.w - 16, 6.4, 9))
     ]
-    if (lista === 'audios') return [{ x: 16, y: 50, w: d.w - 32, h: 24 }, ...d.lineas.map((t, i) => barra(16, d.y0 + i * 16 - 9, t, d.w - 32, 6, 9))]
-    return [...d.titulo.map((t, i) => barra(8, d.tituloY[i] - 9, t, d.iw, 6.8, 9)), ...d.texto.map((t, i) => barra(8, d.textoY[i] - 8, t, d.iw, 6, 8)), ...d.anotacion.map((t, i) => barra(8, d.anotacionY[i] - 12, t, d.iw, 7, 12))]
+    if (lista === 'audios') return [{ x: 16, y: 50, w: d.w - 32, h: 24 }, ...d.lineas.map((t, i) => barra(16, d.y0 + i * 16 - 9, txt(t), d.w - 32, 6, 9))]
+    return [...d.titulo.map((t, i) => barra(8, d.tituloY[i] - 9, t, d.iw, 6.8, 9)), ...d.texto.map((t, i) => barra(8, d.textoY[i] - 8, txt(t), d.iw, 6, 8)), ...d.anotacion.map((t, i) => barra(8, d.anotacionY[i] - 12, t, d.iw, 7, 12))]
   })
+  // Renglones con formato (lib/formato.js): { texto, tramos }; los simples son texto.
+  const txt = l => (typeof l === 'string' ? l : l.texto)
+  const px = f => +(/(\d+(?:\.\d+)?)px/.exec(f || '')?.[1] || 12.5)
   const fondoSimple = $derived(lista === 'notas' ? papel : lista === 'audios' ? '#2F4FB5' : '#FFFDF8')
 </script>
+
+{#snippet tramos(l)}{#if typeof l === 'string'}{l}{:else}{#each l.tramos as s}<tspan font-weight={s.b ? 700 : null} font-style={s.i ? 'italic' : null} text-decoration={s.u ? 'underline' : null}>{s.t}</tspan>{/each}{/if}{/snippet}
+{#snippet resalte(l, x, y, font)}{#if typeof l !== 'string'}{#each l.tramos as s}{#if s.h}<rect x={x + s.x - 1.5} y={y - px(font) * 0.95} width={s.w + 3} height={px(font) * 1.3} rx="2.5" class="resalte" />{/if}{/each}{/if}{/snippet}
 
 <Arrastrable transform="translate({pos?.x ?? o.x} {pos?.y ?? o.y}) rotate({giro} {d.w / 2} {d.h / 2})" clase={clase} etiqueta={etiqueta[lista]} {alTocar} {inicio} {mover} {fin}>
   <rect x="2" y="5" width={d.w} height={d.h} rx="5" class="sombra" />
@@ -62,7 +68,7 @@
       {:else}<line x1="10" x2="10" y1="0" y2={d.h} class="margen" />{/if}
     {/if}
     {#each d.titulo as l, i}<text x="16" y={d.tituloY[i]} class="n-titulo">{l}</text>{/each}
-    {#each d.lineas as l, i}<text x="16" y={d.y0 + i * d.L.lh} style="font:{d.L.font}" class="n-texto" class:adh={o.estilo === 'adhesiva' || !o.estilo} class:vacia={!o.texto && !d.titulo.length}>{l}</text>{/each}
+    {#each d.lineas as l, i}{@render resalte(l, 16, d.y0 + i * d.L.lh, d.L.font)}<text x="16" y={d.y0 + i * d.L.lh} style="font:{d.L.font}" class="n-texto" class:adh={o.estilo === 'adhesiva' || !o.estilo} class:vacia={!o.texto && !d.titulo.length}>{@render tramos(l)}</text>{/each}
     {#if o.creado}<text x={d.w - 12} y={d.fechaY} text-anchor="end" class="fecha">{fechaCorta(o.creado)}</text>{/if}
 
   {:else if lista === 'listas'}
@@ -76,7 +82,7 @@
         <rect x="14" y={it.y + 1} width="13" height="13" rx="3" class="c-caja" class:hecho={it.hecho} />
         {#if it.hecho}<path d="M16.5 {it.y + 7.5}l3 3 5-6" class="c-check" />{/if}
       </g>
-      {#each it.lineas as l, j}<text x="36" y={it.y + d.baseI + j * d.lhI} class="l-item" class:hecho={it.hecho} style={o.letra ? `font:${d.fI}` : null}>{l}</text>{/each}
+      {#each it.lineas as l, j}{@render resalte(l, 36, it.y + d.baseI + j * d.lhI, d.fI)}<text x="36" y={it.y + d.baseI + j * d.lhI} class="l-item" class:hecho={it.hecho} style={o.letra ? `font:${d.fI}` : null}>{@render tramos(l)}</text>{/each}
     {/each}
     {#if o.creado}<text x={d.w - 12} y={d.fechaY} text-anchor="end" class="fecha">{fechaCorta(o.creado)}</text>{/if}
 
@@ -85,7 +91,7 @@
     {#each d.titulo as l, i}<text x="12" y={28 + i * 19} class="l-titulo" style={o.letra ? `font:${d.fTit}` : null}>{l}</text>{/each}
     {#each d.celdas as c}
       <rect x={c.x} y={c.y} width={c.w} height={c.h} class="t-celda-caja" class:cab={c.cab} style={c.fondo ? `fill:${c.fondo}` : ''} />
-      {#each c.lineas as l, k}<text x={c.x + 8} y={c.y + d.base + k * d.lh} class="t-celda" class:cab={c.cab} style={o.letra ? `font:${c.cab ? d.fCab : d.fC}` : null}>{l}</text>{/each}
+      {#each c.lineas as l, k}{@render resalte(l, c.x + 8, c.y + d.base + k * d.lh, d.fC)}<text x={c.x + 8} y={c.y + d.base + k * d.lh} class="t-celda" class:cab={c.cab} style={o.letra ? `font:${c.cab ? d.fCab : d.fC}` : null}>{@render tramos(l)}</text>{/each}
     {/each}
     <rect x={d.x0} y={d.ty} width={d.ancho} height={d.alto} rx="3" class="t-borde" />
     {#if d.mas}<text x={d.x0} y={d.masY} class="fecha">+{d.mas} filas más</text>{/if}
@@ -103,7 +109,7 @@
       {@const h = 3 + v * 34}
       <rect x={64 + i * ((d.w - 80) / o.onda.length)} y={62 - h / 2} width="2" height={h} rx="1" class="a-barra" class:suena />
     {/each}
-    {#each d.lineas as l, i}<text x="16" y={d.y0 + i * d.lh} class="a-texto" class:vacia={!o.transcripcion} style={o.letra ? `font:${d.fA}` : null}>{l}</text>{/each}
+    {#each d.lineas as l, i}{@render resalte(l, 16, d.y0 + i * d.lh, d.fA)}<text x="16" y={d.y0 + i * d.lh} class="a-texto" class:vacia={!o.transcripcion} style={o.letra ? `font:${d.fA}` : null}>{@render tramos(l)}</text>{/each}
     {#if o.creado}<text x="16" y={d.fechaY} class="a-fecha">{fechaCorta(o.creado)}</text>{/if}
 
   {:else}
@@ -122,7 +128,7 @@
       </svg>
     {/if}
     {#each d.titulo as l, i}<text x="8" y={d.tituloY[i]} class="f-titulo" style={o.letra ? `font:${d.fT}` : null}>{l}</text>{/each}
-    {#each d.texto as l, i}<text x="8" y={d.textoY[i]} class="f-texto" style={o.letra ? `font:${d.fX}` : null}>{l}</text>{/each}
+    {#each d.texto as l, i}{@render resalte(l, 8, d.textoY[i], d.fX)}<text x="8" y={d.textoY[i]} class="f-texto" style={o.letra ? `font:${d.fX}` : null}>{@render tramos(l)}</text>{/each}
     {#each d.anotacion as l, i}<text x="8" y={d.anotacionY[i]} class="f-mano">{l}</text>{/each}
     {#if redimensionar}
       <rect x={d.w - 18} y={d.h - 18} width="20" height="20" rx="4" class="esquina" role="button" tabindex="-1" aria-label="Cambiar tamaño de la foto"
@@ -229,6 +235,7 @@
   .c-caja { fill: var(--paper); stroke: var(--ink-soft); stroke-width: 1.3; }
   .c-caja.hecho { fill: var(--using); stroke: var(--using); }
   .c-check { fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+  .resalte { fill: #FBE38A; opacity: .85; pointer-events: none; }
   .t-celda-caja { fill: #FFFDF8; stroke: var(--line); stroke-width: 1; }
   .t-celda-caja.cab { fill: #EFEADF; }
   .t-borde { fill: none; stroke: #CFC8B8; stroke-width: 1; }

@@ -7,6 +7,8 @@
   import Icono from './Icono.svelte'
   import CampoEtiquetas from './CampoEtiquetas.svelte'
   import SelectorLetra from './SelectorLetra.svelte'
+  import BarraFormato from './BarraFormato.svelte'
+  import { conFormato } from '../lib/campo-formato.js'
   import { autocompletar } from '../lib/autocompletar.js'
   import { sugerir } from '../lib/buscador.svelte.js'
   import { TINTAS, RESALTADORES, colorTrazo, esResaltado } from '../lib/tarjetas.js'
@@ -271,11 +273,12 @@
         </div>
         <div class="detalles">
           <label class="campo"><span>Título</span><input type="text" bind:value={o.titulo} placeholder="Ensayo en laboratorio, feb. 2026" use:autocompletar={{ sugerir }} /></label>
+          <BarraFormato />
           <label class="campo"><span>Texto (descripción, análisis, transcripción de la imagen…)</span>
-            <textarea rows="5" bind:value={o.texto} use:autocompletar={{ sugerir }} placeholder="Todo lo que quieras anotar sobre esta foto"></textarea></label>
+            <textarea rows="5" bind:value={o.texto} use:autocompletar={{ sugerir }} use:conFormato placeholder="Todo lo que quieras anotar sobre esta foto"></textarea></label>
           <label class="campo"><span>Anotación a mano (se ve en rojo bajo la foto)</span>
             <input type="text" bind:value={o.anotacion} use:autocompletar={{ sugerir }} class="mano" placeholder="¿coincide con Villarreal?" /></label>
-          <SelectorLetra bind:valor={o.letra} original />
+          <SelectorLetra bind:valor={o.letra} original muestra={o.titulo || o.texto} />
           <CampoEtiquetas bind:valor={o.etiquetas} />
           {#if o.origen && onvinculo}
             <button class="btn vinculo-doc" onclick={onvinculo}>

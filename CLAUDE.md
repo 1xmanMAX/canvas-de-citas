@@ -158,6 +158,8 @@ principal por BroadcastChannel (`lib/ventana-doc.js`). En la app de Windows, `wi
 **Letras** (oct. 2026): 13 letras (`LETRAS` en `lib/tarjetas.js`, archivos de `@fontsource` declarados en `app.css`, se
 descargan al usarse) y campo opcional `letra` en notas, listas, tablas, notas de voz, fotos y agrupadores; sin `letra`
 cada tarjeta se ve como siempre. Selector común `SelectorLetra.svelte`; `fuente(letra, px, fuerte)` y `renglon()` para
-medir y dibujar. Prueba: `npm run test:e2e -- letras`.
+medir y dibujar. **Formato** dentro del texto con marcas (`**negrita**`, `*cursiva*`, `__subrayado__`, `==resaltado==`;
+núcleo puro `lib/formato.js`, botones `BarraFormato.svelte` y atajos en `lib/campo-formato.js`): el texto sigue siendo
+texto (contrato intacto); el lienzo lo dibuja con `<tspan>`. Prueba: `npm run test:e2e -- letras`.
 
 **Siguiente:** probar el APK en el celular de Max (sin compilar APK salvo que lo pida) contra la app de Windows.

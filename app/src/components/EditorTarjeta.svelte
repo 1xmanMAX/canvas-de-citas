@@ -12,6 +12,8 @@
   import { transcribirAudio } from '../lib/voz.js'
   import EditorTabla from './EditorTabla.svelte'
   import SelectorLetra from './SelectorLetra.svelte'
+  import BarraFormato from './BarraFormato.svelte'
+  import { conFormato } from '../lib/campo-formato.js'
   import { tablaVacia, limpiarTabla, aplicarTabla } from '../lib/tablas.js'
 
   /** `o` es una copia editable; `vinculos` los nombres de lo que está conectado a la tarjeta. */
@@ -68,6 +70,8 @@
       transcribiendo = false
     }
   }
+  // Muestra para el selector de letra: el propio texto de la tarjeta.
+  const muestraLetra = $derived(lista === 'listas' ? [o.titulo, ...(o.items || []).map(x => x.t)].filter(Boolean).join(' · ') : lista === 'tablas' ? (o.filas || []).flat().filter(Boolean).join(' · ') : lista === 'audios' ? o.transcripcion : o.texto || o.titulo)
   const puedeGuardar = $derived(lista !== 'audios' || !!o.audio)
 
   function guardar() {
@@ -84,7 +88,8 @@
   {#if lista === 'notas'}
     <label class="campo"><span>Título (opcional)</span><input type="text" bind:value={o.titulo} placeholder="Extended Mind, p. 114" use:autocompletar={{ sugerir }} /></label>
     <!-- svelte-ignore a11y_autofocus -->
-    <textarea rows="6" bind:value={o.texto} use:autocompletar={{ sugerir }} autofocus aria-label="Texto de la nota" style="font-family:{LETRAS[o.letra || 'sans'].css};font-weight:{LETRAS[o.letra || 'sans'].normal};font-size:{Math.round(14 * LETRAS[o.letra || 'sans'].escala)}px"
+    <BarraFormato />
+    <textarea rows="6" bind:value={o.texto} use:autocompletar={{ sugerir }} use:conFormato autofocus aria-label="Texto de la nota" style="font-family:{LETRAS[o.letra || 'sans'].css};font-weight:{LETRAS[o.letra || 'sans'].normal};font-size:{Math.round(14 * LETRAS[o.letra || 'sans'].escala)}px"
       class="texto-nota" placeholder="Escribe la idea, cita o pendiente…"></textarea>
     <div class="opciones">
       <div class="opcion"><span class="rotulo">Papel</span>
@@ -92,7 +97,7 @@
           {#each Object.entries(PAPELES) as [k, v]}<button aria-pressed={(o.estilo || 'adhesiva') === k} onclick={() => (o.estilo = k)}>{v.nombre}</button>{/each}
         </div>
       </div>
-      <SelectorLetra bind:valor={o.letra} />
+      <SelectorLetra bind:valor={o.letra} muestra={o.texto || o.titulo} />
       {#if o.estilo !== 'rayada'}
         <div class="opcion"><span class="rotulo">Color</span>
           <div class="colores">
@@ -107,11 +112,12 @@
   {:else if lista === 'listas'}
     <!-- svelte-ignore a11y_autofocus -->
     <label class="campo"><span>Título</span><input type="text" bind:value={o.titulo} use:autocompletar={{ sugerir }} placeholder="Pendientes del capítulo 2" autofocus={nueva} /></label>
+    <BarraFormato />
     <div class="tareas">
       {#each o.items as it, i}
         <div class="tarea">
           <input type="checkbox" bind:checked={it.hecho} aria-label="Hecha" />
-          <input type="text" bind:value={it.t} use:autocompletar={{ sugerir }} class:hecho={it.hecho} aria-label="Tarea {i + 1}" />
+          <input type="text" bind:value={it.t} use:autocompletar={{ sugerir }} use:conFormato class:hecho={it.hecho} aria-label="Tarea {i + 1}" />
           <button class="icono-btn mini" aria-label="Subir" title="Subir" disabled={i === 0} onclick={() => moverTarea(i, -1)}><span class="flecha">↑</span></button>
           <button class="icono-btn mini" aria-label="Bajar" title="Bajar" disabled={i === o.items.length - 1} onclick={() => moverTarea(i, 1)}><span class="flecha">↓</span></button>
           <button class="icono-btn mini" aria-label="Quitar tarea" title="Quitar" onclick={() => quitarTarea(i)}><Icono nombre="cerrar" tam={14} /></button>
@@ -119,7 +125,7 @@
       {/each}
       <form class="tarea nueva" onsubmit={agregarTarea}>
         <Icono nombre="mas" tam={14} />
-        <input type="text" bind:this={entradaTarea} bind:value={nuevaTarea} use:autocompletar={{ sugerir }} placeholder="Nueva tarea y Enter (o pega varias líneas)"
+        <input type="text" bind:this={entradaTarea} bind:value={nuevaTarea} use:autocompletar={{ sugerir }} use:conFormato placeholder="Nueva tarea y Enter (o pega varias líneas)"
           onpaste={e => { const t = e.clipboardData?.getData('text/plain') || ''; if (t.includes('\n')) { e.preventDefault(); nuevaTarea = t; agregarTarea() } }} />
       </form>
     </div>
@@ -135,8 +141,9 @@
     {:else}
       <audio controls src={o.audio} class="reproductor"></audio>
       <div class="suave meta">{duracionTexto(o.duracion)}{#if o.creado} · {fechaCorta(o.creado)}{/if}</div>
+      <BarraFormato />
       <label class="campo"><span>Transcripción</span>
-        <textarea rows="6" bind:value={o.transcripcion} use:autocompletar={{ sugerir }} disabled={transcribiendo} placeholder={transcribiendo ? 'Transcribiendo…' : 'Escribe o corrige lo que se dijo en el audio…'}></textarea></label>
+        <textarea rows="6" bind:value={o.transcripcion} use:autocompletar={{ sugerir }} use:conFormato disabled={transcribiendo} placeholder={transcribiendo ? 'Transcribiendo…' : 'Escribe o corrige lo que se dijo en el audio…'}></textarea></label>
       {#if esAndroid}
         <div class="fila entre">
           <span class="suave pista-voz" class:error={errorVoz} role={errorVoz ? 'alert' : undefined}>{transcribiendo ? 'Transcribiendo en el celular…' : errorVoz || 'Se transcribe en el celular, sin internet.'}</span>
@@ -147,7 +154,7 @@
 
   {/if}
 
-  {#if lista !== 'notas'}<SelectorLetra bind:valor={o.letra} original />{/if}
+  {#if lista !== 'notas'}<SelectorLetra bind:valor={o.letra} original muestra={muestraLetra} />{/if}
 
   <CampoEtiquetas bind:valor={o.etiquetas} />
 

@@ -5,6 +5,8 @@
   // barras para agregar al final (a la derecha y abajo).
   import { tick } from 'svelte'
   import Icono from './Icono.svelte'
+  import BarraFormato from './BarraFormato.svelte'
+  import { conFormato } from '../lib/campo-formato.js'
   import { avisar } from '../lib/store.svelte.js'
   import { medir, LETRAS } from '../lib/tarjetas.js'
   import {
@@ -161,6 +163,7 @@
 <svelte:window onpointerup={soltar} onpointercancel={soltar} />
 
 <div class="herramientas" role="toolbar" aria-label="Herramientas de la tabla">
+  <BarraFormato />
   <div class="grupo">
     <button class="btn chico" disabled={!varias} onclick={combinar} title="Combinar las celdas elegidas en una (arrastra sobre varias celdas o usa Shift+clic)"><Icono nombre="combinar" tam={14} />Combinar</button>
     <button class="btn chico fantasma" disabled={!combinadaEnSel} onclick={descombinar} title="Separar la celda combinada">Separar</button>
@@ -216,7 +219,7 @@
                 <td data-f={f} data-c={c} rowspan={u?.filas || 1} colspan={u?.cols || 1} class:sel={enSel(f, c)} class:unica={!varias && enSel(f, c)}
                   class:cab={t.encabezado && f === 0} style:background={colorDe(f, c)}
                   onpointerdown={e => bajar(e, f, c)} onpointerenter={() => entrar(f, c)}>
-                  <textarea rows="1" bind:value={t.filas[f][c]} aria-label="Fila {f + 1}, columna {c + 1}{u ? ' (combinada)' : ''}"
+                  <textarea rows="1" bind:value={t.filas[f][c]} use:conFormato aria-label="Fila {f + 1}, columna {c + 1}{u ? ' (combinada)' : ''}"
                     onfocus={() => enfocar(f, c)} onpaste={e => pegarCelda(e, f, c)} onkeydown={e => tecla(e, f, c)}></textarea>
                 </td>
               {/if}

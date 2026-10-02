@@ -163,6 +163,8 @@ que la app no lo restaure. Lo de abajo describe el formato por si hay que editar
   (todas las filas con el mismo número de celdas; \`encabezado\`: la primera fila va en negrita). Opcionales:
   \`fusiones\` \`[{ "fila": 0, "col": 0, "filas": 1, "cols": 2 }]\` (celdas combinadas; el texto va en la primera) y
   \`colores\` \`{ "1,0": "verde" }\` (fondo de la celda fila,columna: amarillo | verde | celeste | rosa | naranja | lila | gris).
+  Formato dentro del texto (notas, tareas, celdas, transcripciones y texto de fotos): \`**negrita**\`, \`*cursiva*\`,
+  \`__subrayado__\` y \`==resaltado==\` (la app las dibuja con su estilo; sin marcas, texto normal).
   Las notas de voz (\`canvas.audios\`) y fotos (\`canvas.fotos\`) llevan el archivo incrustado: no las crees, solo
   puedes corregir su \`transcripcion\`, \`titulo\`, \`texto\` o \`anotacion\`.
 - **Lienzo de lectura de cada fuente:** \`canvas.lecturas.<fuente_id>\` es un tablero propio de esa fuente
