@@ -1,7 +1,7 @@
 // escritorio/src/main.rs
 //! Canvas de Citas para Windows: la app en su propia ventana (WebView2, el motor de Edge).
-//! - Abre la última versión publicada (https://1xmanmax.github.io/canvas-de-citas/); sin
-//!   internet usa la que guardó el service worker.
+//! - Lleva la app dentro (`app/dist`, ver build.rs) y la sirve en https://canvas.localhost/: no
+//!   depende de internet ni del sitio publicado. Cada versión nueva de la app es un exe nuevo.
 //! - Da solos los permisos que la app pide (micrófono, portapapeles…): nunca pregunta.
 //! - Inyecta `window.canvasWindows = { puerto, token }`: la app guarda cada proyecto en su carpeta
 //!   por el puente local del servidor (`/local/*`), sin los permisos del navegador.
@@ -21,7 +21,41 @@ use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
 use tao::window::{WindowBuilder, WindowId};
 use wry::{NewWindowResponse, PermissionResponse, WebContext, WebViewBuilder};
 
-const URL: &str = "https://1xmanmax.github.io/canvas-de-citas/";
+const URL: &str = "https://canvas.localhost/";
+
+// La app incluida: ARCHIVOS = [(ruta, contenido)] (lo genera build.rs desde app/dist).
+include!(concat!(env!("OUT_DIR"), "/app.rs"));
+
+/// Sirve un archivo de la app incluida (protocolo propio `canvas`: https://canvas.localhost/...).
+fn archivo_app(ruta: &str) -> wry::http::Response<std::borrow::Cow<'static, [u8]>> {
+    let ruta = ruta.trim_start_matches('/');
+    let ruta = if ruta.is_empty() { "index.html" } else { ruta };
+    match ARCHIVOS.iter().find(|(r, _)| *r == ruta) {
+        Some((_, datos)) => wry::http::Response::builder()
+            .header("Content-Type", tipo_mime(ruta))
+            // index.html y sw.js sin caché: así un exe nuevo nunca muestra la app anterior.
+            .header("Cache-Control", if ruta.starts_with("assets/") { "max-age=31536000, immutable" } else { "no-cache" })
+            .body(std::borrow::Cow::Borrowed(*datos))
+            .unwrap(),
+        None => wry::http::Response::builder().status(404).body(std::borrow::Cow::Borrowed(&b""[..])).unwrap(),
+    }
+}
+
+fn tipo_mime(ruta: &str) -> &'static str {
+    match ruta.rsplit('.').next().unwrap_or("") {
+        "html" => "text/html; charset=utf-8",
+        "js" | "mjs" => "text/javascript; charset=utf-8",
+        "css" => "text/css; charset=utf-8",
+        "json" | "webmanifest" => "application/json",
+        "wasm" => "application/wasm",
+        "svg" => "image/svg+xml",
+        "png" => "image/png",
+        "ico" => "image/x-icon",
+        "woff2" => "font/woff2",
+        "woff" => "font/woff",
+        _ => "application/octet-stream",
+    }
+}
 const PUERTO: u16 = 47481;
 
 /// Opciones para pruebas: --url <otra página>, --base <carpeta de datos>, --puerto <n>.
@@ -226,6 +260,8 @@ fn crear_webview(
     let (p1, p2) = (prefijo.to_string(), prefijo.to_string());
     let proxy_titulo = proxy.clone();
     let mut b = WebViewBuilder::new_with_web_context(contexto)
+        // La app incluida (https://canvas.localhost/): sin internet ni sitio publicado.
+        .with_custom_protocol("canvas".into(), |_, pedido| archivo_app(pedido.uri().path()))
         .with_url(url)
         .with_initialization_script(inicio)
         // La ventana solo muestra la app: cualquier otra página se abre en el navegador de siempre.
@@ -269,7 +305,7 @@ fn crear_webview(
     #[cfg(windows)]
     let b = {
         use wry::WebViewBuilderExtWindows;
-        b.with_additional_browser_args("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,LocalNetworkAccessChecks,PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults")
+        b.with_https_scheme(true).with_additional_browser_args("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,LocalNetworkAccessChecks,PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults")
     };
     b.build(ventana)
 }
@@ -280,9 +316,26 @@ mod pruebas {
     #[test]
     fn prefijo_de_la_app() {
         assert_eq!(prefijo_app("https://1xmanmax.github.io/canvas-de-citas/"), "https://1xmanmax.github.io/canvas-de-citas/");
+        assert_eq!(prefijo_app(super::URL), "https://canvas.localhost/");
         assert_eq!(prefijo_app("http://localhost:4199/"), "http://localhost:4199/");
         assert_eq!(prefijo_app("http://localhost:4199"), "http://localhost:4199/");
         // Otra página del mismo sitio no es la app.
         assert!(!"https://1xmanmax.github.io/otra/".starts_with(&prefijo_app("https://1xmanmax.github.io/canvas-de-citas/")));
+    }
+}
+
+#[cfg(test)]
+mod app_incluida {
+    use super::{archivo_app, ARCHIVOS};
+    #[test]
+    fn sirve_la_app_incluida() {
+        let r = archivo_app("/");
+        assert_eq!(r.status(), 200);
+        assert!(r.headers()["Content-Type"].to_str().unwrap().starts_with("text/html"));
+        assert!(String::from_utf8_lossy(r.body()).contains("<div id=\"app\""));
+        // El lector de PDF (hilo y PDFium) también va dentro.
+        let wasm = ARCHIVOS.iter().find(|(r, _)| r.ends_with(".wasm")).expect("falta pdfium.wasm");
+        assert_eq!(archivo_app(&format!("/{}", wasm.0)).headers()["Content-Type"], "application/wasm");
+        assert_eq!(archivo_app("/no-existe.js").status(), 404);
     }
 }

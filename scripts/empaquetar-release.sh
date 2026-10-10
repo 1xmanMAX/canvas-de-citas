@@ -11,7 +11,10 @@ RAIZ=$(cd "$(dirname "$0")/.." && pwd)
 OUT="$RAIZ/dist-release/$V"
 rm -rf "$OUT" && mkdir -p "$OUT/CanvasDeCitas-Windows"
 
-# Windows: la app (Canvas de Citas.exe: ventana WebView2 + sincronización por Wi-Fi) + instalador
+# La app web primero: el exe lleva app/dist dentro (escritorio/build.rs).
+(cd "$RAIZ/app" && npm run build)
+
+# Windows: la app (Canvas de Citas.exe: ventana WebView2 con la app incluida + sincronización por Wi-Fi) + instalador
 # (PowerShell 5 necesita BOM y CRLF). En Windows se compila con MSVC; en Linux, con mingw.
 if [ "${OS:-}" = "Windows_NT" ]; then
   (cd "$RAIZ/escritorio" && cargo build --release)

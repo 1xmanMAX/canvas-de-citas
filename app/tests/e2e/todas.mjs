@@ -658,6 +658,22 @@ const SUITES = {
     const zoom = () => pg.$eval('.zoom .porc', e => parseInt(e.textContent))
     const capa = () => pg.$eval('.capa', e => e.style.transform)
     const rueda = (opc) => pg.$eval('.lienzo', (el, o) => el.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaMode: 0, ...o })), opc)
+    await s.paso('al arrastrar, el fondo de puntos acompaña al lienzo sin repintarse', async () => {
+      const r = await (await pg.$('.lienzo')).boundingBox()
+      const x = r.x + 30, y = r.y + r.height - 40
+      await pg.mouse.move(x, y); await pg.mouse.down()
+      for (let i = 1; i <= 10; i++) { await pg.mouse.move(x + i * 13, y - i * 7); await esperar(20) }
+      await pg.mouse.up(); await esperar(100)
+      const v = await pg.evaluate(() => {
+        const num = t => (t.replace('translate3d', '').match(/-?[0-9.]+/g) || []).map(Number)
+        const [tx, ty, , k] = num(document.querySelector('.capa').style.transform)
+        const f = document.querySelector('.fondo'), [fx, fy] = num(f.style.transform), c = parseFloat(f.style.backgroundSize)
+        const m = v => (((v + 60) % c) + c) % c
+        return { ok: Math.abs(m(tx) - fx) < .01 && Math.abs(m(ty) - fy) < .01 && Math.abs(c - 22 * k) < .01, pos: getComputedStyle(document.querySelector('.lienzo')).backgroundImage, tx, ty, fx, fy, c }
+      })
+      if (!v.ok) throw new Error('fondo desalineado: ' + JSON.stringify(v))
+      if (v.pos !== 'none') throw new Error('el lienzo aún pinta el fondo')
+    })
     await s.paso('rueda del mouse (muescas de 120) acerca hacia el cursor', async () => {
       const k0 = await zoom()
       const r = await (await pg.$('.lienzo')).boundingBox()

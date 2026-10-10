@@ -10,8 +10,10 @@ mount(App, { target: document.getElementById('app') })
 // Pellizco del trackpad: zoom solo del lienzo, PDF o foto bajo el cursor, nunca de la página entera.
 bloquearZoomDelNavegador(window, { teclas: !!window.canvasWindows })
 
-// En Android los archivos ya vienen dentro del APK: sin service worker.
-if ('serviceWorker' in navigator && import.meta.env.PROD && !esAndroid) {
+// En Android y en la app de Windows (https://canvas.localhost/) los archivos ya vienen dentro del
+// APK o del exe: sin service worker.
+const incluida = esAndroid || location.hostname === 'canvas.localhost'
+if ('serviceWorker' in navigator && import.meta.env.PROD && !incluida) {
   addEventListener('load', async () => {
     const reg = await navigator.serviceWorker.register('./sw.js')
     // App de Windows: al abrir, si ya hay una versión nueva lista, se pasa a ella sin preguntar (siempre la última).

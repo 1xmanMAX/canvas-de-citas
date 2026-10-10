@@ -5,7 +5,8 @@ lienzo tipo tablero de investigación + biblioteca + visor de papers, integrado 
 Habla con Max **en español**, con avances cortos; la UI, los comentarios y los commits también
 van en español.
 
-- App publicada: https://1xmanmax.github.io/canvas-de-citas/ (PWA, rama `gh-pages`)
+- App publicada: https://1xmanmax.github.io/canvas-de-citas/ (PWA, rama `gh-pages`; desde oct. 2026 GitHub la redirige a
+  `http://mairumax.me/canvas-de-citas/`, el dominio de la web de Max, aún sin HTTPS)
 - Repo: https://github.com/1xmanMAX/canvas-de-citas (público: **nunca subas datos de Max**)
 
 ## Estructura
@@ -24,7 +25,7 @@ van en español.
 | `claude-skill/canvas-de-citas/` | Copia versionada de la skill de Claude Code (`~/.claude/skills/canvas-de-citas` en la PC de Max): CLI `scripts/canvas.mjs` que lee/edita la carpeta de datos |
 | `receptor/` | Receptor Windows en Rust (127.0.0.1:47480): pasa archivos con el celular / PixPin |
 | `receptor/sincro/` | Servidor de sincronización **por Wi-Fi, sin internet** (Rust, **sin PixPin**): una carpeta (`--carpeta`) o las carpetas de los proyectos (`carpetas.rs` + `reparto.rs` ≡ `lib/reparto.js`) y el puente `/local/*` de la app de Windows (`local.rs`) |
-| `escritorio/` | **`Canvas de Citas.exe`** (tao + wry/WebView2): la app publicada en su ventana, permisos concedidos, `window.canvasWindows` para el puente, servidor incorporado (`--segundo-plano` al iniciar Windows). Compila con MSVC en la PC de Max; opciones de prueba `--url --base --puerto` |
+| `escritorio/` | **`Canvas de Citas.exe`** (tao + wry/WebView2): la app **incluida en el exe** (`build.rs` mete `app/dist`; se sirve en `https://canvas.localhost/`) en su ventana, permisos concedidos, `window.canvasWindows` para el puente, servidor incorporado (`--segundo-plano` al iniciar Windows). Compila con MSVC en la PC de Max; opciones de prueba `--url --base --puerto` |
 | `android/` | App Android con Capacitor 8: empaqueta `app/dist` (ver `android/README.md`); en la app, `lib/plataforma.js` (`esAndroid`) |
 | `docs/superpowers/specs/` | Diseños aprobados o en revisión |
 | `spec.md`, `*.html` (raíz) | Especificación y mockups originales |
@@ -129,8 +130,10 @@ instalador (`instalador-windows/`, registra la carpeta de datos anterior en
 `%LOCALAPPDATA%\CanvasDeCitas\proyectos-abiertos.json`). La sincronización es **solo por el Wi-Fi local, sin internet ni
 nube** (pedido de Max). Proyectos nuevos del celular: carpeta en `Documentos\Canvas de Citas`. Fotos en alta viajan solo
 si el servidor declara `capacidades: ["fotos"]` (el APK viejo sigue igual). Pruebas: `npm run test:e2e -- windows`
-(servidor real + `canvasWindows` simulado), `cargo test` en `receptor/sincro`. **La ventana carga la app publicada**:
-tras cambiar la app hay que publicar `gh-pages` para que la app de Windows la tenga.
+(servidor real + `canvasWindows` simulado), `cargo test` en `receptor/sincro`. **Desde la 1.7.1 la ventana lleva la app dentro**
+(`https://canvas.localhost/`, protocolo propio de wry, sin service worker): tras cambiar la app hay que `npm run build` y
+recompilar/reinstalar el exe. Motivo: desde oct. 2026 `1xmanmax.github.io` redirige a `http://mairumax.me` (dominio de la
+web de Max, sin HTTPS), y la ventana no podía descargar lo no guardado (el lector de PDF).
 
 **Lienzo de lectura por fuente** (sep. 2026): cada fuente tiene su propio tablero en el proyecto
 (`canvas.lecturas.<fuente_id>`, `lib/lecturas.js`, `LecturaLienzo.svelte`, ruta `#/p/<id>/l/<fuente>`). Abrir el documento

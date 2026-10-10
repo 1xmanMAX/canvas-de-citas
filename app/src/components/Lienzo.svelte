@@ -12,22 +12,27 @@
   // para no alternar al cruzar el umbral. Los hijos lo leen del contexto (vista.simple).
   const vista = $state({ simple: false })
 
-  let cont, capaEl
+  let cont, capaEl, fondoEl
   let W = $state(0), H = $state(0)
   let k = 1, tx = 0, ty = 0
   let porc = $state(100)
   let ajustado = false
   const MIN = 0.08, MAX = 2.5
+  const MARGEN_FONDO = 60 // la capa del fondo sobra por cada lado más que una celda (22 × MAX)
   const acotar = v => Math.min(MAX, Math.max(MIN, v))
 
   // --- Aplicar la vista (una vez por cuadro) ---
-  let raf = 0, zoomReciente = false, tQuieto
+  let raf = 0, zoomReciente = false, tQuieto, celda = 0
   function aplicar() {
     raf = 0
     if (!capaEl) return
     capaEl.style.transform = `translate3d(${tx}px, ${ty}px, 0) scale(${k})`
-    cont.style.backgroundSize = `${22 * k}px ${22 * k}px`
-    cont.style.backgroundPosition = `${tx}px ${ty}px`
+    // Fondo de puntos: su propia capa, que al desplazar solo se mueve (menos de una celda) sin
+    // volver a pintarse; el tamaño de la celda cambia solo con el zoom.
+    const c = 22 * k
+    if (c !== celda) { celda = c; fondoEl.style.backgroundSize = `${c}px ${c}px` }
+    const m = v => (((v + MARGEN_FONDO) % c) + c) % c
+    fondoEl.style.transform = `translate3d(${m(tx)}px, ${m(ty)}px, 0)`
     porc = Math.round(k * 100)
     // Solo con muchos elementos a la vista (pesado): con pocos, el texto se dibuja siempre.
     const s = pesado && (vista.simple ? k < 0.65 : k < 0.55)
@@ -295,6 +300,7 @@
   onpointercancel={arriba}
   onauxclick={e => e.button === 1 && e.preventDefault()}
 >
+  <div class="fondo" bind:this={fondoEl}></div>
   <div class="capa" bind:this={capaEl}>
     <svg style="left:{caja.x}px;top:{caja.y}px;width:{caja.w}px;height:{caja.h}px" viewBox="{caja.x} {caja.y} {caja.w} {caja.h}">
       {@render children()}
@@ -314,12 +320,16 @@
   .lienzo {
     flex-grow: 1; position: relative; overflow: hidden; min-width: 0;
     background-color: var(--paper);
-    background-image: radial-gradient(circle, var(--line) 1px, transparent 1px);
     touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
     contain: strict;
   }
   .lienzo:active { cursor: grabbing; }
-  .corcho { background-color: #C8A078; background-image: radial-gradient(circle, rgba(92, 58, 26, .38) 1.1px, transparent 1.4px); }
+  .fondo {
+    position: absolute; inset: -60px; pointer-events: none; will-change: transform;
+    background-image: radial-gradient(circle, var(--line) 1px, transparent 1px); background-size: 22px 22px;
+  }
+  .corcho { background-color: #C8A078; }
+  .corcho .fondo { background-image: radial-gradient(circle, rgba(92, 58, 26, .38) 1.1px, transparent 1.4px); }
   .conectando { cursor: crosshair; }
   .capa { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
   svg { position: absolute; overflow: visible; }
