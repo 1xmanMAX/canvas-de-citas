@@ -10,6 +10,7 @@
   import ProyectoForm from '../components/ProyectoForm.svelte'
   import ObjetivoLienzo from '../components/ObjetivoLienzo.svelte'
   import LecturaLienzo from '../components/LecturaLienzo.svelte'
+  import { reemplazar } from '../lib/navegacion.js'
   import Tarjeta from '../components/Tarjeta.svelte'
   import Chinchetas from '../components/Chinchetas.svelte'
   import { tablaDelPortapapeles } from '../lib/tablas.js'
@@ -256,7 +257,7 @@
   const rutaObjetivo = $derived(oid ? `#/p/${p.id}/o/${oid}` : lid ? `#/p/${p.id}/l/${lid}` : `#/p/${p.id}`)
   const abrirLectura = f => {
     if (f === lid) return
-    if (lid || oid || fid) location.replace(`#/p/${p.id}/l/${f}`)
+    if (lid || oid || fid) reemplazar(`#/p/${p.id}/l/${f}`)
     else location.hash = `#/p/${p.id}/l/${f}`
   }
   const cerrarLectura = () => atras(`#/p/${p.id}`)
@@ -265,7 +266,7 @@
   const abrirObjetivo = clave => {
     ficha = false
     if (clave === oid) return
-    if (oid) location.replace(`#/p/${p.id}/o/${clave}`)
+    if (oid) reemplazar(`#/p/${p.id}/o/${clave}`)
     else location.hash = `#/p/${p.id}/o/${clave}`
   }
   const cerrarObjetivo = () => atras(`#/p/${p.id}`)

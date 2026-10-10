@@ -309,7 +309,7 @@
     {#if tieneDoc && !V.archivo}
       <button class="btn chico" onclick={leer} title="Abrir el documento al lado para leer y citar"><Icono nombre="libro" tam={13} /><span class="solo-escritorio">Abrir documento</span></button>
     {/if}
-    <button class="icono-btn" aria-label="Cerrar lienzo de lectura" title="Volver al lienzo general (Esc)" onclick={cerrar}><Icono nombre="cerrar" tam={18} trazo={2} /></button>
+    <button class="btn chico volver" aria-label="Cerrar lienzo de lectura" title="Volver al lienzo general (Esc)" onclick={cerrar}><span class="flecha"><Icono nombre="chevron" tam={14} trazo={2.2} /></span>Lienzo general</button>
   </header>
 
   <div class="sub-cuerpo">
@@ -420,6 +420,7 @@
   .sub-cab { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--line); }
   .sub-cab .chip { flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; }
   .sub-cab .btn { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .volver .flecha { display: inline-flex; transform: scaleX(-1); }
   .sub-titulo { flex-grow: 1; min-width: 0; font: 600 15px var(--serif); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sub-titulo .suave { font: 400 13px var(--sans); }
   .buscar { width: 200px; padding: 6px 10px; font-size: 13px; }

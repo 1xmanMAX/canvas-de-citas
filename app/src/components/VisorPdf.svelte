@@ -59,6 +59,8 @@
       if (cargando) { error = m.mensaje; cargando = false }
     }
   }
+  // El hilo no llegó a cargar (sin conexión, sitio movido): avisar en vez de quedarse "Abriendo PDF…".
+  worker.onerror = () => { if (cargando) { error = 'No se pudo descargar el lector de PDF. Revisa la conexión a internet y vuelve a abrir el documento.'; cargando = false } }
   untrack(() => blob).arrayBuffer().then(buffer => worker.postMessage({ tipo: 'abrir', doc: docId, buffer }, [buffer]))
   onDestroy(() => {
     worker.terminate()

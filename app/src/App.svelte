@@ -18,13 +18,13 @@
   import { leerMeta } from './lib/store.svelte.js'
   import { B } from './lib/buscador.svelte.js'
   import Buscador from './components/Buscador.svelte'
+  import { atras, iniciarNavegacion, alCambiarRuta } from './lib/navegacion.js'
 
   // Rutas por hash: #/  ·  #/p/<id>  ·  #/p/<id>/f/<fuente>  ·  #/p/<id>/o/<objetivo>[/f/<fuente>]
   //                 #/p/<id>/l/<fuente> (lienzo de lectura de la fuente)[/f/<fuente>]
   //                 #/citas  ·  #/citas/<id>
   //                 #/doc/<fuente>[/<proyecto>] (ventana aparte con solo ese documento; lib/ventana-doc.js)
   let hash = $state(location.hash)
-  let navegaciones = 0
   const ruta = $derived.by(() => {
     const m = hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent)
     const tras = k => { const i = m.indexOf(k, 2); return i > 0 ? m[i + 1] || null : null }
@@ -33,11 +33,7 @@
     return { vista: 'proyectos' }
   })
 
-  /** Vuelve atrás dentro de la app; si se entró por un enlace directo, reemplaza la ruta. */
-  function atras(alternativa) {
-    if (navegaciones > 0) history.back()
-    else location.replace(alternativa)
-  }
+  iniciarNavegacion()
 
   let datos = $state(null) // null | { archivos }
   const abrirDatos = () => (datos = { archivos: null })
@@ -129,7 +125,7 @@
 </script>
 
 <svelte:window
-  onhashchange={() => { hash = location.hash; navegaciones++ }}
+  onhashchange={e => { alCambiarRuta(e.oldURL); hash = location.hash }}
   ondragover={e => e.preventDefault()}
   ondrop={soltar}
   onkeydown={teclas}

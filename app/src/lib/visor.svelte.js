@@ -6,6 +6,7 @@ import { asegurarTablero, idLocal, cajas } from './tarjetas.js'
 import { asegurarLectura } from './lecturas.js'
 import { autorCorto, anio } from './citas.js'
 import { enVentanaDoc, pedirAPrincipal } from './ventana-doc.js'
+import { reemplazar } from './navegacion.js'
 
 export const ACEPTADOS = /\.(pdf|html?|md|markdown|txt)$/i
 
@@ -90,7 +91,7 @@ export function abrirLecturaDelVisor(pid = V.proyectoId, fid = V.fuenteId) {
   if (enVentanaDoc()) return
   const r = rutaLectura(pid, fid)
   if (!r || location.hash === r) return
-  if (location.hash.startsWith(`#/p/${pid}`)) location.replace(r)
+  if (location.hash.startsWith(`#/p/${pid}`)) reemplazar(r)
   else location.hash = r
 }
 

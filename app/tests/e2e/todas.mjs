@@ -876,6 +876,26 @@ const SUITES = {
     return s
   },
 
+  // Si el lector de PDF no se puede descargar (sin conexión, sitio movido), se avisa: nunca "cargando" para siempre.
+  async pdfsinred(b) {
+    const s = suite('Visor de PDF sin poder descargar el lector'), pg = await pagina(b)
+    await pg.setBypassServiceWorker(true) // que el bloqueo de abajo alcance también lo que pediría el service worker
+    await conEjemplo(pg)
+    await adjuntar(pg, 'fuente_003', PDF)
+    await pg.setRequestInterception(true)
+    pg.on('request', r => (/VisorPdf|pdf.worker|pdfium/.test(r.url()) ? r.abort() : r.continue()))
+    pg.errores.length = 0
+    await clicTexto(pg, 'Abrir')
+    await s.paso('avisa que no pudo descargar el lector en vez de quedarse cargando', async () => {
+      // La primera falla recarga la app para buscar una versión nueva; si vuelve a fallar, avisa.
+      await esperar(2500)
+      if (!(await pg.$('.visor'))) { await pg.evaluate(() => (location.hash = '#/p/proyecto_001/f/fuente_003')); await esperar(800); await clicTexto(pg, 'Abrir') }
+      await pg.waitForFunction(() => /No se pudo descargar el lector/.test(document.querySelector(".v-cuerpo")?.textContent || ""), { timeout: 15000 }).catch(async e => { throw new Error((await pg.evaluate(() => location.hash + " | " + (document.querySelector(".v-cuerpo")?.innerHTML || "sin visor").slice(0, 300))) + " " + pg.errores.join(";")) })
+    })
+    await pg.browserContext().close().catch(() => {})
+    return s
+  },
+
   // Lienzo de lectura de cada fuente: las citas del PDF van a su propio tablero y la chincheta
   // las clava también en el lienzo general del proyecto.
   async lectura(b) {
@@ -964,6 +984,29 @@ const SUITES = {
       await contador.click(); await esperar(600)
       if (!/\/l\/fuente_0\d\d$/.test(await pg.evaluate(() => location.hash))) throw new Error('no abrió la lectura desde el contador (' + await antes + ')')
       if (await pg.$('dialog[open]')) throw new Error('abrió también la ficha de la fuente')
+    })
+    await s.paso('cerrar la lectura vuelve al lienzo general, no a Proyectos (también tras abrir el documento)', async () => {
+      const cerrar = async () => { await pg.click('button[aria-label="Cerrar lienzo de lectura"]'); await esperar(500); return pg.evaluate(() => location.hash) }
+      // Desde el contador del general
+      let h = await cerrar()
+      if (h !== '#/p/proyecto_001') throw new Error('contador → cerrar fue a ' + JSON.stringify(h))
+      // Entrando desde Proyectos: ficha → Abrir documento → lectura → cerrar
+      await pg.evaluate(() => (location.hash = '#/')); await esperar(400)
+      await pg.evaluate(() => (location.hash = '#/p/proyecto_001')); await esperar(600)
+      await pg.evaluate(() => (location.hash = '#/p/proyecto_001/f/fuente_003')); await esperar(600)
+      await clicTexto(pg, 'Abrir'); await pg.waitForSelector('.lectura-panel', { timeout: 10000 }); await esperar(400)
+      await pg.keyboard.press('Escape'); await esperar(300) // cierra el visor
+      h = await cerrar()
+      if (h !== '#/p/proyecto_001') throw new Error('documento → cerrar fue a ' + JSON.stringify(h))
+      // El botón "Lienzo de lectura" del visor (reemplaza la ruta del general)
+      await pg.evaluate(() => (location.hash = '#/p/proyecto_001/f/fuente_003')); await esperar(600)
+      await clicTexto(pg, 'Abrir'); await pg.waitForSelector('.lectura-panel', { timeout: 10000 }); await esperar(400)
+      h = await cerrar()
+      if (h !== '#/p/proyecto_001') throw new Error('con visor → cerrar fue a ' + JSON.stringify(h))
+      if (!(await pg.$('.visor'))) throw new Error('se cerró el visor')
+      await clicTexto(pg, 'Lienzo de lectura'); await pg.waitForSelector('.lectura-panel', { timeout: 5000 }); await esperar(300)
+      h = await cerrar()
+      if (h !== '#/p/proyecto_001') throw new Error('botón del visor → cerrar fue a ' + JSON.stringify(h))
     })
     if (pg.errores.length) s.fallas.push(...pg.errores)
     return s

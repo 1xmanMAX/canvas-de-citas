@@ -15,9 +15,14 @@
   import { autorCorto, anio } from '../lib/citas.js'
 
   // Lector de PDF propio (PDFium en un hilo aparte): se descarga la primera vez que se abre un PDF.
-  let VisorPdf = $state(null)
+  // Si no se puede descargar (sin conexión, sitio movido), se avisa en vez de quedarse cargando.
+  let VisorPdf = $state(null), falloPdf = $state(false)
   $effect(() => {
-    if (V.archivo?.tipo === 'pdf' && !VisorPdf) import('./VisorPdf.svelte').then(m => (VisorPdf = m.default))
+    if (V.archivo?.tipo === 'pdf' && !VisorPdf) {
+      falloPdf = false
+      // (si la app busca su versión nueva, el import puede volver sin módulo: también es un fallo)
+      import('./VisorPdf.svelte').then(m => { if (!m) throw new Error('sin módulo'); VisorPdf = m.default }).catch(() => (falloPdf = true))
+    }
   })
 
   const a = $derived(V.archivo)
@@ -177,7 +182,7 @@
         {#if VisorPdf}
           {#key a.url}<VisorPdf blob={a.blob} {marcas} destino={V.destino} onseleccion={(t, pag, rects) => { seleccion = t; seleccionPag = pag; seleccionRects = rects }} onrecorte={fotoDesdeRecorte} />{/key}
         {:else}
-          <p class="suave cargando">Cargando lector de PDF…</p>
+          <p class="suave cargando">{falloPdf ? 'No se pudo descargar el lector de PDF. Revisa la conexión a internet y vuelve a abrir el documento.' : 'Cargando lector de PDF…'}</p>
         {/if}
       {:else if a.tipo === 'html'}
         {#if srcdoc}
