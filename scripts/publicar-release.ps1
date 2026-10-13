@@ -27,7 +27,7 @@ $sumas = Join-Path $Archivos 'SHA256SUMS.txt'
 if (Test-Path $sumas) {
   foreach ($linea in Get-Content $sumas) {
     $hash, $nombre = $linea -split '\s+', 2
-    $real = (Get-FileHash (Join-Path $Archivos $nombre.Trim()) -Algorithm SHA256).Hash.ToLower()
+    $real = (Get-FileHash (Join-Path $Archivos $nombre.Trim().TrimStart('*')) -Algorithm SHA256).Hash.ToLower()
     if ($real -ne $hash) { Write-Error "La huella de $nombre no coincide: el archivo cambió."; exit 1 }
   }
   Write-Host 'Huellas SHA-256 correctas.'
