@@ -19,8 +19,8 @@ if ($LASTEXITCODE -ne 0) { Write-Error 'Inicia sesión en GitHub CLI con  gh aut
 
 $notas = Join-Path $raiz "docs\releases\$Version.md"
 if (-not (Test-Path $notas)) { Write-Error "No existen las notas $notas"; exit 1 }
-$lista = Get-ChildItem $Archivos -File | Where-Object { $_.Extension -in '.apk', '.zip' -or $_.Name -eq 'SHA256SUMS.txt' }
-if (-not $lista) { Write-Error "No hay .apk ni .zip en $Archivos"; exit 1 }
+$lista = Get-ChildItem $Archivos -File | Where-Object { $_.Extension -in '.apk', '.zip', '.exe' -or $_.Name -eq 'SHA256SUMS.txt' }
+if (-not $lista) { Write-Error "No hay .exe, .apk ni .zip en $Archivos"; exit 1 }
 
 # Comprobar las huellas antes de subir.
 $sumas = Join-Path $Archivos 'SHA256SUMS.txt'

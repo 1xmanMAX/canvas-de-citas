@@ -3,7 +3,7 @@ CANVAS DE CITAS PARA WINDOWS
 
 Instalar: doble clic en  Instalar.cmd
 
-  1. Se instala "Canvas de Citas" (su propia ventana; siempre abre la última versión publicada).
+  1. Se instala "Canvas de Citas" (su propia ventana, con la app incluida: funciona sin internet).
   2. La primera vez, tu carpeta de datos actual queda como la carpeta de tu proyecto.
   3. Acepta el permiso de administrador si Windows lo pide (es solo para el firewall).
   4. Al terminar tienes:

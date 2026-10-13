@@ -261,9 +261,17 @@ En **[Releases](https://github.com/1xmanMAX/canvas-de-citas/releases/latest)** e
 
 | Archivo | Para qué |
 |---|---|
-| `CanvasDeCitas-Windows-vX.Y.Z.zip` | **PC con Windows.** Descomprime y ejecuta `Instalar.cmd`: crea los accesos directos y deja lista la sincronización. Trae la app dentro: funciona sin internet |
-| `CanvasDeCitas-Android-vX.Y.Z.apk` | **Celular Android.** Se instala encima de la versión anterior sin perder nada |
+| `CanvasDeCitas-Instalar-Windows-vX.Y.Z.exe` | **PC con Windows.** Doble clic y listo: crea los accesos directos, deja lista la sincronización y se desinstala desde *Configuración → Aplicaciones*. Trae la app dentro: funciona sin internet |
+| `CanvasDeCitas-Android-vX.Y.Z.apk` | **Celular Android.** Ábrelo en el celular y toca *Instalar*; se instala encima de la versión anterior sin perder nada |
 | `CanvasDeCitas-web-vX.Y.Z.zip` | La app web, para servirla donde quieras |
+
+**Si Windows o Android avisan**
+
+- Windows (*Windows protegió su PC*): toca **Más información → Ejecutar de todas formas**. Aparece porque el
+  instalador no lleva firma de pago, no porque tenga algo malo; las huellas SHA-256 están en `SHA256SUMS.txt`.
+- Android (*Por tu seguridad…*): toca **Configuración** y activa **Permitir de esta fuente** para el navegador o
+  la app de Archivos con la que abriste el APK; luego vuelve atrás y toca **Instalar**. Si Play Protect pregunta,
+  elige **Instalar de todas formas**.
 
 **Primeros pasos**
 

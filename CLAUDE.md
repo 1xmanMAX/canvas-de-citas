@@ -72,8 +72,9 @@ la rama de trabajo: deja el cambio en una rama/PR y la publicación se hace desd
 
 ## Versiones oficiales (Releases)
 
-`scripts/empaquetar-release.sh vX.Y.Z` arma en `dist-release/` el instalador de Windows
-(`instalador-windows/` + `canvas-sincro.exe` compilado con mingw), el APK firmado (llave oficial
+`scripts/empaquetar-release.sh vX.Y.Z` arma en `dist-release/` el instalador de Windows de un solo
+archivo (`CanvasDeCitas-Instalar-Windows-vX.Y.Z.exe`: Inno Setup, `instalador-windows/canvas-de-citas.iss`, que
+envuelve `Instalar.ps1`/`Desinstalar.ps1`; `iscc` con `scoop install inno-setup`), el APK firmado (llave oficial
 en `android/android/firma.properties` + `.jks`, **nunca en git**) y el zip web. Desde la nube no
 se pueden crear releases: se publican en la PC de Max con `scripts/publicar-release.ps1`
 (GitHub CLI), con notas en `docs/releases/vX.Y.Z.md`. Sube `versionName`/`versionCode` en
